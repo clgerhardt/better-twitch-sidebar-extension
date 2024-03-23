@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "testing-bttv-ext",
+  "description": "testing-this-package",
+  "options_ui": {
+    "page": "src/pages/options/index.html"
+  },
+  "background": {
+    "service_worker": "src/pages/background/index.ts",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "src/pages/popup/index.html",
+    "default_icon": "public/dev-icon-32.png"
+  },
+  "icons": {
+    "128": "icon-128.png"
+  },
+  "permissions": [
+    "tabs",
+    "bookmarks",
+    "storage",
+    "identity",
+    "cookies",
+    "activeTab",
+    "unlimitedStorage"
+  ],
+  "host_permissions": [
+    "https://*.twitch.tv/*",
+    "https://*/*",
+    "http://*/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://*.twitch.tv/*"],
+      "js": [
+        "src/pages/content/index.tsx"
+      ],
+      "css": [
+        "contentStyle.css"
+      ]
+    }
+  ],
+  "devtools_page": "src/pages/devtools/index.html",
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "contentStyle.css",
+        "icon-128.png",
+        "icon-32.png"
+      ],
+      "matches": []
+    }
+  ]
+}
