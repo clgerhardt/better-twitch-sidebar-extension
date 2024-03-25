@@ -1,5 +1,7 @@
 import { constants } from "../utils/constants";
 import { messageLogger } from "../utils/logger";
+import { followerDataV1 } from "../mock/followers_data_v1";
+import { followerDataV2 } from "../mock/followers_data_v2";
 
 export const getSyncStorage = async (key: string) => {
   return new Promise((resolve, reject) => {
@@ -24,7 +26,7 @@ export const getLocalStorage = (key: string) => {
     chrome.storage.local.get([key], (result) => {
       messageLogger(constants.location.STORAGE, "getLocalStorage", result[key])
       if(result[key])
-        resolve(result[key]);
+        import.meta.env.VITE_USE_MOCK ? resolve(getMockStorage()) : resolve(result[key]);
       else
         reject("cannot get value from local storage");
     });
@@ -53,3 +55,18 @@ export const attachStorageListener = () => {
     }
   });
 };
+
+const getMockStorage = () => {
+  let mockedValue;
+  switch(import.meta.env.VITE_MOCK_FILE) {
+    case "v2":
+      mockedValue = followerDataV2;
+      break;
+    case "v1":
+    default:
+      mockedValue = followerDataV1;
+      break;
+  }
+  console.log("mockedValue", mockedValue)
+  return mockedValue;
+}

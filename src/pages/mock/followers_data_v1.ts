@@ -1,4 +1,4 @@
-{
+export const followerDataV1 = {
   "default": {
     "order": 0,
     "items": [
