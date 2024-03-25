@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import UserGreeting from "./UserGreeting/UserGreeting";
 import GuestGreeting from "./GuestGreeting/GuestGreeting";
+import { messageLogger } from "../utils/logger";
+import { constants } from "../utils/constants";
 
 const Popup = () => {
   const [userSession, setUserSession] = useState({} as any);
@@ -21,7 +23,7 @@ const Popup = () => {
     };
     initSession();
   }, []);
-  console.log(userSession);
+  messageLogger(constants.location.POPUP, "userSession", userSession);
   return (
     <div id="main-container">
       {userSession?.user ? (

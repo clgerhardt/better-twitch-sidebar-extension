@@ -9,34 +9,33 @@ import {
 } from "react-accessible-accordion";
 import "react-accessible-accordion/dist/fancy-example.css";
 import { PlusCircleIcon, MinusCircleIcon } from "@heroicons/react/24/solid";
+import { messageLogger } from "../utils/logger";
+import { constants } from "../utils/constants";
+import { getLocalStorage } from "../background/storage";
 
 const port = chrome.runtime.connect({ name: "content-script" });
 let followersDOMNode: HTMLElement;
-let expandedSidebarBtnState: boolean = false;
+let expandedSidebarBtnState = false;
 
-var observer = new MutationObserver((mutationsList) => {
-  for (var mutation of mutationsList) {
-    // console.log(mutation);
+const observer = new MutationObserver((mutationsList) => {
+  for (const mutation of mutationsList) {
+    // messageLogger(constants.location.CONTENT_SCRIPT, "mutation", mutation);
     if (mutation.type === "childList" && mutation.addedNodes.length === 1) {
-      let addedNode = mutation.addedNodes[0] as HTMLElement;
+      const addedNode = mutation.addedNodes[0] as HTMLElement;
       if (addedNode.ariaLabel === "Followed Channels") {
-        // console.log(mutation);
         followersDOMNode = mutation.addedNodes[0] as HTMLElement;
         hideFollowedChannelsSideNav(mutation.addedNodes[0]);
         port.postMessage({ message: "SYS:Followers:FOLLOWED_CHANNELS_LOADED" });
       }
     }
-    // aria-label="Collapse Side Nav"
     if (
       mutation.type === "attributes" &&
       mutation.attributeName === "aria-label"
     ) {
-      console.log("mutation", mutation)
-      let expandedSidebarBtn = mutation.target as HTMLElement;
+      const expandedSidebarBtn = mutation.target as HTMLElement;
       if(expandedSidebarBtn.ariaLabel === "Expand Side Nav") {
         expandedSidebarBtnState = true;
       } else {
-        // console.log("mutation expanded", mutation)
         expandedSidebarBtnState = false;
       }
       renderToUI();
@@ -62,7 +61,7 @@ const hideFollowedChannelsSideNav = (node: any) => {
 async function waitUntil() {
   return await new Promise((resolve) => {
     const interval = setInterval(() => {
-      let showMoreBtn = document.querySelector('[data-a-target="side-nav-show-more-button"]');
+      const showMoreBtn = document.querySelector('[data-a-target="side-nav-show-more-button"]');
       if (showMoreBtn) {
         (document.querySelector('[data-a-target="side-nav-show-more-button"]') as HTMLElement).click();
       } else {
@@ -74,7 +73,7 @@ async function waitUntil() {
 }
 
 const parseFollowersHTML = async () => {
-  let expandBtn = document.querySelector('[data-a-target="side-nav-arrow"]');
+  const expandBtn = document.querySelector('[data-a-target="side-nav-arrow"]');
   let hadToExpandSideBar = false;
   if (expandBtn?.ariaLabel === "Expand Side Nav") {
     (expandBtn as HTMLElement).click();
@@ -86,8 +85,8 @@ const parseFollowersHTML = async () => {
     console.log("clicking show more is done");
   }
 
-  let followerCards = followersDOMNode.querySelectorAll("[data-a-id]");
-  let followerData: any = [];
+  const followerCards = followersDOMNode.querySelectorAll("[data-a-id]");
+  const followerData: any = [];
 
   followerCards.forEach((item: any) => {
     const imageNode = item.querySelector("img");
@@ -111,21 +110,25 @@ const parseFollowersHTML = async () => {
   if (hadToExpandSideBar) {
     (expandBtn as HTMLElement).click();
   }
-  console.log("contentScripts - followersData", followerData);
+  messageLogger(constants.location.CONTENT_SCRIPT, "followersData", followerData);
   port.postMessage({
     message: "SYS:Followers:FOLLOWED_CHANNELS_PARSED",
     data: followerData,
-    // sideBarIsExpanded: !hadToExpandSideBar
   });
 };
 
-const renderToUI = () => {
-  const data = getFromLocal();
+const renderToUI = async () => {
+  const followedChannels = await getLocalStorage(constants.storage.localStorageKey).then((d: any) => {
+    return d || {};
+  }).catch((e: any) => {
+    messageLogger(constants.location.CONTENT_SCRIPT, "error", e);
+  });
+
   const recommendedFollowers = document.querySelector(
-    '[aria-label="Recommended Channels"]'
+    constants.htmlSearchStrings.ARIA_LABEL_RECOMMENDED_CHANNELS
   ) as HTMLElement;
   const parentDiv = recommendedFollowers.parentNode;
-  let rootFound = document.querySelector("#__root") as HTMLElement;
+  const rootFound = document.querySelector("#__root") as HTMLElement;
   if (!rootFound) {
     const newMainDiv = document.createElement("div");
     newMainDiv.id = "__root";
@@ -148,13 +151,12 @@ const renderToUI = () => {
   const root = createRoot(rootContainer);
 
   const handleChannelClick = (channelLink: string) => {
-    console.log("channelLink", channelLink);
     document.location = channelLink;
   };
   root.render(
     <div className="overflow-y-auto" style={{ height: "60vh" }}>
       <Accordion allowZeroExpanded>
-        {Object.keys(data)?.map((group: string) => (
+        {Object.keys(followedChannels)?.map((group: string) => (
           <AccordionItem key={group}>
             <AccordionItemHeading
               id="expanded-side-bar-title"
@@ -178,9 +180,9 @@ const renderToUI = () => {
             <AccordionItemPanel className="p-1">
               <div data-testid="group-container" className="m-2">
                 <ul role="list" className="divide-y divide-gray-100 p-2">
-                  {data[group].items.map((channel: any) => (
-                    <div className="has-tooltip">
-                      <div className="py-0.5 hover:bg-slate-500 cursor-pointer" onClick={() => handleChannelClick(channel.channelLink)} dangerouslySetInnerHTML={{__html: `<div class=\"flex\">${channel.expandedHTML}</div>`}}/>
+                  {followedChannels[group].items.map((channel: any) => (
+                    <div key={channel.channelName} className="has-tooltip">
+                      <div className="py-0.5 hover:bg-slate-500 cursor-pointer" onClick={() => handleChannelClick(channel.channelLink)} dangerouslySetInnerHTML={{__html: `<div class="flex">${channel.expandedHTML}</div>`}}/>
                     </div>
                   ))}
                 </ul>
@@ -194,41 +196,22 @@ const renderToUI = () => {
   );
 };
 
-function storeInLocal(data: any) {
-    window.localStorage.setItem('betterTwitchSidebar', JSON.stringify(data));
-    port.postMessage({message: "SYS:Followers:STORED_IN_LOCAL"});
-}
-
-const getFromLocal = () => {
-  const betterTwitchSidebarData = window.localStorage.getItem(
-    "betterTwitchSidebar"
-  );
-  return betterTwitchSidebarData != "undefined"
-    ? JSON.parse(betterTwitchSidebarData ?? "")
-    : null;
-};
-
 port.onMessage.addListener((response) => {
-  console.log("content script - posted message: ", response);
+  messageLogger(constants.location.CONTENT_SCRIPT, "posted message", response.data);
   switch (response.message) {
     case "SYS:Followers:PARSE_FOLLOWED_CHANNELS_HTML":
       parseFollowersHTML();
-      break;
-    case "SYS:Followers:STORE_IN_LOCAL":
-      storeInLocal(response.data)
-      // window.localStorage.setItem('betterTwitchSidebar', JSON.stringify(response.data));
-      // port.postMessage({ message: "SYS:Followers:STORED_IN_LOCAL" });
       break;
     case "SYS:UI:RenderFollowersInSideBar":
       renderToUI();
       break;
     default:
-    // console.log("no action found");
+      messageLogger(constants.location.CONTENT_SCRIPT, "no action found", response)
   }
 });
 
 try {
-  console.log("TESTING - content script loaded");
+  messageLogger(constants.location.CONTENT_SCRIPT, "content script loaded");
 } catch (e) {
-  console.error(e);
+  messageLogger(constants.location.CONTENT_SCRIPT, "error", e);
 }
