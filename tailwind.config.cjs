@@ -4,6 +4,11 @@ module.exports = {
     extend: {
       animation: {
         'spin-slow': 'spin 20s linear infinite',
+      },
+      colors: {
+        'custom-twitch': {
+          'light-gray': '#26262c',
+        }
       }
     },
   },

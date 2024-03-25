@@ -177,12 +177,12 @@ const renderToUI = async () => {
                 {expandedSidebarBtnState && <MinusCircleIcon className="h-10 w-10 text-blue-500" />}
               </AccordionItemButton>
             </AccordionItemHeading>
-            <AccordionItemPanel className="p-1">
-              <div data-testid="group-container" className="m-2">
-                <ul role="list" className="divide-y divide-gray-100 p-2">
+            <AccordionItemPanel className="p-0 pt-1">
+              <div data-testid="group-container">
+                <ul role="list" className="divide-y divide-gray-100">
                   {followedChannels[group].items.map((channel: any) => (
-                    <div key={channel.channelName} className="has-tooltip">
-                      <div className="py-0.5 hover:bg-slate-500 cursor-pointer" onClick={() => handleChannelClick(channel.channelLink)} dangerouslySetInnerHTML={{__html: `<div class="flex">${channel.expandedHTML}</div>`}}/>
+                    <div key={channel.channelName} className="has-tooltip hover:bg-custom-twitch-light-gray p-2">
+                      <div className="py-0.5 cursor-pointer" onClick={() => handleChannelClick(channel.channelLink)} dangerouslySetInnerHTML={{__html: `<div class="flex">${channel.expandedHTML}</div>`}}/>
                     </div>
                   ))}
                 </ul>
