@@ -7,20 +7,17 @@
 ## Table of Contents
 
 - [Intro](#intro)
-- [Why another boilerplate?](#why)
 - [Features](#features)
 - [Usage](#usage)
   - [Setup](#setup) 
 - [Tech Docs](#tech)
-- [Credit](#credit)
 - [Contributing](#contributing)
 
 
 ## Intro <a name="intro"></a>
-This boilerplate is meant to be a minimal quick start for creating chrome extensions using React, Typescript and Tailwind CSS.
+I've always disliked the existing Twitch sidebar for viewing the channels you follow. It seems to promote the higher viewed channels and with a more recent addition "recommended channels" which i believe only shows recently watched channels...
 
-Built for:
-> For improved DX and rapid building vite and nodemon are used.
+The goal of this project is to provide a more user friendly means of viewing your followed channels. This includes allowing for the ability to manage groups of followed channels, move channels around and add/delete groups, and more to come.
 
 > Chrome does not accept manifest v2 extensions since Jan 2022, therefore this template uses manifest v3.
 
@@ -31,15 +28,6 @@ Built for:
 
 As soon as Firefox supports manifest v3, support will be added in this repo as well.
 
-Oh by the way ... I also implemented a chrome local/sync storage hook for react, which works well with this 
-template. [Check it out here](https://gist.github.com/JohnBra/c81451ea7bc9e77f8021beb4f198ab96).
-
-## Why another boilerplate? <a name="why"></a>
-I have used webpack react boilerplates and found it too hard to configure.
-
-Vite is mega easy to understand which makes it easier to get into and to maintain for others.
-
-I couldn't find another minimal boilerplate for React, TypeScript and Tailwind CSS. So here it is.
 
 ## Features <a name="features"></a>
 - [React 18](https://reactjs.org/)
@@ -64,23 +52,11 @@ I couldn't find another minimal boilerplate for React, TypeScript and Tailwind C
    5. Select - `dist` folder in this project (after dev or build)
 6. If you want to build in production, Just run `yarn build` or `npm run build`.
 
-### Customization
-The template includes **all** of the Chrome extension pages. You will likely have to customize it to fit your needs.
+Testing:
+1. `yarn test` or `npm run test`
+2. `yarn coverage` or `npm run coverage`
 
-E.g. you don't want the newtab page to activate whenever you open a new tab:
-1. remove the directory `newtab` and its contents in `src/pages`
-2. remove `chrome_url_overrides: { newtab: 'src/pages/newtab/index.html' },` in `manifest.json`
-
-If you need to declare extra HTML pages beyond those the manifest accommodates, place them in the Vite config under build.rollupOptions.input.
-
-This example includes a welcome page to open when the user installs the extension.
-
-CSS files in the `src/pages/*` directories are not necessary. They are left in there in case you want 
-to use it in combination with Tailwind CSS. **Feel free to delete them**.
-
-Tailwind can be configured as usual in the `tailwind.config.cjs` file. See doc link below.
-
-### Publish your extension
+### Publishing
 To upload an extension to the Chrome store you have to pack (zip) it and then upload it to your item in entry 
 in the Chrome Web Store.
 
@@ -102,10 +78,6 @@ To run the workflow do the following:
 - [Rollup](https://rollupjs.org/guide/en/)
 - [@crxjs/vite-plugin](https://crxjs.dev/vite-plugin)
 - [Tailwind CSS](https://tailwindcss.com/docs/configuration)
-
-# Credit <a name="credit"></a>
-Heavily inspired by [Jonghakseo's vite chrome extension boilerplate](https://github.com/Jonghakseo/chrome-extension-boilerplate-react-vite). 
-It uses SASS instead of TailwindCSS if you want to check it out.
 
 # Contributing <a name="contributing"></a>
 Feel free to open PRs or raise issues!
