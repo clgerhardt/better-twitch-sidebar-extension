@@ -1,12 +1,42 @@
 import react from '@vitejs/plugin-react-swc';
 import { resolve } from 'path';
 import fs from 'fs';
+/// <reference types="vitest" />
 import { defineConfig } from 'vite';
+import { configDefaults, type UserConfig as VitestUserConfigInterface } from 'vitest/config';
 import { crx, ManifestV3Export } from '@crxjs/vite-plugin';
 
 import manifest from './manifest.json';
 import devManifest from './manifest.dev.json';
 import pkg from './package.json';
+
+
+const vitestConfig: VitestUserConfigInterface = {
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: './tests-setup.ts',
+    coverage: {
+      provider: 'istanbul',
+      exclude: [
+        ...configDefaults.exclude,
+        'src/global.d.ts',
+        'src/vite-env.d.ts',
+        'src/pages/mock/**',
+        'src/assets/**',
+        'src/pages/background/**',
+        'src/pages/content/index.tsx',
+        '**tailwind.config.cjs',
+        '**postcss.config.cjs',
+        'src/pages/newtab/**',
+        'src/pages/options/**',
+        'src/pages/devtools/**',
+        'src/pages/panel/**',
+      ]
+    }
+  }
+};
+
 
 const root = resolve(__dirname, 'src');
 const pagesDir = resolve(root, 'pages');
@@ -38,11 +68,12 @@ function stripDevIcons (apply: boolean) {
       fs.rm(resolve(outDir, 'dev-icon-128.png'), () => console.log(`Deleted dev-icon-128.png frm prod build`))
       fs.rm(resolve(outDir, 'followers_data_v1.ts'), () => console.log(`Deleted followers_data_v1.ts frm prod build`))
       fs.rm(resolve(outDir, 'followers_data_v2.ts'), () => console.log(`Deleted followers_data_v2.ts frm prod build`))
+      fs.rm(resolve(outDir, 'followers_data_v3.ts'), () => console.log(`Deleted followers_data_v3.ts frm prod build`))
     }
   }
 }
 
-export default defineConfig({
+export default defineConfig(() => ({
   resolve: {
     alias: {
       '@src': root,
@@ -60,10 +91,11 @@ export default defineConfig({
     }),
     stripDevIcons(isDev)
   ],
+  test: vitestConfig.test,
   publicDir,
   build: {
     outDir,
     sourcemap: isDev,
     emptyOutDir: !isDev
-  },
-});
+  }
+}));

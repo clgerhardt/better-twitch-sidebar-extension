@@ -1,3 +1,4 @@
+import { Group } from "../models/Group";
 import { constants } from "../utils/constants";
 import { messageLogger } from "../utils/logger";
 import { attachStorageListener, setLocalStorage } from "./storage";
@@ -10,10 +11,27 @@ chrome.runtime.onInstalled.addListener(() => {
 })
 
 const initFollowersData = (data: any) => {
+    const group: Group = {
+        default: true,
+        order: 0,
+        groupName: "Default",
+        numberOfChannels: 0,
+        numberOfLiveChannels: 0,
+        dialogOpen: false,
+        dropdownVisible: false,
+        followedChannels: []
+    };
     if(data) {
-        return {default: { order: 0, items: [...data]}};
+        // return {default: { order: 0, items: [...data]}};
+        group.followedChannels = data;
+        return [
+            group
+        ] as Group[];
     } else {
-       return {default: { order: 0, items: []}};
+        //    return {default: { order: 0, items: []}};
+       return [
+        group
+        ] as Group[];
     }
 };
 
@@ -26,7 +44,10 @@ chrome.runtime.onConnect.addListener((port) => {
                     port.postMessage({message: "SYS:Followers:PARSE_FOLLOWED_CHANNELS_HTML"});
                     break;
                 case "SYS:Followers:FOLLOWED_CHANNELS_PARSED":
-                    setLocalStorage(constants.storage.localStorageKey, initFollowersData(response.data))
+                    if(import.meta.env.VITE_USE_MOCK)
+                        chrome.storage.local.remove(constants.storage.localStorageKey);
+                    if(!import.meta.env.VITE_USE_MOCK)
+                        setLocalStorage(constants.storage.localStorageKey, initFollowersData(response.data))
                     port.postMessage({message: "SYS:Followers:RenderFollowersInSideBar"});
                     break;
                 default:
