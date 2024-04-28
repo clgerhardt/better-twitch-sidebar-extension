@@ -9,6 +9,7 @@
 - [Intro](#intro)
 - [Preview](#preview)
 - [Features](#features)
+  - [Timeline](#timeline)
 - [Usage](#usage)
   - [Setup](#setup) 
 - [Tech Docs](#tech)
@@ -50,6 +51,24 @@ https://github.com/clgerhardt/better-twitch-sidebar-extension/assets/22062735/eb
 - [ESLint](https://eslint.org/)
 - [Chrome Extension Manifest Version 3](https://developer.chrome.com/docs/extensions/mv3/intro/)
 - [Github Action](https://github.com/JohnBra/vite-web-extension/actions/workflows/ci.yml) to build and zip your extension (manual trigger)
+
+### Timeline <a name="timeline"></a>
+
+```mermaid
+timeline
+    title Better Twitch Sidebar
+    MVP
+         : Group Manager
+         : Add Group
+         : Delete group
+         : Update group name
+         : Move channels to other groups
+         : Auto update channel HTML on changes
+         : Update channels list based on follow btn being clicked
+         : Re-Sync functionality for any channel follows 
+    Future plans 
+         : Color themes for sidebar
+```
 
 ## Usage <a name="usage"></a>
 
