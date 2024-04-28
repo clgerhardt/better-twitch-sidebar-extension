@@ -1,6 +1,7 @@
 export const constants = {
   location: {
     CONTENT_SCRIPT: 'content_script',
+    UI_COMPONENT: 'ui_component',
     BACKGROUND: 'background',
     POPUP: 'popup',
     STORAGE: 'storage',

@@ -1,17 +1,13 @@
 import { createRoot } from "react-dom/client";
 import "./style.css";
-import {
-  Accordion,
-  AccordionItem,
-  AccordionItemButton,
-  AccordionItemHeading,
-  AccordionItemPanel,
-} from "react-accessible-accordion";
 import "react-accessible-accordion/dist/fancy-example.css";
-import { PlusCircleIcon, MinusCircleIcon } from "@heroicons/react/24/solid";
+
 import { messageLogger } from "../utils/logger";
 import { constants } from "../utils/constants";
 import { getLocalStorage } from "../background/storage";
+import AccordianChannels from "./components/accordian-channels/AccordianChannels";
+import ManageGroups from "./components/manage-groups-cta/ManageGroupsCta";
+
 
 const port = chrome.runtime.connect({ name: "content-script" });
 let followersDOMNode: HTMLElement;
@@ -98,12 +94,12 @@ const parseFollowersHTML = async () => {
       channelLink: `https://twitch.tv${item.getAttribute("href")}`,
       channelImage: imageNode?.src,
       isLive: liveStatus.length > 0,
-      viewerCount: liveStatus.length > 0 ? liveStatus[1].innerHTML : null,
+      viewerCount: liveStatus.length > 0 ? liveStatus[1].innerHTML : "",
       streamingContent:
         liveStatus.length > 0
           ? item?.querySelector('[data-a-target="side-nav-game-title"] p')
               ?.innerHTML
-          : null,
+          : "",
       expandedHTML: item.innerHTML
     });
   });
@@ -128,71 +124,33 @@ const renderToUI = async () => {
     constants.htmlSearchStrings.ARIA_LABEL_RECOMMENDED_CHANNELS
   ) as HTMLElement;
   const parentDiv = recommendedFollowers.parentNode;
+
   const rootFound = document.querySelector("#__root") as HTMLElement;
+  const manageGroupsRootFound = document.querySelector("#__manage-groups-root") as HTMLElement;
   if (!rootFound) {
     const newMainDiv = document.createElement("div");
     newMainDiv.id = "__root";
-    // data?.default?.items?.forEach((follower: any) => {
-    //   let followerDiv = document.createElement("div");
-    //   let p = document.createElement("p");
-    //   p.classList.add("text-purple-500");
-    //   p.innerText = follower.channelName;
-    //   followerDiv.appendChild(p);
-    //   newMainDiv.appendChild(followerDiv);
-    // });
-    // let sideNavDiv = document.querySelector(
-    //   '[data-test-selector="side-nav"]'
-    // ) as HTMLElement;
-    // sideNavDiv?.classList.add("peer");
+    parentDiv?.insertBefore(newMainDiv, recommendedFollowers);
+  }
+  if(!manageGroupsRootFound) {
+    const newMainDiv = document.createElement("div");
+    newMainDiv.id = "__manage-groups-root";
+    newMainDiv.style.height = "3.5rem";
     parentDiv?.insertBefore(newMainDiv, recommendedFollowers);
   }
   const rootContainer = document.querySelector("#__root");
   if (!rootContainer) throw new Error("Can't find Options root element");
-  const root = createRoot(rootContainer);
+  const manageGroupsContainer = document.querySelector("#__manage-groups-root");
+  if(!manageGroupsContainer) throw new Error("Can't find Manage Groups root element");
 
-  const handleChannelClick = (channelLink: string) => {
-    document.location = channelLink;
-  };
+  const root = createRoot(rootContainer);
+  const manageGroupsRoot = createRoot(manageGroupsContainer);
+
   root.render(
-    <div className="overflow-y-auto" style={{ height: "60vh" }}>
-      <Accordion allowZeroExpanded>
-        {Object.keys(followedChannels)?.map((group: string) => (
-          <AccordionItem key={group}>
-            <AccordionItemHeading
-              id="expanded-side-bar-title"
-              className="text-2xl mt-3"
-            >
-              <AccordionItemButton className="p-4 rounded-3xl text-left w-full cursor-pointer bg-slate-700">
-                {!expandedSidebarBtnState &&
-                <div
-                  id="expanded-side-bar-heading"
-                  className="grid grid-cols-3 gap-2"
-                >
-                    <div className="col-start-1 col-end-4">{group}</div>
-                    <div className="col-end-5">
-                      <PlusCircleIcon className="h-10 w-10 text-blue-500" />
-                    </div>
-                </div>
-                }
-                {expandedSidebarBtnState && <MinusCircleIcon className="h-10 w-10 text-blue-500" />}
-              </AccordionItemButton>
-            </AccordionItemHeading>
-            <AccordionItemPanel className="p-0 pt-1">
-              <div data-testid="group-container">
-                <ul role="list" className="divide-y divide-gray-100">
-                  {followedChannels[group].items.map((channel: any) => (
-                    <div key={channel.channelName} className="has-tooltip hover:bg-custom-twitch-light-gray p-2">
-                      <div className="py-0.5 cursor-pointer" onClick={() => handleChannelClick(channel.channelLink)} dangerouslySetInnerHTML={{__html: `<div class="flex">${channel.expandedHTML}</div>`}}/>
-                    </div>
-                  ))}
-                </ul>
-                <span className='mainbody-tooltip translate-x-40 rounded shadow-lg p-1 bg-gray-100 text-red-500'>Some Nice Tooltip Text</span>
-              </div>
-            </AccordionItemPanel>
-          </AccordionItem>
-        ))}
-      </Accordion>
-    </div>
+    <AccordianChannels expandedSidebarBtnState={expandedSidebarBtnState}/>
+  );
+  manageGroupsRoot.render(
+    <ManageGroups />
   );
 };
 
@@ -212,6 +170,11 @@ port.onMessage.addListener((response) => {
 
 try {
   messageLogger(constants.location.CONTENT_SCRIPT, "content script loaded");
+  const isDark = document.querySelector(".tw-root--theme-dark");
+  if (isDark) {
+    messageLogger(constants.location.CONTENT_SCRIPT, "dark mode detected");
+    isDark.classList.add("dark");
+  }
 } catch (e) {
   messageLogger(constants.location.CONTENT_SCRIPT, "error", e);
 }
