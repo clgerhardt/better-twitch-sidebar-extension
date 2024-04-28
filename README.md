@@ -7,6 +7,7 @@
 ## Table of Contents
 
 - [Intro](#intro)
+- [Preview](#preview)
 - [Features](#features)
 - [Usage](#usage)
   - [Setup](#setup) 
@@ -27,6 +28,19 @@ The goal of this project is to provide a more user friendly means of viewing you
 * Read more about Firefox Manifest v3 support [here](https://discourse.mozilla.org/t/manifest-v3/94564).
 
 As soon as Firefox supports manifest v3, support will be added in this repo as well.
+
+
+## Preview <a name="preview"></a>
+
+
+Current Twitch Sidebar
+
+https://github.com/clgerhardt/better-twitch-sidebar-extension/assets/22062735/13ff32b8-be18-4114-b4c3-b7d5046a05c3
+
+
+Better Twitch Sidebar!🥳
+
+https://github.com/clgerhardt/better-twitch-sidebar-extension/assets/22062735/ebdfef1a-7c7c-455b-b7fd-7a97a73c7480
 
 
 ## Features <a name="features"></a>
