@@ -73,8 +73,7 @@ timeline
 ## Usage <a name="usage"></a>
 
 ### Setup <a name="setup"></a>
-1. Clone this repository｀
-2. Change `name` and `description` in `manifest.json`
+1. Clone this repository
 3. Run `yarn` or `npm i` (check your node version >= 16)
 4. Run `yarn dev` or `npm run dev`
 5. Load Extension in Chrome
@@ -88,6 +87,21 @@ timeline
 Testing:
 1. `yarn test` or `npm run test`
 2. `yarn coverage` or `npm run coverage`
+
+Additional Notes For Running:
+
+`.env` configurations
+if you don't have one already - add `.env` file to the root of the project
+
+Currently there are 3 env properties:
+- VITE_LOGGER_LEVEL: string
+  - e.g., "debug"
+- VITE_USE_MOCK: boolean
+  - true or false
+- VITE_MOCK_FILE: string - required if VITE_USE_MOCK is true
+  - version of mock corresponding to end of file name for mocks in /src/pages/mock
+  - e.g., "v2"
+
 
 ### Publishing
 To upload an extension to the Chrome store you have to pack (zip) it and then upload it to your item in entry 
