@@ -1,10 +1,16 @@
 import { Group } from "@src/pages/models/Group";
 import { constants } from "@src/pages/utils/constants";
 import { messageLogger } from "@src/pages/utils/logger";
-import { ChangeEvent, FormEvent, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { AddGroupProps, ErrorState } from "./AddGroupModels";
+import { setLocalStorage } from "@src/pages/background/storage";
+import { group } from "console";
 
-const AddGroup = ({ groups, updateFollowersList }: AddGroupProps) => {
+const getGroupNames = (followedChannels: Array<Group>) => {
+  return followedChannels.map((g: Group) => g.groupName.toLowerCase());
+};
+
+const AddGroup = ({ groups }: AddGroupProps) => {
   const [addGroupInput, setAddGroupInput] = useState("");
   const [errors, setErrors] = useState<ErrorState>({
     invalid: true,
@@ -12,6 +18,9 @@ const AddGroup = ({ groups, updateFollowersList }: AddGroupProps) => {
     overCharacterLimit: false,
     errorMessages: ["Group name cannot be blank"],
   });
+  const [groupNames, setGroupNames] = useState(getGroupNames(groups) || []);
+
+  useEffect(() => setGroupNames(getGroupNames(groups)), [groups])
 
   const addGroupToFollowedChannels = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -26,11 +35,13 @@ const AddGroup = ({ groups, updateFollowersList }: AddGroupProps) => {
       dialogOpen: false,
       dropdownVisible: false
     };
-    updateFollowersList(groupToAdd);
+    groups.push(groupToAdd);
+    setLocalStorage(constants.storage.localStorageKey, groups);
     setAddGroupInput("");
   };
 
   const handleInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    console.log("handleInputChange", groups, groupNames);
     const groupName = event.target.value;
     if (groupName.length === 0) {
       setErrors({
@@ -47,7 +58,7 @@ const AddGroup = ({ groups, updateFollowersList }: AddGroupProps) => {
         overCharacterLimit: true,
         errorMessages: ["Group name cannot be over 15 characters"],
       });
-    } else if (groups.includes(groupName.toLowerCase())) {
+    } else if (groupNames.includes(groupName.toLowerCase())) {
       setErrors({
         ...errors,
         invalid: true,

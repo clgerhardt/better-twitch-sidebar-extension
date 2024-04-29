@@ -16,5 +16,4 @@ export interface ManageGroupsDialogProps {
     open: boolean;
     setOpen: (open: boolean)=>void;
     followedChannels: Group[];
-    refreshFollowersData: ()=>void;
 }
