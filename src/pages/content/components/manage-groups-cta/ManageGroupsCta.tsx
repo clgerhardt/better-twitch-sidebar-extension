@@ -44,11 +44,13 @@ const ManageGroupsCTA = () => {
     };
   }, []);
 
-  const refreshFollowersData = () => {
-    getFollowedChannels().then((d: any) => {
-      setFollowedChannels(d);
-    });
-  }
+  chrome.storage.onChanged.addListener((changes) => {
+    for (const [key, { newValue }] of Object.entries(changes)) {
+      if(key === constants.storage.localStorageKey) {
+        setFollowedChannels(newValue);
+      }
+    }
+  });
 
   return (
     <div className="m-1">
@@ -61,7 +63,7 @@ const ManageGroupsCTA = () => {
           <span className="relative invisible">Manage Groups</span>
         </button>
       </div>
-      <ManageGroupsDialog open={openDialog} setOpen={setOpenDialog} followedChannels={followedChannels} refreshFollowersData={refreshFollowersData}/>
+      <ManageGroupsDialog open={openDialog} setOpen={setOpenDialog} followedChannels={followedChannels} />
     </div>
   );
 };

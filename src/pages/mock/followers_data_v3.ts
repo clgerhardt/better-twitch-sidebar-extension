@@ -751,7 +751,8 @@ export const followerDataV3 = [
       ],
       "groupName": "default",
       "order": 0,
-      "numberOfChannels": 83
+      "numberOfChannels": 83,
+      "default": true
   },
   {
       "followedChannels": [
@@ -803,7 +804,8 @@ export const followerDataV3 = [
       ],
       "groupName": "EFT",
       "order": 1,
-      "numberOfChannels": 5
+      "numberOfChannels": 5,
+      "default": false
   },
   {
       "followedChannels": [
@@ -882,7 +884,8 @@ export const followerDataV3 = [
       ],
       "groupName": "Risk of racers",
       "order": 2,
-      "numberOfChannels": 8
+      "numberOfChannels": 8,
+      "default": false
   },
   {
       "followedChannels": [
@@ -916,7 +919,8 @@ export const followerDataV3 = [
       ],
       "groupName": "Coding/Game Dev",
       "order": 3,
-      "numberOfChannels": 3
+      "numberOfChannels": 3,
+      "default": false
   },
   {
       "followedChannels": [
@@ -932,7 +936,8 @@ export const followerDataV3 = [
       ],
       "groupName": "Warframe",
       "order": 4,
-      "numberOfChannels": 1
+      "numberOfChannels": 1,
+      "default": false
   },
   {
       "groupName": "testing",

@@ -1,29 +1,15 @@
 import { Fragment, useRef } from "react";
 import { Dialog, Transition } from "@headlessui/react";
-import { constants } from "@src/pages/utils/constants";
-import { Group } from "@src/pages/models/Group";
 import AddGroup from "./add-group-form/AddGroup";
-import { setLocalStorage } from "@src/pages/background/storage";
 import { ManageGroupsDialogProps } from "./GroupsDialogModels";
 import GroupsDataTable from "./data-tables/Groups";
-
-const getGroupNames = (followedChannels: Array<Group>) => {
-  return followedChannels.map((g: Group) => g.groupName.toLowerCase());
-};
 
 export default function ManageFollowedChannelsDialog({
   open,
   setOpen,
-  followedChannels,
-  refreshFollowersData,
+  followedChannels
 }: ManageGroupsDialogProps) {
   const cancelButtonRef = useRef(null);
-
-  const updateFollowersList = (newGroup: Group) => {
-    followedChannels.push(newGroup);
-    setLocalStorage(constants.storage.localStorageKey, followedChannels);
-    refreshFollowersData();
-  };
 
   return (
     <Transition.Root show={open} as={Fragment}>
@@ -68,8 +54,7 @@ export default function ManageFollowedChannelsDialog({
                       </Dialog.Title>
                     </div>
                     <AddGroup
-                      groups={getGroupNames(followedChannels)}
-                      updateFollowersList={updateFollowersList}
+                      groups={followedChannels}
                     />
                     <GroupsDataTable followedChannels={followedChannels}/>
                   </div>

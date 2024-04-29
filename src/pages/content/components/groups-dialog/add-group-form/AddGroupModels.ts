@@ -8,6 +8,5 @@ export interface ErrorState {
 }
 
 export interface AddGroupProps {
-  groups: string[];
-  updateFollowersList: (newGroup: Group)=>void;
+  groups: Group[];
 }

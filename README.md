@@ -68,6 +68,7 @@ timeline
          : Re-Sync functionality for any channel follows 
     Future plans 
          : Color themes for sidebar
+         : Undo snackbar
 ```
 
 ## Usage <a name="usage"></a>

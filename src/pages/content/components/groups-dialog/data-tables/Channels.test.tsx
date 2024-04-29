@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { Group } from "@src/pages/models/Group";
-import ChannelsDataTable from "./channels";
+import ChannelsDataTable from "./Channels";
 
 const group: Group = {
     groupName: "group1",
