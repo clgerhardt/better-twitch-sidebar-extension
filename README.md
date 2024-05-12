@@ -1,6 +1,6 @@
 <div align="center">
 <img src="src/assets/img/cover.png" alt="logo"/>
-<h1> Chrome Extension For Replacing <br/>Twitch's Followed Channels Siebar Section</h1>
+<h1> Chrome Extension For Replacing <br/>Twitch's Followed Channels Sidebar Section</h1>
 
 </div>
 

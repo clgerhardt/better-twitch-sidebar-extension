@@ -3,10 +3,6 @@ import { TableColumn } from "react-data-table-component";
 
 export const groupColumns: TableColumn<Group>[] = [
   {
-    name: "Group",
-    selector: (row) => row.groupName,
-  },
-  {
     name: "# of Channels",
     selector: (row) => row.numberOfChannels,
   },
