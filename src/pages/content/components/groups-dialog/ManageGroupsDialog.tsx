@@ -1,6 +1,6 @@
 import { Fragment, useRef } from "react";
 import { Dialog, Transition } from "@headlessui/react";
-import AddGroup from "./add-group-form/AddGroup";
+import { AddGroup } from "./add-group-form/AddGroup";
 import { ManageGroupsDialogProps } from "./GroupsDialogModels";
 import GroupsDataTable from "./data-tables/Groups";
 

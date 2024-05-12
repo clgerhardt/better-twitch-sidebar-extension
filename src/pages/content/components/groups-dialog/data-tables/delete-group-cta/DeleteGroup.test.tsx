@@ -126,8 +126,6 @@ describe("Delete Group", () => {
         }}
       />
     );
-    screen.debug();
-    // fireEvent.click(screen.getByRole("button"));
     screen.getAllByRole("button").forEach((button) => {
       if(button.ariaLabel === "delete-group")
         fireEvent.click(button);

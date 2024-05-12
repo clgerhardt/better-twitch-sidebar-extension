@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import ManageFollowedChannelsDialog from "./ManageGroupsDialog";
 
@@ -58,16 +58,15 @@ const followedChannels = [
 describe("ManageGroupsDialog", () => {
 
   it("should render nothing when dialog is closed", () => {
-   const {container} = render(<ManageFollowedChannelsDialog open={false} setOpen={()=> {return}} followedChannels={followedChannels} refreshFollowersData={()=>{return}} />);
+   const {container} = render(<ManageFollowedChannelsDialog open={false} setOpen={()=> {return}} followedChannels={followedChannels} />);
     expect(container.querySelectorAll("div").length).toBe(0);
   });
 
   it("should render dialog and group table rows when open", () => {
-    render(<ManageFollowedChannelsDialog open={true} setOpen={()=> {return}} followedChannels={followedChannels} refreshFollowersData={()=>{return}} />);
+    render(<ManageFollowedChannelsDialog open={true} setOpen={()=> {return}} followedChannels={followedChannels} />);
 
     const dialog = screen.getByRole("dialog");
     const title = screen.getByText("Manage your groups");
-
     followedChannels.forEach((group) => {
       const groupTitle = screen.getByText(group.groupName);
       expect(groupTitle).not.toBeNull();
