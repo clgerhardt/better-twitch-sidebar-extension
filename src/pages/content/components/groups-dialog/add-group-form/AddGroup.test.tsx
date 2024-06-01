@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import AddGroup from "./AddGroup";
+import { AddGroup } from "./AddGroup";
 import { Group } from "@src/pages/models/Group";
 
 const groupsMock = [
@@ -66,12 +66,12 @@ describe("AddGroup", () => {
     render(<AddGroup groups={groupsMock} />);
 
     const label = await screen.findByText("Group Name");
-    const placeholder = await screen.queryByPlaceholderText(/New Group/i);
+    const placeholder = await screen.queryByPlaceholderText(/Add group/i);
     const button = await screen.findByRole("button");
     const errorMessage = await screen.findByText("Group name cannot be blank");
 
     expect(label.textContent).toBe("Group Name");
-    expect(placeholder?.getAttribute("placeholder")).toBe("New Group");
+    expect(placeholder?.getAttribute("placeholder")).toBe("Add group");
     expect(button).toBeDisabled();
     expect(errorMessage.textContent).toBe("Group name cannot be blank");
   });
@@ -124,9 +124,9 @@ describe("AddGroup", () => {
   it("should render success message when group name is valid and button should be enabled", async () => {
     const { input } = setup();
     fireEvent.change(input, { target: { value: "newGroup" } });
-    const successMessage = await screen.findByText("Add your group!");
+    const successMessage = await screen.findByText("Add a group");
     const button = await screen.findByRole("button");
-    expect(successMessage.textContent).toBe("Add your group!");
+    expect(successMessage.textContent).toBe("Add a group");
     expect(button).not.toBeDisabled();
   });
 
