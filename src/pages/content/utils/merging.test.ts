@@ -164,4 +164,53 @@ describe("Merging", () => {
 
     expect(mergeChannels(groups, channels, "group2")).toEqual(result);
   });
+
+  it("should remove channel from origin group after moving to other group", () => {
+    const result = [
+      {
+        groupName: "group1",
+        default: true,
+        dialogOpen: false,
+        dropdownVisible: false,
+        numberOfChannels: 0,
+        numberOfLiveChannels: 0,
+        order: 2,
+        followedChannels: [
+        ],
+      },
+      {
+        groupName: "group2",
+        default: false,
+        dialogOpen: false,
+        dropdownVisible: false,
+        numberOfChannels: 1,
+        numberOfLiveChannels: 0,
+        order: 2,
+        followedChannels: [
+          {
+            channelName: "channel3",
+            channelImage: "image",
+            channelLink: "link",
+            expandedHTML: "expandedHTML",
+            isLive: true,
+            streamingContent: "game",
+            viewerCount: "1 viewers",
+          }
+        ],
+      }
+    ];
+    const channelsToMove = [
+      {
+        channelName: "channel3",
+        channelImage: "image",
+        channelLink: "link",
+        expandedHTML: "expandedHTML",
+        isLive: true,
+        streamingContent: "game",
+        viewerCount: "1 viewers",
+      }
+    ];
+
+    expect(mergeChannels(groups, channelsToMove, "group2", "group1")).toEqual(result);
+  });
 });

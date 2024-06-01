@@ -1,13 +1,22 @@
 import { Channel } from "@src/pages/models/Channel";
 import { Group } from "@src/pages/models/Group";
 import React, { useState } from "react";
-import DataTable, { TableColumn } from "react-data-table-component";
+import DataTable, {
+  ExpanderComponentProps,
+  TableColumn,
+} from "react-data-table-component";
+import { SelectedChannels } from "./selected-channels/SelectedChannels";
 
 const channelColumns: TableColumn<Channel>[] = [
   {
     cell: (row) => (
       <div className="flex items-center">
-        <img role="img" src={row.channelImage} alt="" className="w-12 h-12 rounded-full" />
+        <img
+          role="img"
+          src={row.channelImage}
+          alt=""
+          className="w-12 h-12 rounded-full"
+        />
         <a
           href={row.channelLink}
           style={{ marginLeft: "5px", fill: "#43a047" }}
@@ -37,28 +46,15 @@ const channelColumns: TableColumn<Channel>[] = [
   },
 ];
 
-export default function ChannelsDataTable({ data }: { data: Group }) {
+interface Props extends ExpanderComponentProps<Group> {
+  // currently, props that extend ExpanderComponentProps must be set to optional.
+  groupNames?: string[];
+  groups?: Group[];
+}
+
+export const ChannelsDataTable: React.FC<Props> = ({ data, groupNames, groups }) => {
   const [selectedRows, setSelectedRows] = useState<Channel[]>([]);
   const [toggleCleared, setToggleCleared] = useState(false);
-  const contextActions = React.useMemo(() => {
-    const handleDelete = () => {
-      if (
-        window.confirm(
-          `Are you sure you want to delete:\r ${selectedRows.map(
-            (r) => r.channelName
-          )}?`
-        )
-      ) {
-        setToggleCleared(!toggleCleared);
-      }
-    };
-
-    return (
-      <button key="delete" aria-label="delete-channel" onClick={handleDelete}>
-        Delete
-      </button>
-    );
-  }, [selectedRows, toggleCleared]);
 
   const handleRowSelected = React.useCallback(
     (state: {
@@ -72,15 +68,28 @@ export default function ChannelsDataTable({ data }: { data: Group }) {
   );
 
   return (
-      <DataTable
-        title={data.groupName}
-        columns={channelColumns}
-        data={data.followedChannels}
-        selectableRows
-        contextActions={contextActions}
-        onSelectedRowsChange={handleRowSelected}
-        clearSelectedRows={toggleCleared}
-        pagination
-      />
+    <DataTable
+      title={data.groupName}
+      columns={channelColumns}
+      data={data.followedChannels}
+      selectableRows
+      contextComponent={
+        <SelectedChannels
+          groupNames={
+            groupNames?.filter(
+              (gn) => data.groupName.toLowerCase() !== gn.toLowerCase()
+            ) ?? []
+          }
+          selectedRows={selectedRows}
+          groups={groups ?? []}
+          currentGroup={data.groupName}
+          setToggleCleared={setToggleCleared}
+          setSelectedRows={setSelectedRows}
+        />
+      }
+      onSelectedRowsChange={handleRowSelected}
+      clearSelectedRows={toggleCleared}
+      pagination
+    />
   );
-}
+};
