@@ -16,11 +16,7 @@ import { messageLogger } from "@src/pages/utils/logger";
 import { getLocalStorage } from "@src/pages/background/storage";
 import { constants } from "@src/pages/utils/constants";
 
-const AccordianChannels = ({
-  expandedSidebarBtnState,
-}: {
-  expandedSidebarBtnState: boolean;
-}) => {
+const AccordianChannels = () => {
   const handleChannelClick = (channelLink: string) => {
     document.location = channelLink;
   };
@@ -47,19 +43,15 @@ const AccordianChannels = ({
   };
 
   const [followedChannelsState, setFollowedChannelsState] = useState([]);
+  const [expandedSidebarBtnState, setExpandedSidebarBtnState] = useState(false);
 
-  // chrome.runtime.onConnect.addListener((port) => {
-  //   if(port.name === 'followers-list') {
-  //     port.onMessage.addListener((response) => {
-  //       console.log(response)
-  //     });
-  //   }
-  // });
-
-  chrome.storage.onChanged.addListener((changes, namespace) => {
+  chrome.storage.onChanged.addListener((changes) => {
     for (const [key, { oldValue, newValue }] of Object.entries(changes)) {
       if(key === constants.storage.localStorageKey) {
         setFollowedChannelsState(newValue);
+      }
+      if(key === constants.storage.prefix + constants.storage.sideBarState) {
+        setExpandedSidebarBtnState(newValue.sidebarExpanded);
       }
     }
   });

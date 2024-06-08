@@ -15,7 +15,8 @@ export const constants = {
   },
   storage: {
     prefix: 'bttvSidebar_',
-    localStorageKey: 'betterTwitchSidebar'
+    localStorageKey: 'betterTwitchSidebar',
+    sideBarState: 'sidebarState'
   },
   htmlSearchStrings: {
     ARIA_LABEL_RECOMMENDED_CHANNELS: '[aria-label="Recommended Channels"]'

@@ -50,6 +50,12 @@ chrome.runtime.onConnect.addListener((port) => {
                         setLocalStorage(constants.storage.localStorageKey, initFollowersData(response.data))
                     port.postMessage({message: "SYS:Followers:RenderFollowersInSideBar"});
                     break;
+                case "SYS:Followers:EXPANDED_SIDEBAR":
+                    setLocalStorage(constants.storage.prefix + constants.storage.sideBarState, {sidebarExpanded: true});
+                    break;
+                case "SYS:Followers:COLLAPSED_SIDEBAR":
+                    setLocalStorage(constants.storage.prefix + constants.storage.sideBarState, {sidebarExpanded: false});
+                    break;
                 default:
                     messageLogger(constants.location.BACKGROUND, "no action found", response);
             }
