@@ -4,14 +4,12 @@ import "react-accessible-accordion/dist/fancy-example.css";
 
 import { messageLogger } from "../utils/logger";
 import { constants } from "../utils/constants";
-import { getLocalStorage } from "../background/storage";
 import AccordianChannels from "./components/accordian-channels/AccordianChannels";
 import ManageGroups from "./components/manage-groups-cta/ManageGroupsCta";
 
 
 const port = chrome.runtime.connect({ name: "content-script" });
 let followersDOMNode: HTMLElement;
-let expandedSidebarBtnState = false;
 
 const observer = new MutationObserver((mutationsList) => {
   for (const mutation of mutationsList) {
@@ -30,9 +28,9 @@ const observer = new MutationObserver((mutationsList) => {
     ) {
       const expandedSidebarBtn = mutation.target as HTMLElement;
       if(expandedSidebarBtn.ariaLabel === "Expand Side Nav") {
-        expandedSidebarBtnState = true;
+        port.postMessage({ message: "SYS:Followers:EXPANDED_SIDEBAR" });
       } else {
-        expandedSidebarBtnState = false;
+        port.postMessage({ message: "SYS:Followers:COLLAPSED_SIDEBAR" });
       }
       renderToUI();
     }
@@ -114,12 +112,6 @@ const parseFollowersHTML = async () => {
 };
 
 const renderToUI = async () => {
-  const followedChannels = await getLocalStorage(constants.storage.localStorageKey).then((d: any) => {
-    return d || {};
-  }).catch((e: any) => {
-    messageLogger(constants.location.CONTENT_SCRIPT, "error", e);
-  });
-
   const recommendedFollowers = document.querySelector(
     constants.htmlSearchStrings.ARIA_LABEL_RECOMMENDED_CHANNELS
   ) as HTMLElement;
@@ -147,7 +139,7 @@ const renderToUI = async () => {
   const manageGroupsRoot = createRoot(manageGroupsContainer);
 
   root.render(
-    <AccordianChannels expandedSidebarBtnState={expandedSidebarBtnState}/>
+    <AccordianChannels />
   );
   manageGroupsRoot.render(
     <ManageGroups />
