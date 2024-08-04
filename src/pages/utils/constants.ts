@@ -1,3 +1,5 @@
+import { channel } from "diagnostics_channel";
+
 export const constants = {
   location: {
     CONTENT_SCRIPT: 'content_script',
@@ -14,9 +16,13 @@ export const constants = {
     ERROR: 'error'
   },
   storage: {
+    generalKey: 'bttvSidebar',
     prefix: 'bttvSidebar_',
     localStorageKey: 'betterTwitchSidebar',
-    sideBarState: 'sidebarState'
+    sideBarStateByTab: 'sideBarStateByTab',
+    globalState: 'globalState',
+    followedChannels: 'followedChannels',
+    channelGroupMap: 'channelGroupMap'
   },
   htmlSearchStrings: {
     ARIA_LABEL_RECOMMENDED_CHANNELS: '[aria-label="Recommended Channels"]'
@@ -25,3 +31,10 @@ export const constants = {
     FOLLOWED_CHANNELS_LOADED: 'SYS:Followers:FOLLOWED_CHANNELS_LOADED'
   }
 };
+
+// constants.js
+export const STORAGE_PREFIX = constants.storage.prefix;
+export const GLOBAL_STATE_KEY = constants.storage.globalState;
+export const SIDEBAR_STATE_KEY = STORAGE_PREFIX + constants.storage.sideBarStateByTab;
+export const CHANNEL_GROUP_MAP = STORAGE_PREFIX + constants.storage.channelGroupMap;
+export const LOCAL_STORAGE_KEY = constants.storage.localStorageKey;

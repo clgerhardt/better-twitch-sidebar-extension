@@ -50,9 +50,10 @@ interface Props extends ExpanderComponentProps<Group> {
   // currently, props that extend ExpanderComponentProps must be set to optional.
   groupNames?: string[];
   groups?: Group[];
+  channelGroupMap?: any;
 }
 
-export const ChannelsDataTable: React.FC<Props> = ({ data, groupNames, groups }) => {
+export const ChannelsDataTable: React.FC<Props> = ({ data, groupNames, groups, channelGroupMap }) => {
   const [selectedRows, setSelectedRows] = useState<Channel[]>([]);
   const [toggleCleared, setToggleCleared] = useState(false);
 
@@ -85,6 +86,7 @@ export const ChannelsDataTable: React.FC<Props> = ({ data, groupNames, groups })
           currentGroup={data.groupName}
           setToggleCleared={setToggleCleared}
           setSelectedRows={setSelectedRows}
+          channelGroupMap={channelGroupMap}
         />
       }
       onSelectedRowsChange={handleRowSelected}

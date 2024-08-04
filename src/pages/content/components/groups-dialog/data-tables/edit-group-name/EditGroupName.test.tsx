@@ -2,31 +2,33 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it , vi } from "vitest";
 import { EditGroupName } from "./EditGroupName";
 import { Group } from "@src/pages/models/Group";
+import { Channel } from "@src/pages/models/Channel";
 
 vi.mock("@src/pages/background/storage");
 
 describe("EditGroupName", () => {
 
   const group = {
-    groupName: "group name"
+    groupName: "group name",
+    followedChannels: [] as Channel[],
   } as Group;
 
   const allGroups = [group, { groupName: "group name 2"}] as Group[];
 
   it("should render group name and one button", () => {
-    render(<EditGroupName allGroups={allGroups} group={group}/>);
+    render(<EditGroupName allGroups={allGroups} group={group} channelGroupMap={{"channel-1": "group name"}}/>);
     expect(screen.getByText("group name")).toBeInTheDocument();
     expect(screen.getByRole("button")).toBeInTheDocument();
   });
 
   it("should render group name and form when button is clicked", () => {
-    render(<EditGroupName allGroups={allGroups} group={group}/>);
+    render(<EditGroupName allGroups={allGroups} group={group} channelGroupMap={{"channel-1": "group name"}}/>);
     fireEvent.click(screen.getByRole("button"));
     expect((screen.getByLabelText('Group Name') as HTMLInputElement).value).toBe("group name");
   });
 
   it("should hide form when submit button is clicked", () => {
-    render(<EditGroupName allGroups={allGroups} group={group}/>);
+    render(<EditGroupName allGroups={allGroups} group={group} channelGroupMap={{"channel-1": "group name"}}/>);
     fireEvent.click(screen.getByRole("button"));
     fireEvent.click(screen.getByRole("button"));
     expect(screen.getByText("group name")).toBeInTheDocument();
@@ -40,7 +42,7 @@ describe("EditGroupName", () => {
   });
 
   it("should show 'Update Name' placeholder in input field when form input value is cleared/empty", async () => {
-    render(<EditGroupName allGroups={allGroups} group={group}/>);
+    render(<EditGroupName allGroups={allGroups} group={group} channelGroupMap={{"channel-1": "group name"}} />);
     fireEvent.click(screen.getByRole("button"));
     fireEvent.change(screen.getByLabelText('Group Name'), { target: { value: "" } });
     const placeholder = await screen.queryByPlaceholderText(/Updated Name/i);
@@ -48,7 +50,7 @@ describe("EditGroupName", () => {
   });
 
   it("should update group name when submit button is clicked", async () => {
-    render(<EditGroupName allGroups={allGroups} group={group}/>);
+    render(<EditGroupName allGroups={allGroups} group={group} channelGroupMap={{"channel-1": "group name"}} />);
     const setLocalStorageMock = await import("@src/pages/background/storage");
     fireEvent.click(screen.getByRole("button"));
     fireEvent.change(screen.getByLabelText('Group Name'), { target: { value: "new group name" } });

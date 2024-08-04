@@ -4,13 +4,16 @@ import { useState } from "react";
 import { GroupNameForm } from "../../group-name-form/GroupNameForm";
 import { setLocalStorage } from "@src/pages/background/storage";
 import { constants } from "@src/pages/utils/constants";
+import { updateChannelGroupMap } from "@src/pages/content/utils/channelGroupMap";
 
 export const EditGroupName = ({
   allGroups,
   group,
+  channelGroupMap,
 }: {
   allGroups: Group[];
   group: Group;
+  channelGroupMap: any;
 }) => {
   const [showForm, setShowForm] = useState(false);
 
@@ -25,6 +28,7 @@ export const EditGroupName = ({
       }
     });
     setLocalStorage(constants.storage.localStorageKey, allGroups);
+    updateChannelGroupMap(channelGroupMap, group.followedChannels, groupName);
     setShowForm(false);
   };
 

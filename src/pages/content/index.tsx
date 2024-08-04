@@ -1,172 +1,140 @@
 import { createRoot } from "react-dom/client";
 import "./style.css";
 import "react-accessible-accordion/dist/fancy-example.css";
-
 import { messageLogger } from "../utils/logger";
 import { constants } from "../utils/constants";
 import AccordianChannels from "./components/accordian-channels/AccordianChannels";
 import ManageGroups from "./components/manage-groups-cta/ManageGroupsCta";
-
+import { followersListParser } from "../utils/parser";
+import { getLocalStorage, setLocalStorage } from "../background/storage";
+import { getElementBySelector, createElement, insertBefore } from './utils/domUtils';
+import { createMutationObserver } from './observer';
 
 const port = chrome.runtime.connect({ name: "content-script" });
-let followersDOMNode: HTMLElement;
+let followersDOMNode: any;
 
-const observer = new MutationObserver((mutationsList) => {
-  for (const mutation of mutationsList) {
-    // messageLogger(constants.location.CONTENT_SCRIPT, "mutation", mutation);
-    if (mutation.type === "childList" && mutation.addedNodes.length === 1) {
-      const addedNode = mutation.addedNodes[0] as HTMLElement;
-      if (addedNode.ariaLabel === "Followed Channels") {
-        followersDOMNode = mutation.addedNodes[0] as HTMLElement;
-        hideFollowedChannelsSideNav(mutation.addedNodes[0]);
-        port.postMessage({ message: "SYS:Followers:FOLLOWED_CHANNELS_LOADED" });
-      }
-    }
-    if (
-      mutation.type === "attributes" &&
-      mutation.attributeName === "aria-label"
-    ) {
-      const expandedSidebarBtn = mutation.target as HTMLElement;
-      if(expandedSidebarBtn.ariaLabel === "Expand Side Nav") {
-        port.postMessage({ message: "SYS:Followers:EXPANDED_SIDEBAR" });
-      } else {
-        port.postMessage({ message: "SYS:Followers:COLLAPSED_SIDEBAR" });
-      }
-      renderToUI();
-    }
-  }
-});
-const config = {
-  attributes: true,
-  childList: true,
-  characterData: true,
-  subtree: true,
-};
-// I can't do this because on page load the DOM element doesnt exist yet so the observer doesnt work
-// in my current case im watching DOM to see when this element will load.
-// var mainFollowerNode = document.querySelector('[aria-label="Followed Channels"]') as HTMLElement;
-observer.observe(document.body, config);
-
-const hideFollowedChannelsSideNav = (node: any) => {
-  node.classList.remove("dcyYPL");
-  node.style.display = "none";
+const setFollowersDOMNode = (node: any) => {
+  messageLogger(constants.location.CONTENT_SCRIPT, "Setting followersDOMNode", node);
+  followersDOMNode = node;
 };
 
-async function waitUntil() {
-  return await new Promise((resolve) => {
+const observer = createMutationObserver(port, setFollowersDOMNode);
+
+const waitUntil = async () => {
+  messageLogger(constants.location.CONTENT_SCRIPT, "Entering waitUntil function");
+  return new Promise((resolve) => {
     const interval = setInterval(() => {
-      const showMoreBtn = document.querySelector('[data-a-target="side-nav-show-more-button"]');
+      const showMoreBtn = getElementBySelector('[data-a-target="side-nav-show-more-button"]');
       if (showMoreBtn) {
-        (document.querySelector('[data-a-target="side-nav-show-more-button"]') as HTMLElement).click();
+        showMoreBtn.click();
       } else {
+        messageLogger(constants.location.CONTENT_SCRIPT, "Show more button not found, resolving waitUntil");
         resolve(true);
         clearInterval(interval);
       }
     }, 10);
   });
-}
+};
 
 const parseFollowersHTML = async () => {
-  const expandBtn = document.querySelector('[data-a-target="side-nav-arrow"]');
-  let hadToExpandSideBar = false;
-  if (expandBtn?.ariaLabel === "Expand Side Nav") {
-    (expandBtn as HTMLElement).click();
-    hadToExpandSideBar = true;
-  }
+  messageLogger(constants.location.CONTENT_SCRIPT, "Entering parseFollowersHTML function");
+  try {
+    const expandBtn = getElementBySelector('[data-a-target="side-nav-arrow"]');
+    let hadToExpandSideBar = false;
+    if (expandBtn?.ariaLabel === "Expand Side Nav") {
+      expandBtn.click();
+      hadToExpandSideBar = true;
+    }
 
-  const clickingShowMore = await waitUntil();
-  if (clickingShowMore) {
-    console.log("clicking show more is done");
-  }
+    await waitUntil();
 
-  const followerCards = followersDOMNode.querySelectorAll("[data-a-id]");
-  const followerData: any = [];
+    const followerCards = followersDOMNode.querySelectorAll("[data-a-id]");
+    const followerData = followersListParser(followerCards);
 
-  followerCards.forEach((item: any) => {
-    const imageNode = item.querySelector("img");
-    const liveStatus = item.querySelectorAll(
-      '[data-a-target="side-nav-live-status"] p'
-    );
-    followerData.push({
-      channelName: imageNode?.alt,
-      channelLink: `https://twitch.tv${item.getAttribute("href")}`,
-      channelImage: imageNode?.src,
-      isLive: liveStatus.length > 0,
-      viewerCount: liveStatus.length > 0 ? liveStatus[1].innerHTML : "",
-      streamingContent:
-        liveStatus.length > 0
-          ? item?.querySelector('[data-a-target="side-nav-game-title"] p')
-              ?.innerHTML
-          : "",
-      expandedHTML: item.innerHTML
+    if (hadToExpandSideBar) {
+      expandBtn.click();
+    }
+
+    port.postMessage({
+      message: "SYS:Followers:FOLLOWED_CHANNELS_PARSED",
+      data: followerData,
     });
-  });
-  if (hadToExpandSideBar) {
-    (expandBtn as HTMLElement).click();
+
+    messageLogger(constants.location.CONTENT_SCRIPT, "Exiting parseFollowersHTML function");
+  } catch (error) {
+    messageLogger(constants.location.CONTENT_SCRIPT, "Error in parseFollowersHTML function", error);
   }
-  messageLogger(constants.location.CONTENT_SCRIPT, "followersData", followerData);
-  port.postMessage({
-    message: "SYS:Followers:FOLLOWED_CHANNELS_PARSED",
-    data: followerData,
-  });
 };
 
-const renderToUI = async () => {
-  const recommendedFollowers = document.querySelector(
-    constants.htmlSearchStrings.ARIA_LABEL_RECOMMENDED_CHANNELS
-  ) as HTMLElement;
-  const parentDiv = recommendedFollowers.parentNode;
+const renderToUI = async (tabId: any) => {
+  messageLogger(constants.location.CONTENT_SCRIPT, "Entering renderToUI function with tabId", tabId);
+  try {
+    const sideNavBtn = getElementBySelector('[data-a-target="side-nav-arrow"]');
+    const ariaLabel = sideNavBtn?.getAttribute("aria-label");
+    const currentState = ariaLabel === "Expand Side Nav" ? false : true;
 
-  const rootFound = document.querySelector("#__root") as HTMLElement;
-  const manageGroupsRootFound = document.querySelector("#__manage-groups-root") as HTMLElement;
-  if (!rootFound) {
-    const newMainDiv = document.createElement("div");
-    newMainDiv.id = "__root";
-    parentDiv?.insertBefore(newMainDiv, recommendedFollowers);
+    const data: any = await getLocalStorage(constants.storage.prefix + constants.storage.sideBarStateByTab);
+    await setLocalStorage(constants.storage.prefix + constants.storage.sideBarStateByTab, {
+      ...data,
+      [tabId]: {
+        sidebarExpanded: currentState,
+        initialDocStateIdentified: true,
+      },
+    });
+
+    const recommendedFollowers = getElementBySelector(constants.htmlSearchStrings.ARIA_LABEL_RECOMMENDED_CHANNELS);
+    const parentDiv = recommendedFollowers.parentNode;
+
+    const rootContainer = getElementBySelector("#__root") || createElement("__root");
+    const manageGroupsContainer = getElementBySelector("#__manage-groups-root") || createElement("__manage-groups-root", { height: "3.5rem" });
+
+    insertBefore(rootContainer, recommendedFollowers);
+    insertBefore(manageGroupsContainer, recommendedFollowers);
+
+    const root = createRoot(rootContainer);
+    const manageGroupsRoot = createRoot(manageGroupsContainer);
+
+    root.render(<AccordianChannels tabId={tabId} />);
+    manageGroupsRoot.render(<ManageGroups tabId={tabId} />);
+
+    messageLogger(constants.location.CONTENT_SCRIPT, "Exiting renderToUI function");
+  } catch (error) {
+    messageLogger(constants.location.CONTENT_SCRIPT, "Error in renderToUI function", error);
   }
-  if(!manageGroupsRootFound) {
-    const newMainDiv = document.createElement("div");
-    newMainDiv.id = "__manage-groups-root";
-    newMainDiv.style.height = "3.5rem";
-    parentDiv?.insertBefore(newMainDiv, recommendedFollowers);
-  }
-  const rootContainer = document.querySelector("#__root");
-  if (!rootContainer) throw new Error("Can't find Options root element");
-  const manageGroupsContainer = document.querySelector("#__manage-groups-root");
-  if(!manageGroupsContainer) throw new Error("Can't find Manage Groups root element");
-
-  const root = createRoot(rootContainer);
-  const manageGroupsRoot = createRoot(manageGroupsContainer);
-
-  root.render(
-    <AccordianChannels />
-  );
-  manageGroupsRoot.render(
-    <ManageGroups />
-  );
 };
 
-port.onMessage.addListener((response) => {
-  messageLogger(constants.location.CONTENT_SCRIPT, "posted message", response.data);
-  switch (response.message) {
-    case "SYS:Followers:PARSE_FOLLOWED_CHANNELS_HTML":
-      parseFollowersHTML();
-      break;
-    case "SYS:UI:RenderFollowersInSideBar":
-      renderToUI();
-      break;
-    default:
-      messageLogger(constants.location.CONTENT_SCRIPT, "no action found", response)
+port.onMessage.addListener(async (response) => {
+  messageLogger(constants.location.CONTENT_SCRIPT, "Received message from port", response);
+  try {
+    switch (response.message) {
+      case "SYS:Followers:PARSE_FOLLOWED_CHANNELS_HTML":
+        await parseFollowersHTML();
+        break;
+      case "SYS:Followers:RenderFollowersInSideBar":
+        await renderToUI(response.tabId);
+        break;
+      default:
+        messageLogger(constants.location.CONTENT_SCRIPT, "No action found for message", response);
+    }
+  } catch (error) {
+    messageLogger(constants.location.CONTENT_SCRIPT, "Error handling port message", error);
   }
 });
 
 try {
-  messageLogger(constants.location.CONTENT_SCRIPT, "content script loaded");
-  const isDark = document.querySelector(".tw-root--theme-dark");
+  messageLogger(constants.location.CONTENT_SCRIPT, "Content script loaded");
+  observer.observe(document.body, {
+    attributes: true,
+    childList: true,
+    characterData: true,
+    subtree: true,
+  });
+
+  const isDark = getElementBySelector(".tw-root--theme-dark");
   if (isDark) {
-    messageLogger(constants.location.CONTENT_SCRIPT, "dark mode detected");
+    messageLogger(constants.location.CONTENT_SCRIPT, "Dark mode detected");
     isDark.classList.add("dark");
   }
 } catch (e) {
-  messageLogger(constants.location.CONTENT_SCRIPT, "error", e);
+  messageLogger(constants.location.CONTENT_SCRIPT, "Error in content script initialization", e);
 }

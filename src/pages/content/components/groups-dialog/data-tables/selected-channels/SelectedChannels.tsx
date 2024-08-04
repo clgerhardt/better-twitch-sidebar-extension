@@ -1,8 +1,9 @@
 import { setLocalStorage } from "@src/pages/background/storage";
+import { updateChannelGroupMap } from "@src/pages/content/utils/channelGroupMap";
 import { mergeChannels } from "@src/pages/content/utils/merging";
 import { Channel } from "@src/pages/models/Channel";
 import { Group } from "@src/pages/models/Group";
-import { constants } from "@src/pages/utils/constants";
+import { CHANNEL_GROUP_MAP, constants } from "@src/pages/utils/constants";
 import React, { FormEvent } from "react";
 
 interface Props {
@@ -13,6 +14,7 @@ interface Props {
   setToggleCleared: (value: boolean) => void;
   selectedCount?: string;
   setSelectedRows: (value: Channel[]) => void;
+  channelGroupMap?: any;
 }
 
 export const SelectedChannels = ({
@@ -23,6 +25,7 @@ export const SelectedChannels = ({
   currentGroup,
   setToggleCleared,
   setSelectedRows,
+  channelGroupMap,
 }: Props): React.ReactNode => {
   const selectedChannelsText = `Selected Channels: ${selectedCount}`;
   const [selectedGroup, setSelectedGroup] = React.useState<string>("default");
@@ -33,6 +36,7 @@ export const SelectedChannels = ({
       constants.storage.localStorageKey,
       mergeChannels(groups, selectedRows, selectedGroup, currentGroup)
     );
+    updateChannelGroupMap(channelGroupMap, selectedRows, selectedGroup);
     setSelectedGroup("default");
     setToggleCleared(true);
     setSelectedRows([]);

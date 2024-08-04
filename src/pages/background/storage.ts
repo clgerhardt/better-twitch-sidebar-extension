@@ -25,17 +25,19 @@ export const setSyncStorage = async (key: string, value: any) => {
 export const getLocalStorage = (key: string) => {
   return new Promise((resolve, reject) => {
     chrome.storage.local.get([key], (result) => {
-      messageLogger(constants.location.STORAGE, "getLocalStorage", result[key])
+      messageLogger(constants.location.STORAGE, `getLocalStorage key ${key} result`, result[key])
       if(result[key])
         resolve(result[key]);
       else {
-        if(import.meta.env.VITE_USE_MOCK) {
-          const mockValue = getMockStorage();
-          setLocalStorage(key, mockValue);
-          resolve(mockValue)
-        } else {
-          reject("cannot get value from local storage");
-        }
+        // const useMock = import.meta.env.VITE_USE_MOCK as boolean;
+        // messageLogger(constants.location.STORAGE, "getLocalStorage useMock", useMock)
+        // if(useMock) {
+        //   const mockValue = getMockStorage();
+        //   setLocalStorage(key, mockValue);
+        //   resolve(mockValue)
+        // } else {
+          reject("cannot get value from local storage: " + key);
+        // }
       }
     });
   });

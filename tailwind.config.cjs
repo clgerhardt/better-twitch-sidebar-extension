@@ -9,6 +9,7 @@ module.exports = {
       colors: {
         'custom-twitch': {
           'light-gray': '#26262c',
+          'blue-gray': '#97ACBE',
         }
       }
     },
