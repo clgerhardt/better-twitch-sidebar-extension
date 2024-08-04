@@ -7,7 +7,8 @@ import GroupsDataTable from "./data-tables/Groups";
 export default function ManageFollowedChannelsDialog({
   open,
   setOpen,
-  followedChannels
+  followedChannels,
+  channelGroupMap
 }: ManageGroupsDialogProps) {
   const cancelButtonRef = useRef(null);
 
@@ -56,7 +57,7 @@ export default function ManageFollowedChannelsDialog({
                     <AddGroup
                       groups={followedChannels}
                     />
-                    <GroupsDataTable followedChannels={followedChannels}/>
+                    <GroupsDataTable followedChannels={followedChannels} channelGroupMap={channelGroupMap}/>
                   </div>
                 </div>
               </Dialog.Panel>

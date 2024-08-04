@@ -11,10 +11,11 @@
   },
   "action": {
     "default_popup": "src/pages/popup/index.html",
-    "default_icon": "public/dev-icon-32.png"
+    "default_icon": "public/game-icon-32.png"
   },
   "icons": {
-    "128": "icon-128.png"
+    "128": "icon-128.png",
+    "100": "game-icon-100.png"
   },
   "permissions": [
     "tabs",
@@ -47,7 +48,9 @@
       "resources": [
         "contentStyle.css",
         "icon-128.png",
-        "icon-32.png"
+        "icon-32.png",
+        "game-icon-100.png",
+        "game-icon-32.png"
       ],
       "matches": []
     }

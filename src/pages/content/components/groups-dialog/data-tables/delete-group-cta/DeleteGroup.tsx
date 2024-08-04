@@ -6,13 +6,16 @@ import { useState } from "react";
 import {
   TrashIcon,
 } from "@heroicons/react/24/outline";
+import { updateChannelGroupMap } from "@src/pages/content/utils/channelGroupMap";
 
 export default function DeleteGroup({
   allGroups,
   group,
+  channelGroupMap,
 }: {
   allGroups: Group[];
   group: Group;
+  channelGroupMap: any;
 }) {
   const [showAreYouSure, setShowAreYouSure] = useState(false);
 
@@ -24,6 +27,7 @@ export default function DeleteGroup({
         (g) => g.groupName !== group.groupName
       )
     );
+    updateChannelGroupMap(channelGroupMap, group.followedChannels, "Default");
   };
 
   return group.default ? (
