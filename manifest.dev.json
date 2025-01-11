@@ -1,19 +1,17 @@
 {
   "action": {
-    "default_popup": "src/pages/popup/index.html",
-    "default_icon": "public/game-icon-32.png"
+    "default_icon": "public/dev-icon-32.png",
+    "default_popup": "src/pages/popup/index.html"
   },
   "icons": {
-    "128": "public/game-icon-100.png"
+    "128": "public/dev-icon-128.png"
   },
   "web_accessible_resources": [
     {
       "resources": [
         "contentStyle.css",
         "dev-icon-128.png",
-        "dev-icon-32.png",
-        "game-icon-32.png",
-        "game-icon-100.png"
+        "dev-icon-32.png"
       ],
       "matches": []
     }

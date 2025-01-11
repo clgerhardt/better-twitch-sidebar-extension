@@ -1,21 +1,18 @@
 {
   "manifest_version": 3,
-  "name": "testing-bttv-ext",
-  "description": "testing-this-package",
+  "name": "name in manifest.json",
+  "description": "description in manifest.json",
   "options_ui": {
     "page": "src/pages/options/index.html"
   },
-  "background": {
-    "service_worker": "src/pages/background/index.ts",
-    "type": "module"
-  },
   "action": {
     "default_popup": "src/pages/popup/index.html",
-    "default_icon": "public/game-icon-32.png"
+    "default_icon": {
+      "32": "icon-32.png"
+    }
   },
   "icons": {
-    "128": "icon-128.png",
-    "100": "game-icon-100.png"
+    "128": "icon-128.png"
   },
   "permissions": [
     "tabs",
@@ -27,13 +24,15 @@
     "unlimitedStorage"
   ],
   "host_permissions": [
-    "https://*.twitch.tv/*",
-    "https://*/*",
-    "http://*/*"
+    "https://*.twitch.tv/*"
   ],
   "content_scripts": [
     {
-      "matches": ["https://*.twitch.tv/*"],
+      "matches": [
+        "https://*.twitch.tv/*",
+        "http://*/*",
+        "https://*/*"
+      ],
       "js": [
         "src/pages/content/index.tsx"
       ],
@@ -48,9 +47,7 @@
       "resources": [
         "contentStyle.css",
         "icon-128.png",
-        "icon-32.png",
-        "game-icon-100.png",
-        "game-icon-32.png"
+        "icon-32.png"
       ],
       "matches": []
     }
