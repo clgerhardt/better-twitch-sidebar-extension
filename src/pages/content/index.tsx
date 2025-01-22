@@ -2,38 +2,58 @@ import { createRoot } from "react-dom/client";
 import "./style.css";
 import "react-accessible-accordion/dist/fancy-example.css";
 import { messageLogger } from "../utils/logger";
-import { constants } from "../utils/constants";
-import AccordianChannels from "./components/accordian-channels/AccordianChannels";
+import { CHANNEL_GROUP_MAP, constants, GLOBAL_STATE_KEY } from "../utils/constants";
+import AccordianChannels from "./components/side-navigation/AccordianChannels";
 import ManageGroups from "./components/manage-groups-cta/ManageGroupsCta";
 import { followersListParser } from "../utils/parser";
 import { getLocalStorage, setLocalStorage } from "../background/storage";
-import { getElementBySelector, createElement, insertBefore } from './utils/domUtils';
+import { getElementBySelector, createElement, insertBefore, waitUntilNoMoreShowMoreButton } from './utils/domUtils';
 import { createMutationObserver } from './observer';
+import { initFollowersData } from "../utils/transformer";
 
-const port = chrome.runtime.connect({ name: "content-script" });
-let followersDOMNode: any;
+// Global variables
+let port: chrome.runtime.Port;
+let followersDOMNode: HTMLElement | null = null;
+let observer: MutationObserver;
 
-const setFollowersDOMNode = (node: any) => {
+const setFollowersDOMNode = (node: HTMLElement) => {
   messageLogger(constants.location.CONTENT_SCRIPT, "Setting followersDOMNode", node);
   followersDOMNode = node;
 };
 
-const observer = createMutationObserver(port, setFollowersDOMNode);
+const connectToBackground = () => {
+    messageLogger(constants.location.CONTENT_SCRIPT, "Connecting to long-lived port");
+    port = chrome.runtime.connect({ name: "content-script" });
 
-const waitUntil = async () => {
-  messageLogger(constants.location.CONTENT_SCRIPT, "Entering waitUntil function");
-  return new Promise((resolve) => {
-    const interval = setInterval(() => {
-      const showMoreBtn = getElementBySelector('[data-a-target="side-nav-show-more-button"]');
-      if (showMoreBtn) {
-        showMoreBtn.click();
-      } else {
-        messageLogger(constants.location.CONTENT_SCRIPT, "Show more button not found, resolving waitUntil");
-        resolve(true);
-        clearInterval(interval);
+    port.onDisconnect.addListener(() => {
+      messageLogger(constants.location.CONTENT_SCRIPT, "Disconnected from background. Attempting to reconnect...");
+      setTimeout(connectToBackground, 1000);
+    });
+
+    port.onMessage.addListener(async (response: any) => {
+      messageLogger(constants.location.CONTENT_SCRIPT, "Received message from port", response);
+      try {
+        switch (response.message) {
+          case "SYS:Followers:PARSE_FOLLOWED_CHANNELS_HTML":
+            await parseFollowersHTML();
+            break;
+          case "SYS:Followers:RenderFollowersInSideBar":
+            await renderToUI(response.tabId);
+            break;
+          default:
+            messageLogger(constants.location.CONTENT_SCRIPT, "No action found for message", response);
+        }
+      } catch (error) {
+        messageLogger(constants.location.CONTENT_SCRIPT, "Error handling port message", error);
       }
-    }, 10);
-  });
+    });
+    observer = createMutationObserver(port, setFollowersDOMNode);
+    observer.observe(document.body, {
+      attributes: true,
+      childList: true,
+      characterData: true,
+      subtree: true,
+    });
 };
 
 const parseFollowersHTML = async () => {
@@ -46,21 +66,18 @@ const parseFollowersHTML = async () => {
       hadToExpandSideBar = true;
     }
 
-    await waitUntil();
+    await waitUntilNoMoreShowMoreButton();
 
-    const followerCards = followersDOMNode.querySelectorAll("[data-a-id]");
-    const followerData = followersListParser(followerCards);
+    const followerCards = followersDOMNode?.querySelectorAll("[data-a-id]");
+    const followerData = followerCards ? followersListParser(followerCards) : [];
 
     if (hadToExpandSideBar) {
       expandBtn.click();
     }
 
-    port.postMessage({
-      message: "SYS:Followers:FOLLOWED_CHANNELS_PARSED",
-      data: followerData,
-    });
-
     messageLogger(constants.location.CONTENT_SCRIPT, "Exiting parseFollowersHTML function");
+    return followerData;
+
   } catch (error) {
     messageLogger(constants.location.CONTENT_SCRIPT, "Error in parseFollowersHTML function", error);
   }
@@ -86,7 +103,7 @@ const renderToUI = async (tabId: any) => {
     const parentDiv = recommendedFollowers.parentNode;
 
     const rootContainer = getElementBySelector("#__root") || createElement("__root");
-    const manageGroupsContainer = getElementBySelector("#__manage-groups-root") || createElement("__manage-groups-root", { height: "3.5rem" });
+    const manageGroupsContainer = getElementBySelector("#__manage-groups-root") || createElement("__manage-groups-root", { maxheight: "3.5rem" });
 
     insertBefore(rootContainer, recommendedFollowers);
     insertBefore(manageGroupsContainer, recommendedFollowers);
@@ -103,38 +120,38 @@ const renderToUI = async (tabId: any) => {
   }
 };
 
-port.onMessage.addListener(async (response) => {
-  messageLogger(constants.location.CONTENT_SCRIPT, "Received message from port", response);
-  try {
-    switch (response.message) {
-      case "SYS:Followers:PARSE_FOLLOWED_CHANNELS_HTML":
-        await parseFollowersHTML();
-        break;
-      case "SYS:Followers:RenderFollowersInSideBar":
-        await renderToUI(response.tabId);
-        break;
-      default:
-        messageLogger(constants.location.CONTENT_SCRIPT, "No action found for message", response);
+const addFollowersInitializeListener = () => {
+  chrome.runtime.onMessage.addListener(async (request) => {
+    if (request.message === "SYS:Followers:INITALIZE_FOLLOWED_CHANNELS_FROM_HTML") {
+      messageLogger(constants.location.CONTENT_SCRIPT, "Initializing followed channels from HTML");
+      const followedData = await parseFollowersHTML();
+      const { groupsList, channelGroupMap } = initFollowersData(followedData);
+      messageLogger(constants.location.CONTENT_SCRIPT, "Followed channels initialized", groupsList);
+      messageLogger(constants.location.CONTENT_SCRIPT, "Channel group map initialized", channelGroupMap);
+      await setLocalStorage(
+        constants.storage.localStorageKey,
+        groupsList
+      );
+      await setLocalStorage(
+        CHANNEL_GROUP_MAP,
+        channelGroupMap
+      );
+      const globalS: any = await getLocalStorage(GLOBAL_STATE_KEY)
+      await setLocalStorage(GLOBAL_STATE_KEY, { ...globalS, followersListInitialized: true, initializationDate: new Date().toISOString() });
     }
-  } catch (error) {
-    messageLogger(constants.location.CONTENT_SCRIPT, "Error handling port message", error);
-  }
-});
+    return true;
+  });
+};
 
 try {
   messageLogger(constants.location.CONTENT_SCRIPT, "Content script loaded");
-  observer.observe(document.body, {
-    attributes: true,
-    childList: true,
-    characterData: true,
-    subtree: true,
-  });
-
   const isDark = getElementBySelector(".tw-root--theme-dark");
   if (isDark) {
     messageLogger(constants.location.CONTENT_SCRIPT, "Dark mode detected");
     isDark.classList.add("dark");
   }
+  connectToBackground();
+  addFollowersInitializeListener();
 } catch (e) {
   messageLogger(constants.location.CONTENT_SCRIPT, "Error in content script initialization", e);
 }

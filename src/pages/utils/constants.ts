@@ -1,5 +1,3 @@
-import { channel } from "diagnostics_channel";
-
 export const constants = {
   location: {
     CONTENT_SCRIPT: 'content_script',
@@ -7,6 +5,7 @@ export const constants = {
     BACKGROUND: 'background',
     POPUP: 'popup',
     STORAGE: 'storage',
+    UTIL: 'util',
     NOT_SET: 'not_set'
   },
   loggerLevel: {

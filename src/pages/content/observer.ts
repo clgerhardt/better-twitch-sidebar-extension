@@ -1,6 +1,6 @@
 // Observer and related functions
 
-export const createMutationObserver = (port: any, setFollowersDOMNode: any) => {
+export const createMutationObserver = (port: chrome.runtime.Port, setFollowersDOMNode: (node: HTMLElement) => void) => {
   return new MutationObserver((mutationsList) => {
     for (const mutation of mutationsList) {
       if (mutation.type === "childList" && mutation.addedNodes.length === 1) {
