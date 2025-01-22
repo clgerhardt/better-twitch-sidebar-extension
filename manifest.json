@@ -20,6 +20,7 @@
     "storage",
     "identity",
     "cookies",
+    "scripting",
     "activeTab",
     "unlimitedStorage"
   ],

@@ -1,13 +1,13 @@
 import { GlobalState } from "../models/GlobalState";
-import { CHANNEL_GROUP_MAP, SIDEBAR_STATE_KEY, constants } from "../utils/constants";
+import { SIDEBAR_STATE_KEY, constants } from "../utils/constants";
 import { messageLogger } from "../utils/logger";
-import { initFollowersData } from "../utils/transformer";
+
 import {
   attachStorageListener,
   getLocalStorage,
   setLocalStorage,
 } from "./storage";
-import { getGlobalState, setGlobalState, updateSidebarState } from "./utils";
+import { getGlobalState, updateSidebarState } from "./utils";
 
 messageLogger(constants.location.BACKGROUND, "background script loaded");
 attachStorageListener();
@@ -25,8 +25,8 @@ chrome.runtime.onInstalled.addListener(async () => {
         loggedIn: false,
         followersListInitialized: false,
         showDefaultSidebar: false,
-        initializationDate: new Date().toDateString(),
-        lastUpdated: new Date().toDateString(),
+        initializationDate: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
       } as GlobalState
     );
     await setLocalStorage(SIDEBAR_STATE_KEY, []);
@@ -72,34 +72,25 @@ chrome.runtime.onConnect.addListener((port) => {
         "posted message",
         response
       );
+      let tabs;
 
       try {
         switch (response.message) {
-          case "SYS:Followers:FOLLOWED_CHANNELS_LOADED":
-            port.postMessage({
-              message: "SYS:Followers:PARSE_FOLLOWED_CHANNELS_HTML",
-            });
+          case "SYS:Followers:INITIALIZE":
+            // eslint-disable-next-line no-case-declarations
+            const storageGlobalState: any = await getGlobalState();
+            messageLogger(constants.location.BACKGROUND,
+              "Attempting to Initialize Followers List",
+              response);
+            if (!storageGlobalState.followersListInitialized) {
+              tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+              chrome.tabs.sendMessage(tabs[0].id ?? 0, { message: "SYS:Followers:INITALIZE_FOLLOWED_CHANNELS_FROM_HTML" });
+            }
             break;
-          case "SYS:Followers:FOLLOWED_CHANNELS_PARSED":
+          case "SYS:Followers:FOLLOWED_CHANNELS_LOADED":
+              messageLogger(constants.location.BACKGROUND, "UI Loaded");
               // eslint-disable-next-line no-case-declarations
-              const storageGlobalState: any = await getGlobalState();
-              if (storageGlobalState && !storageGlobalState.followersListInitialized) {
-                const { groupsList, channelGroupMap } = initFollowersData(response.data);
-                await setLocalStorage(
-                  constants.storage.localStorageKey,
-                  groupsList
-                );
-                await setLocalStorage(
-                  CHANNEL_GROUP_MAP,
-                  channelGroupMap
-                );
-                storageGlobalState.followersListInitialized = true;
-                storageGlobalState.lastUpdated = new Date().toDateString();
-                await setGlobalState(storageGlobalState);
-              }
-
-              // eslint-disable-next-line no-case-declarations
-              const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+              tabs = await chrome.tabs.query({ active: true, currentWindow: true });
               if (tabs.length > 0) {
                 const tabId = tabs[0].id?.toString() ?? "";
                 if (tabId) {
@@ -109,7 +100,7 @@ chrome.runtime.onConnect.addListener((port) => {
                   });
                 }
               }
-            break;
+              break;
           case "SYS:Followers:EXPANDED_SIDEBAR":
           case "SYS:Followers:COLLAPSED_SIDEBAR":
             // eslint-disable-next-line no-case-declarations
@@ -137,4 +128,8 @@ chrome.runtime.onConnect.addListener((port) => {
       }
     });
   }
+
+  port.onDisconnect.addListener(() => {
+    messageLogger(constants.location.BACKGROUND, "Disconnected: ", port);
+  });
 });

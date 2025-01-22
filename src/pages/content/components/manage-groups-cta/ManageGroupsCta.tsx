@@ -3,12 +3,16 @@ import useFollowedChannels from "../../hooks/useFollowedChannels";
 import useSidebarState from "../../hooks/useSidebarState";
 import useChannelGroupMap from "../../hooks/useChannelGroupMap";
 import ManageFollowedChannelsDialog from "../groups-dialog/ManageGroupsDialog";
+import useGlobalState from "../../hooks/useGlobalState";
 
 const ManageGroupsCTA = ({ tabId }: { tabId: string }) => {
   const [openDialog, setOpenDialog] = useState(false);
   const channelGroupMap = useChannelGroupMap();
   const followedChannels = useFollowedChannels();
   const isSidebarExpanded = useSidebarState(tabId);
+  const globalState = useGlobalState();
+
+  if(!globalState.followersListInitialized) return null;
 
   const handleToggleDialog = () => {
     setOpenDialog((prev) => !prev);

@@ -14,7 +14,7 @@ const useSidebarState = (tabId: string) => {
 
         const manageGroupRoot = document.getElementById("__manage-groups-root");
         if (manageGroupRoot) {
-          manageGroupRoot.style.height = sidebarState[tabId]?.sidebarExpanded ? "3.5rem" : "0rem";
+          manageGroupRoot.style.maxHeight = sidebarState[tabId]?.sidebarExpanded ? "3.5rem" : "0rem";
         }
 
         messageLogger(constants.location.UI_COMPONENT, "sideBarState", sidebarState);
@@ -32,7 +32,7 @@ const useSidebarState = (tabId: string) => {
         if (key === constants.storage.prefix + constants.storage.sideBarStateByTab) {
           const manageGroupRoot = document.getElementById("__manage-groups-root");
           if (manageGroupRoot) {
-            manageGroupRoot.style.height = newValue[tabId]?.sidebarExpanded ? "3.5rem" : "0rem";
+            manageGroupRoot.style.maxHeight = newValue[tabId]?.sidebarExpanded ? "3.5rem" : "0rem";
           }
           setIsSidebarExpanded(newValue[tabId]?.sidebarExpanded || false);
         }
