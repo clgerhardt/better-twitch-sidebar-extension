@@ -1,9 +1,6 @@
-import { setLocalStorage } from "@src/pages/background/storage";
-import { updateChannelGroupMap } from "@src/pages/content/utils/channelGroupMap";
-import { mergeChannels } from "@src/pages/content/utils/merging";
 import { Channel } from "@src/pages/models/Channel";
 import { Group } from "@src/pages/models/Group";
-import { FOLLOWED_CHANNELS_KEY } from "@src/pages/utils/constants";
+import { CHANNEL_GROUPS_KEY } from "@src/pages/utils/constants";
 import React, { FormEvent } from "react";
 
 interface Props {
@@ -30,13 +27,14 @@ export const SelectedChannels = ({
   const selectedChannelsText = `Selected Channels: ${selectedCount}`;
   const [selectedGroup, setSelectedGroup] = React.useState<string>("default");
 
-  const handleMoveToGroup = (event: FormEvent<HTMLFormElement>) => {
+  const handleMoveToGroup = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setLocalStorage(
-      FOLLOWED_CHANNELS_KEY,
-      mergeChannels(groups, selectedRows, selectedGroup, currentGroup)
-    );
-    updateChannelGroupMap(channelGroupMap, selectedRows, selectedGroup);
+    const stored = await chrome.storage.local.get(CHANNEL_GROUPS_KEY);
+    const updatedChannelGroups: Record<string, string> = { ...(stored[CHANNEL_GROUPS_KEY] || {}) };
+    selectedRows.forEach((channel) => {
+      if (channel.login) updatedChannelGroups[channel.login] = selectedGroup;
+    });
+    await chrome.storage.local.set({ [CHANNEL_GROUPS_KEY]: updatedChannelGroups });
     setSelectedGroup("default");
     setToggleCleared(true);
     setSelectedRows([]);

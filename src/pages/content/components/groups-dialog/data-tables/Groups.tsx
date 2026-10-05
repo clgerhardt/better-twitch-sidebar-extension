@@ -35,7 +35,7 @@ export default function GroupsDataTable({
       data={followedChannels}
       expandableRows
       expandableRowsComponent={ChannelsDataTable}
-      expandableRowsComponentProps={{ groups: followedChannels, groupNames: followedChannels.map((group) => group.groupName.toLowerCase()), channelGroupMap: channelGroupMap }}
+      expandableRowsComponentProps={{ groups: followedChannels, groupNames: followedChannels.map((group) => group.groupName), channelGroupMap: channelGroupMap }}
     />
   );
 }

@@ -40,6 +40,28 @@ test("a group added in Manage Groups appears in the sidebar and the dialog", asy
   await expect(twitchPage.locator("#__root")).toContainText("Zebra Squad", { timeout: 5_000 });
 });
 
+test("moving a channel to a group updates the dialog and the sidebar", async ({ twitchPage }) => {
+  await twitchPage.getByRole("button", { name: "Manage Groups" }).click();
+  const dialog = twitchPage.getByRole("dialog");
+  await twitchPage.getByPlaceholder("Add group").fill("Zebra Squad");
+  await twitchPage.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(dialog).toContainText("Zebra Squad");
+
+  // Expand Ungrouped, select a channel, move it
+  await dialog.getByRole("button", { name: /expand row/i }).first().click();
+  await dialog.locator("input[name^=select-row]").first().check();
+  await dialog.locator("#groups-select").selectOption("Zebra Squad");
+  await dialog.getByRole("button", { name: "move-channel" }).click();
+
+  const zebraRow = dialog.getByRole("row").filter({ hasText: "Zebra Squad" }).first();
+  await expect(zebraRow).toContainText("1", { timeout: 2_000 });
+  await twitchPage.keyboard.press("Escape");
+
+  const sidebar = twitchPage.locator("#__root");
+  await sidebar.getByRole("button", { name: /Zebra Squad/ }).click();
+  await expect(sidebar.getByText("Fixture_Live")).toBeVisible();
+});
+
 test("adding a group does not refetch from the Twitch API", async ({ twitchPage }) => {
   await twitchPage.getByRole("button", { name: "Manage Groups" }).click();
   await expect(twitchPage.getByRole("dialog")).toContainText("Ungrouped");

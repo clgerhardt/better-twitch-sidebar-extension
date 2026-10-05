@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 const TWITCH_API_BASE = "https://api.twitch.tv/helix";
 
 export type SidebarChannel = {
+  login: string;
   channelImage: string;
   channelLink: string;
   channelName: string;
@@ -177,6 +178,7 @@ export const useSidebarGroups = (): {
           return {
             login: u.login,
             channel: {
+              login: u.login,
               channelImage: u.profile_image_url,
               channelLink: `https://twitch.tv/${u.display_name}`,
               channelName: u.display_name,
