@@ -1,5 +1,5 @@
 import { Group } from "@src/pages/models/Group";
-import { constants } from "@src/pages/utils/constants";
+import { constants, FOLLOWED_CHANNELS_KEY } from "@src/pages/utils/constants";
 import { messageLogger } from "@src/pages/utils/logger";
 import { AddGroupProps } from "./AddGroupModels";
 import { setLocalStorage } from "@src/pages/background/storage";
@@ -20,7 +20,7 @@ export const AddGroup = ({ groups }: AddGroupProps) => {
       dropdownVisible: false
     };
     groups.push(groupToAdd);
-    setLocalStorage(constants.storage.localStorageKey, groups);
+    setLocalStorage(FOLLOWED_CHANNELS_KEY, groups);
   };
 
   return (

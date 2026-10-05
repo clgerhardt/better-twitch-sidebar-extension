@@ -3,7 +3,7 @@ import { updateChannelGroupMap } from "@src/pages/content/utils/channelGroupMap"
 import { mergeChannels } from "@src/pages/content/utils/merging";
 import { Channel } from "@src/pages/models/Channel";
 import { Group } from "@src/pages/models/Group";
-import { CHANNEL_GROUP_MAP, constants } from "@src/pages/utils/constants";
+import { FOLLOWED_CHANNELS_KEY } from "@src/pages/utils/constants";
 import React, { FormEvent } from "react";
 
 interface Props {
@@ -33,7 +33,7 @@ export const SelectedChannels = ({
   const handleMoveToGroup = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLocalStorage(
-      constants.storage.localStorageKey,
+      FOLLOWED_CHANNELS_KEY,
       mergeChannels(groups, selectedRows, selectedGroup, currentGroup)
     );
     updateChannelGroupMap(channelGroupMap, selectedRows, selectedGroup);

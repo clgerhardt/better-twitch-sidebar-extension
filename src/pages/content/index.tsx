@@ -2,7 +2,7 @@ import { createRoot } from "react-dom/client";
 import "./style.css";
 import "react-accessible-accordion/dist/fancy-example.css";
 import { messageLogger } from "../utils/logger";
-import { CHANNEL_GROUP_MAP, constants, GLOBAL_STATE_KEY } from "../utils/constants";
+import { CHANNEL_GROUPS_KEY, FOLLOWED_CHANNELS_KEY, constants, GLOBAL_STATE_KEY } from "../utils/constants";
 import AccordianChannels from "./components/side-navigation/AccordianChannels";
 import ManageGroups from "./components/manage-groups-cta/ManageGroupsCta";
 import { followersListParser } from "../utils/parser";
@@ -219,11 +219,11 @@ const addMessageListener = () => {
       messageLogger(constants.location.CONTENT_SCRIPT, "Followed channels initialized", groupsList);
       messageLogger(constants.location.CONTENT_SCRIPT, "Channel group map initialized", channelGroupMap);
       await setLocalStorage(
-        constants.storage.localStorageKey,
+        FOLLOWED_CHANNELS_KEY,
         groupsList
       );
       await setLocalStorage(
-        CHANNEL_GROUP_MAP,
+        CHANNEL_GROUPS_KEY,
         channelGroupMap
       );
       const globalS: any = await getLocalStorage(GLOBAL_STATE_KEY)

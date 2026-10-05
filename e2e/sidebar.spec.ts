@@ -22,6 +22,13 @@ test("toggle message hides the Followed Channels section", async ({ twitchPage, 
   await expect(followed).toBeHidden({ timeout: 5_000 });
 });
 
+test("Manage Groups lists the groups shown in the sidebar", async ({ twitchPage }) => {
+  await twitchPage.getByRole("button", { name: "Manage Groups" }).click();
+  const dialog = twitchPage.getByRole("dialog");
+  await expect(dialog).toContainText("Ungrouped");
+  await expect(dialog).not.toContainText("There are no records to display");
+});
+
 // Known defects. test.fail() keeps the suite green while the bug exists and turns
 // red when it is fixed, which is the cue to remove the annotation.
 test.describe("known defects", () => {

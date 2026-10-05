@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getLocalStorage } from "@src/pages/background/storage";
-import { constants } from "@src/pages/utils/constants";
+import { constants, FOLLOWED_CHANNELS_KEY } from "@src/pages/utils/constants";
 import { messageLogger } from "@src/pages/utils/logger";
 
 const useFollowedChannels = () => {
@@ -9,7 +9,7 @@ const useFollowedChannels = () => {
   useEffect(() => {
     const fetchFollowedChannels = async () => {
       try {
-        const channels: any = await getLocalStorage(constants.storage.localStorageKey) || [];
+        const channels: any = await getLocalStorage(FOLLOWED_CHANNELS_KEY) || [];
         setFollowedChannels(channels);
         messageLogger(constants.location.UI_COMPONENT, "followedChannels", channels);
       } catch (e) {
@@ -23,7 +23,7 @@ const useFollowedChannels = () => {
   useEffect(() => {
     const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }) => {
       for (const [key, { newValue }] of Object.entries(changes)) {
-        if (key === constants.storage.localStorageKey) {
+        if (key === FOLLOWED_CHANNELS_KEY) {
           setFollowedChannels(newValue);
         }
       }

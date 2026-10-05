@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getLocalStorage } from "@src/pages/background/storage";
-import { CHANNEL_GROUP_MAP, constants } from "@src/pages/utils/constants";
+import { CHANNEL_GROUPS_KEY, constants } from "@src/pages/utils/constants";
 import { messageLogger } from "@src/pages/utils/logger";
 
 const useChannelGroupMap = () => {
@@ -9,7 +9,7 @@ const useChannelGroupMap = () => {
   useEffect(() => {
     const fetchFollowedChannels = async () => {
       try {
-        const channelsMap: any = await getLocalStorage(CHANNEL_GROUP_MAP) || {};
+        const channelsMap: any = await getLocalStorage(CHANNEL_GROUPS_KEY) || {};
         setChannelGroupMap(channelsMap);
         messageLogger(constants.location.UI_COMPONENT, "channelsGroupMap", channelsMap);
       } catch (e) {
@@ -23,7 +23,7 @@ const useChannelGroupMap = () => {
   useEffect(() => {
     const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }) => {
       for (const [key, { newValue }] of Object.entries(changes)) {
-        if (key === CHANNEL_GROUP_MAP) {
+        if (key === CHANNEL_GROUPS_KEY) {
           setChannelGroupMap(newValue);
         }
       }

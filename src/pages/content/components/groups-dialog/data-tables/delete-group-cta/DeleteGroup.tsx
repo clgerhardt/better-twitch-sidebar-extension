@@ -1,7 +1,7 @@
 import { setLocalStorage } from "@src/pages/background/storage";
 import { mergeChannels } from "@src/pages/content/utils/merging";
 import { Group } from "@src/pages/models/Group";
-import { constants } from "@src/pages/utils/constants";
+import { FOLLOWED_CHANNELS_KEY } from "@src/pages/utils/constants";
 import { useState } from "react";
 import {
   TrashIcon,
@@ -22,7 +22,7 @@ export default function DeleteGroup({
   const deleteGroup = () => {
     setShowAreYouSure(false);
     setLocalStorage(
-      constants.storage.localStorageKey,
+      FOLLOWED_CHANNELS_KEY,
       mergeChannels(allGroups, group.followedChannels).filter(
         (g) => g.groupName !== group.groupName
       )

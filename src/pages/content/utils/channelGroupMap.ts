@@ -1,5 +1,5 @@
 import { setLocalStorage } from "@src/pages/background/storage";
-import { CHANNEL_GROUP_MAP } from "@src/pages/utils/constants";
+import { CHANNEL_GROUPS_KEY } from "@src/pages/utils/constants";
 
 
 export const updateChannelGroupMap = (channelGroupMap: any, groups: any, groupName: string) => {
@@ -7,7 +7,7 @@ export const updateChannelGroupMap = (channelGroupMap: any, groups: any, groupNa
     channelGroupMap[channel.channelName] = groupName;
   });
   setLocalStorage(
-    CHANNEL_GROUP_MAP,
+    CHANNEL_GROUPS_KEY,
     channelGroupMap
   );
 };

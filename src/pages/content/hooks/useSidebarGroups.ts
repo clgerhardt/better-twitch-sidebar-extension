@@ -1,4 +1,5 @@
 import { messageLogger } from "@src/pages/utils/logger";
+import { CHANNEL_GROUPS_KEY, FOLLOWED_CHANNELS_KEY } from "@src/pages/utils/constants";
 import { useEffect, useState } from "react";
 
 const TWITCH_API_BASE = "https://api.twitch.tv/helix";
@@ -64,7 +65,9 @@ export const useSidebarGroups = (): {
   const [channelGroups, setChannelGroups] = useState<Record<string, string>>({});
 
   const doStuff = async () => {
-    chrome.storage.local.get(["twitchToken", "twitchUserId", "channelGroups"], async ({ twitchToken, twitchUserId, channelGroups }) => {
+    chrome.storage.local.get(["twitchToken", "twitchUserId", CHANNEL_GROUPS_KEY], async (stored) => {
+      const { twitchToken, twitchUserId } = stored;
+      const channelGroups = stored[CHANNEL_GROUPS_KEY];
       if (!twitchToken || !twitchUserId) {
         setLoading(false);
         setError("Missing Twitch credentials");
@@ -168,13 +171,13 @@ export const useSidebarGroups = (): {
         );
 
         if (didAddNewMapping) {
-          chrome.storage.local.set({ channelGroups: updatedChannelGroups });
+          chrome.storage.local.set({ [CHANNEL_GROUPS_KEY]: updatedChannelGroups });
         }
 
         setChannelGroups(updatedChannelGroups);
         setGroups(groupList);
         setError(null);
-        chrome.storage.local.set({ followedChannels: groupList });
+        chrome.storage.local.set({ [FOLLOWED_CHANNELS_KEY]: groupList });
       } catch (err) {
         setError("Failed to fetch followed channels");
       } finally {
@@ -188,7 +191,7 @@ export const useSidebarGroups = (): {
     doStuff();
 
     const listener = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
-      if (areaName === "local" && (changes.twitchToken || changes.twitchUserId || changes.channelGroups)) {
+      if (areaName === "local" && (changes.twitchToken || changes.twitchUserId || changes[CHANNEL_GROUPS_KEY])) {
         console.log("[HOOK] twitchToken, twitchUserId or channelGroups changed in storage");
         doStuff();
       }
