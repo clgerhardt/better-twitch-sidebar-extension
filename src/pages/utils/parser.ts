@@ -9,8 +9,9 @@ export const followersListParser = (
     const liveStatus = item.querySelectorAll(
       '[data-a-target="side-nav-live-status"] p'
     );
+    const channelName = item.querySelector('[data-a-target="side-nav-title"]');
     followerData.push({
-      channelName: imageNode?.alt ?? "",
+      channelName: channelName?.textContent ?? "",
       channelLink: `https://twitch.tv${item.getAttribute("href")}`,
       channelImage: imageNode?.src ?? "",
       isLive: liveStatus.length > 0,

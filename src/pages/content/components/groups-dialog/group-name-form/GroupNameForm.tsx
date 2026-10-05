@@ -26,6 +26,7 @@ export const GroupNameForm = ({
   const [errors, setErrors] = useState<ErrorState>(initialErrorState);
   const [showInfoMessage, setShowInfoMessage] = useState(true);
   const [formValue, setFormValue] = useState(value ?? "");
+  const [touched, setTouched] = useState(false);
 
   useEffect(() => {
     if(action === "edit" && initialValue === value) {
@@ -79,6 +80,7 @@ export const GroupNameForm = ({
       setShowInfoMessage(true);
     }
     setFormValue(groupName);
+    setTouched(true);
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -86,6 +88,7 @@ export const GroupNameForm = ({
     submit(formValue);
     if(action === "add") {
       setFormValue("");
+      setTouched(false);
       setErrors({
         ...errors,
         invalid: true,
@@ -120,7 +123,7 @@ export const GroupNameForm = ({
               value={formValue}
               onChange={handleInputChange}
             />
-            {errors.errorMessages.map((error: string) => (
+            {touched && errors.errorMessages.map((error: string) => (
               <p key={error} className="text-red-500 text-sm italic">
                 {error}
               </p>

@@ -10,6 +10,7 @@ const useSidebarState = (tabId: string) => {
     const fetchSidebarState = async () => {
       try {
         const sidebarState: any = await getLocalStorage(constants.storage.prefix + constants.storage.sideBarStateByTab) || {};
+        messageLogger(constants.location.UTIL, "setting side bar state - Fetched sidebar state from local storage", sidebarState[tabId]);
         setIsSidebarExpanded(sidebarState[tabId]?.sidebarExpanded || false);
 
         const manageGroupRoot = document.getElementById("__manage-groups-root");
@@ -34,6 +35,7 @@ const useSidebarState = (tabId: string) => {
           if (manageGroupRoot) {
             manageGroupRoot.style.maxHeight = newValue[tabId]?.sidebarExpanded ? "3.5rem" : "0rem";
           }
+          messageLogger(constants.location.UTIL, "setting side bar state - local storage changing", newValue[tabId]);
           setIsSidebarExpanded(newValue[tabId]?.sidebarExpanded || false);
         }
       }
@@ -42,6 +44,8 @@ const useSidebarState = (tabId: string) => {
     chrome.storage.onChanged.addListener(handleStorageChange);
     return () => chrome.storage.onChanged.removeListener(handleStorageChange);
   }, [tabId]);
+
+  messageLogger(constants.location.UTIL, "useSidebarState", isSidebarExpanded.toString());
 
   return isSidebarExpanded;
 };

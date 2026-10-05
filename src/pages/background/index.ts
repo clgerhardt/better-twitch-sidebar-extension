@@ -6,8 +6,9 @@ import {
   attachStorageListener,
   getLocalStorage,
   setLocalStorage,
+  clearAllStorage
 } from "./storage";
-import { getGlobalState, updateSidebarState } from "./utils";
+import { getGlobalState, isUserLoggedIn, updateSidebarState } from "./utils";
 
 messageLogger(constants.location.BACKGROUND, "background script loaded");
 attachStorageListener();
@@ -19,16 +20,23 @@ chrome.runtime.onInstalled.addListener(async () => {
   );
 
   try {
-    await setLocalStorage(
-      constants.storage.globalState,
-      {
-        loggedIn: false,
-        followersListInitialized: false,
-        showDefaultSidebar: false,
-        initializationDate: new Date().toISOString(),
-        lastUpdated: new Date().toISOString(),
-      } as GlobalState
-    );
+    const success = await clearAllStorage();
+    if (success) {
+      const loggedIn = await isUserLoggedIn();
+      const isoNow   = new Date().toISOString();
+      await setLocalStorage(
+        constants.storage.globalState,
+        {
+          loggedIn: loggedIn,
+          followersListInitialized: false,
+          hideOriginalFollowersList: true,
+          hideStories: false,
+          hideLiveChannels: false,
+          initializationDate: isoNow,
+          lastUpdated: isoNow,
+        } as GlobalState
+      );
+    }
     await setLocalStorage(SIDEBAR_STATE_KEY, []);
   } catch (error) {
     console.error("Error during onInstalled:", error);
@@ -69,7 +77,7 @@ chrome.runtime.onConnect.addListener((port) => {
     port.onMessage.addListener(async (response) => {
       messageLogger(
         constants.location.BACKGROUND,
-        "posted message",
+        "content script posted message",
         response
       );
       let tabs;
@@ -101,6 +109,9 @@ chrome.runtime.onConnect.addListener((port) => {
                 }
               }
               break;
+          case "SYS:Followers:CHANNEL_CARD_UPDATED":
+            messageLogger(constants.location.BACKGROUND, "CHANNEL_CARD_UPDATED", response);
+            break;
           case "SYS:Followers:EXPANDED_SIDEBAR":
           case "SYS:Followers:COLLAPSED_SIDEBAR":
             // eslint-disable-next-line no-case-declarations
@@ -124,12 +135,46 @@ chrome.runtime.onConnect.addListener((port) => {
             );
         }
       } catch (error) {
-        messageLogger(constants.location.BACKGROUND, "Error in port message handling", error);
+        messageLogger(constants.location.BACKGROUND, "Error in content script port message handling", error);
+      }
+    });
+  }
+
+  if (port.name === "popup") {
+    port.onMessage.addListener(async (response) => {
+      messageLogger(
+        constants.location.BACKGROUND,
+        "popup posted message",
+        response
+      );
+      try {
+        switch (response.message) {
+          case "SYS:User:LoggedIn":
+            // eslint-disable-next-line no-case-declarations
+            messageLogger(constants.location.BACKGROUND, "User logged in", response);
+            const storageGlobalState: any = await getGlobalState();
+            if (!storageGlobalState.loggedIn) {
+              await setLocalStorage(constants.storage.globalState, {
+                ...storageGlobalState,
+                loggedIn: true,
+                lastUpdated: new Date().toISOString(),
+              });
+            }
+            break;
+          default:
+            messageLogger(
+              constants.location.BACKGROUND,
+              "no action found for popup message",
+              response
+            );
+        }
+      } catch (error) {
+        messageLogger(constants.location.BACKGROUND, "Error in popup message handling", error);
       }
     });
   }
 
   port.onDisconnect.addListener(() => {
-    messageLogger(constants.location.BACKGROUND, "Disconnected: ", port);
+    messageLogger(constants.location.BACKGROUND, `Disconnected: ${port.name} at ${new Date(Date.now()).toLocaleString()}`);
   });
 });

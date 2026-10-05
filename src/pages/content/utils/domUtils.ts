@@ -13,7 +13,9 @@ export const createElement = (id: any, styles = {}) => {
 };
 
 export const insertBefore = (newElement: any, referenceElement: any) => {
-  const parent = referenceElement.parentNode;
+  messageLogger(constants.location.UTIL, "Entering insertBefore function");
+  console.log("ref ele: ", referenceElement);
+  const parent = referenceElement?.parentNode;
   if (parent) {
     parent.insertBefore(newElement, referenceElement);
   }

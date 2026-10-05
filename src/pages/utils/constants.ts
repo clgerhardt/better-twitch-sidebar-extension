@@ -6,7 +6,9 @@ export const constants = {
     POPUP: 'popup',
     STORAGE: 'storage',
     UTIL: 'util',
-    NOT_SET: 'not_set'
+    OBSERVER: 'observer',
+    NOT_SET: 'not_set',
+    HOOK: 'hook'
   },
   loggerLevel: {
     DEBUG: 'debug',
@@ -21,10 +23,10 @@ export const constants = {
     sideBarStateByTab: 'sideBarStateByTab',
     globalState: 'globalState',
     followedChannels: 'followedChannels',
-    channelGroupMap: 'channelGroupMap'
+    channelGroupMap: 'channelGroups'
   },
   htmlSearchStrings: {
-    ARIA_LABEL_RECOMMENDED_CHANNELS: '[aria-label="Recommended Channels"]'
+    ARIA_LABEL_RECOMMENDED_CHANNELS: '[aria-label="Live Channels"]'
   },
   portMessages: {
     FOLLOWED_CHANNELS_LOADED: 'SYS:Followers:FOLLOWED_CHANNELS_LOADED'

@@ -55,6 +55,21 @@ export const setLocalStorage = async (key: string, value: any) => {
   });
 }
 
+export const clearAllStorage = (): Promise<boolean> => {
+  messageLogger(constants.location.BACKGROUND, "Clearing all storage");
+  return new Promise(resolve => {
+    chrome.storage.local.clear(() => {
+      if (chrome.runtime.lastError) {
+        console.error("Error clearing storage:", chrome.runtime.lastError);
+        resolve(false);
+      } else {
+        console.log("Local storage has been cleared.");
+        resolve(true);
+      }
+    });
+  });
+};
+
 export const attachStorageListener = () => {
   chrome.storage.onChanged.addListener((changes, namespace) => {
     for (const [key, { oldValue, newValue }] of Object.entries(changes)) {

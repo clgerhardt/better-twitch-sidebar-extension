@@ -12,8 +12,6 @@ const ManageGroupsCTA = ({ tabId }: { tabId: string }) => {
   const isSidebarExpanded = useSidebarState(tabId);
   const globalState = useGlobalState();
 
-  if(!globalState.followersListInitialized) return null;
-
   const handleToggleDialog = () => {
     setOpenDialog((prev) => !prev);
   };

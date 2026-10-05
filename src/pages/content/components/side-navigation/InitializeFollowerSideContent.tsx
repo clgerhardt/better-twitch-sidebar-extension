@@ -29,7 +29,7 @@ const InitializeFollowerSideContent = ({ globalState, isSidebarExpanded }: { glo
       </div>
       <div className="py-4">
         <button onClick={()=>{initialize()}} className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">
-          Initialize!
+          Get Started!
         </button>
       </div>
     </div>

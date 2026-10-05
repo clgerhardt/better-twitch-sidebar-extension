@@ -1,3 +1,128 @@
+// import {
+//   Accordion,
+//   AccordionItem,
+//   AccordionItemButton,
+//   AccordionItemHeading,
+//   AccordionItemPanel,
+//   AccordionItemState,
+// } from "react-accessible-accordion";
+// import { useCallback } from "react";
+// import { Group } from "@src/pages/models/Group";
+// import { Channel } from "@src/pages/models/Channel";
+// import useFollowedChannels from "../../hooks/useFollowedChannels";
+// import useSidebarState from "../../hooks/useSidebarState";
+// import {
+//   ChevronDoubleDownIcon,
+//   ChevronDoubleUpIcon,
+// } from "@heroicons/react/24/outline";
+// import useGlobalState from "../../hooks/useGlobalState";
+// import InitializeFollowerSideContent from "./InitializeFollowerSideContent";
+// import NotLoggedInContent from "./NotLoggedInContent";
+// import { messageLogger } from "@src/pages/utils/logger";
+// import { constants } from "@src/pages/utils/constants";
+
+// const AccordianChannels = ({ tabId }: { tabId: string }) => {
+//   const followedChannelsState = useFollowedChannels();
+//   const isSidebarExpanded = useSidebarState(tabId);
+//   const globalState = useGlobalState();
+
+//   messageLogger(constants.location.UI_COMPONENT, "isSidebarExpanded", isSidebarExpanded.toString());
+
+//   const handleChannelClick = useCallback((channelLink: string) => {
+//     document.location = channelLink;
+//   }, []);
+
+//   if (!globalState.loggedIn) {
+//     return <div><NotLoggedInContent isSidebarExpanded={isSidebarExpanded}></NotLoggedInContent></div>
+//   }
+
+//   if (globalState.followersListInitialized && followedChannelsState.length === 0) {
+//     return <div className="text-center">No channels to show</div>;
+//   }
+
+//   return (
+//     <div>
+//       {!globalState.followersListInitialized && <InitializeFollowerSideContent globalState={globalState} isSidebarExpanded={isSidebarExpanded} />}
+//       {globalState.followersListInitialized && <div className="overflow-y-auto" style={{ maxHeight: "50vh" }}>
+//         <Accordion allowZeroExpanded>
+//           {followedChannelsState.map((group: Group) => (
+//             <AccordionItem key={group.groupName}>
+//               <div className="grid grid-cols-3 gap-2 items-center">
+//                 <div className="col-start-1 col-end-4">
+//                   <AccordionItemHeading
+//                     id="expanded-side-bar-title"
+//                     className="text-2xl my-1.5"
+//                   >
+//                     <AccordionItemButton  className={isSidebarExpanded ? "p-4 rounded-3xl text-left w-full cursor-pointer bg-purple-500" : "flex justify-center p-4 rounded-3xl text-left w-full cursor-pointer bg-purple-500"} >
+//                       {isSidebarExpanded ? (
+//                         <div
+//                           id="expanded-side-bar-heading"
+//                           className="grid grid-cols-3 gap-2"
+//                         >
+//                           <div className="text-white col-start-1 col-end-4">
+//                             {group.groupName}
+//                           </div>
+//                           <div className="col-end-5">
+//                             <AccordionItemState>
+//                               {({ expanded }) =>
+//                                 expanded ? (
+//                                   <ChevronDoubleUpIcon className="h-10 w-10 text-white" />
+//                                 ) : (
+//                                   <ChevronDoubleDownIcon className="h-10 w-10 text-white" />
+//                                 )
+//                               }
+//                             </AccordionItemState>
+//                           </div>
+//                         </div>
+//                       ) : (
+//                         <AccordionItemState>
+//                           {({ expanded }) =>
+//                             expanded ? (
+//                               <ChevronDoubleUpIcon className="h-10 w-10 text-white" />
+//                             ) : (
+//                               <ChevronDoubleDownIcon className="h-10 w-10 text-white" />
+//                             )
+//                           }
+//                         </AccordionItemState>
+//                       )}
+//                     </AccordionItemButton>
+//                   </AccordionItemHeading>
+//                 </div>
+//               </div>
+//               <AccordionItemPanel className="p-0 pt-1">
+//                 <div data-testid="group-container">
+//                   <ul role="list" className="divide-y divide-gray-100">
+//                     {group.followedChannels.map((channel: Channel) => (
+//                       <div
+//                         key={channel.channelName}
+//                         className="has-tooltip hover:bg-custom-twitch-light-gray p-2"
+//                       >
+//                         <div
+//                           className="py-0.5 cursor-pointer pl-1"
+//                           onClick={() => handleChannelClick(channel.channelLink)}
+//                           dangerouslySetInnerHTML={{
+//                             __html: `<div class="flex">${channel.expandedHTML}</div>`,
+//                           }}
+//                         />
+//                       </div>
+//                     ))}
+//                   </ul>
+//                   {group.followedChannels.length === 0 && (
+//                     <div className="text-center">No channels to show</div>
+//                   )}
+//                 </div>
+//               </AccordionItemPanel>
+//             </AccordionItem>
+//           ))}
+//         </Accordion>
+//       </div>}
+//     </div>
+//   );
+// };
+
+// export default AccordianChannels;
+
+
 import {
   Accordion,
   AccordionItem,
@@ -6,107 +131,133 @@ import {
   AccordionItemPanel,
   AccordionItemState,
 } from "react-accessible-accordion";
-import { useCallback } from "react";
-import { Group } from "@src/pages/models/Group";
-import { Channel } from "@src/pages/models/Channel";
-import useFollowedChannels from "../../hooks/useFollowedChannels";
-import useSidebarState from "../../hooks/useSidebarState";
+import { useCallback, useEffect, useState } from "react";
 import {
   ChevronDoubleDownIcon,
   ChevronDoubleUpIcon,
 } from "@heroicons/react/24/outline";
+import useSidebarState from "../../hooks/useSidebarState";
 import useGlobalState from "../../hooks/useGlobalState";
-import InitializeFollowerSideContent from "./InitializeFollowerSideContent";
+import NotLoggedInContent from "./NotLoggedInContent";
+import { messageLogger } from "@src/pages/utils/logger";
+import { constants } from "@src/pages/utils/constants";
+import { useSidebarGroups } from "../../hooks/useSidebarGroups";
 
 const AccordianChannels = ({ tabId }: { tabId: string }) => {
-  const followedChannelsState = useFollowedChannels();
   const isSidebarExpanded = useSidebarState(tabId);
   const globalState = useGlobalState();
+  const { groups, loading, error } = useSidebarGroups();
+  const [visibleGroups, setVisibleGroups] = useState(groups);
 
   const handleChannelClick = useCallback((channelLink: string) => {
     document.location = channelLink;
   }, []);
 
-  if (followedChannelsState.length === 0) {
-    return <div className="text-center">No channels to show</div>;
+  useEffect(() => {
+    messageLogger(constants.location.UI_COMPONENT, "groups", groups);
+    setVisibleGroups(groups); // ensure re-render if `groups` is a stable reference
+  }, [groups]);
+
+  if (!globalState.loggedIn) {
+    return <div><NotLoggedInContent isSidebarExpanded={isSidebarExpanded} /></div>
+  }
+
+  if (loading) {
+    return <div className="text-center">Loading groups and channels...</div>;
+  }
+
+  if (error === "Missing Twitch credentials") {
+    return <NotLoggedInContent isSidebarExpanded={isSidebarExpanded} />;
+  }
+
+  if (error) {
+    return <div className="text-center text-red-500">Error loading groups: {error}</div>;
   }
 
   return (
     <div>
-      {!globalState.followersListInitialized && <InitializeFollowerSideContent globalState={globalState} isSidebarExpanded={isSidebarExpanded} />}
-      {globalState.followersListInitialized && <div className="overflow-y-auto" style={{ maxHeight: "50vh" }}>
+      <div className="overflow-y-auto" style={{ maxHeight: "50vh" }}>
         <Accordion allowZeroExpanded>
-          {followedChannelsState.map((group: Group) => (
-            <AccordionItem key={group.groupName}>
-              <div className="grid grid-cols-3 gap-2 items-center">
-                <div className="col-start-1 col-end-4">
-                  <AccordionItemHeading
-                    id="expanded-side-bar-title"
-                    className="text-2xl my-1.5"
-                  >
-                    <AccordionItemButton className="p-4 rounded-3xl text-left w-full cursor-pointer bg-purple-500">
-                      {isSidebarExpanded ? (
-                        <div
-                          id="expanded-side-bar-heading"
-                          className="grid grid-cols-3 gap-2"
-                        >
-                          <div className="text-white col-start-1 col-end-4">
-                            {group.groupName}
-                          </div>
-                          <div className="col-end-5">
-                            <AccordionItemState>
-                              {({ expanded }) =>
-                                expanded ? (
-                                  <ChevronDoubleUpIcon className="h-10 w-10 text-white" />
-                                ) : (
-                                  <ChevronDoubleDownIcon className="h-10 w-10 text-white" />
-                                )
-                              }
-                            </AccordionItemState>
-                          </div>
-                        </div>
-                      ) : (
-                        <AccordionItemState>
-                          {({ expanded }) =>
-                            expanded ? (
-                              <ChevronDoubleUpIcon className="h-10 w-10 text-white" />
-                            ) : (
-                              <ChevronDoubleDownIcon className="h-10 w-10 text-white" />
-                            )
-                          }
-                        </AccordionItemState>
-                      )}
-                    </AccordionItemButton>
-                  </AccordionItemHeading>
-                </div>
-              </div>
-              <AccordionItemPanel className="p-0 pt-1">
-                <div data-testid="group-container">
-                  <ul role="list" className="divide-y divide-gray-100">
-                    {group.followedChannels.map((channel: Channel) => (
+          {visibleGroups.map((group) => (
+          <AccordionItem key={group.groupName}>
+            <div className="grid grid-cols-3 gap-2 items-center">
+              <div className="col-start-1 col-end-4">
+                <AccordionItemHeading
+                  id="expanded-side-bar-title"
+                  className="text-2xl my-1.5"
+                >
+                  <AccordionItemButton className={isSidebarExpanded ? "p-4 rounded-3xl text-left w-full cursor-pointer bg-purple-500" : "flex justify-center p-4 rounded-3xl text-left w-full cursor-pointer bg-purple-500"}>
+                    {isSidebarExpanded ? (
                       <div
-                        key={channel.channelName}
-                        className="has-tooltip hover:bg-custom-twitch-light-gray p-2"
+                        id="expanded-side-bar-heading"
+                        className="grid grid-cols-3 gap-2"
                       >
-                        <div
-                          className="py-0.5 cursor-pointer"
-                          onClick={() => handleChannelClick(channel.channelLink)}
-                          dangerouslySetInnerHTML={{
-                            __html: `<div class="flex">${channel.expandedHTML}</div>`,
-                          }}
-                        />
+                        <div className="text-white col-start-1 col-end-4">
+                          {group.groupName}
+                        </div>
+                        <div className="col-end-5">
+                          <AccordionItemState>
+                            {({ expanded }) =>
+                              expanded ? (
+                                <ChevronDoubleUpIcon className="h-10 w-10 text-white" />
+                              ) : (
+                                <ChevronDoubleDownIcon className="h-10 w-10 text-white" />
+                              )
+                            }
+                          </AccordionItemState>
+                        </div>
                       </div>
-                    ))}
-                  </ul>
-                  {group.followedChannels.length === 0 && (
-                    <div className="text-center">No channels to show</div>
-                  )}
-                </div>
-              </AccordionItemPanel>
-            </AccordionItem>
+                    ) : (
+                      <AccordionItemState>
+                        {({ expanded }) =>
+                          expanded ? (
+                            <ChevronDoubleUpIcon className="h-10 w-10 text-white" />
+                          ) : (
+                            <ChevronDoubleDownIcon className="h-10 w-10 text-white" />
+                          )
+                        }
+                      </AccordionItemState>
+                    )}
+                  </AccordionItemButton>
+                </AccordionItemHeading>
+              </div>
+            </div>
+            <AccordionItemPanel className="p-0 pt-1">
+              <div data-testid="group-container">
+                <ul role="list" className="divide-y divide-gray-100">
+                  {group.followedChannels.map((channel, idx) => (
+                    <li
+                      key={idx}
+                      className="has-tooltip hover:bg-custom-twitch-light-gray p-2 cursor-pointer"
+                      onClick={() => handleChannelClick(channel.channelLink)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <img
+                          src={channel.channelImage}
+                          alt=""
+                          className="w-8 h-8 rounded-full"
+                        />
+                        <div className="text-sm">
+                          <div className="font-semibold">{channel.channelName}</div>
+                          {channel.isLive && (
+                            <div className="text-xs text-green-500">
+                              {channel.streamingContent} · {channel.viewerCount}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                {group.followedChannels.length === 0 && (
+                  <div className="text-center">No channels to show</div>
+                )}
+              </div>
+            </AccordionItemPanel>
+          </AccordionItem>
           ))}
         </Accordion>
-      </div>}
+      </div>
     </div>
   );
 };

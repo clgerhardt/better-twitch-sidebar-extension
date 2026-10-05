@@ -14,9 +14,11 @@
   "icons": {
     "128": "icon-128.png"
   },
+  "incognito": "split",
   "permissions": [
     "tabs",
     "bookmarks",
+    "webRequest",
     "storage",
     "identity",
     "cookies",
@@ -25,7 +27,8 @@
     "unlimitedStorage"
   ],
   "host_permissions": [
-    "https://*.twitch.tv/*"
+    "https://*.twitch.tv/*",
+    "https://api.twitch.tv/*"
   ],
   "content_scripts": [
     {
@@ -42,6 +45,11 @@
       ]
     }
   ],
+  "oauth2": {
+    "client_id": "2eqeyehs2r153z4f7d18wurlhpudsl",
+    "scopes": ["user:read:follows"],
+    "redirect_uri": "https://ppeijopobnpjcnaimpcoamnkdikfafjd.chromiumapp.org/"
+  },
   "devtools_page": "src/pages/devtools/index.html",
   "web_accessible_resources": [
     {
