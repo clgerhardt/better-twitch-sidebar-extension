@@ -390,3 +390,7 @@ $RECYCLE.BIN/
 
 #generated manifest
 public/manifest.json
+
+# playwright
+/test-results
+/playwright-report
