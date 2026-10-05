@@ -59,8 +59,10 @@ const applySidebarVisibilityFromState = (globalState: any) => {
 
     if (overrideStyle) {
       element.style.setProperty("display", hidden ? "none" : "block", "important");
+    } else if (hidden) {
+      element.style.setProperty("display", "none", "important");
     } else {
-      element.style.display = hidden ? "none" : "block";
+      element.style.removeProperty("display");
     }
   }
 };
