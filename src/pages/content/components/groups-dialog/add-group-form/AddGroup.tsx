@@ -1,26 +1,15 @@
-import { Group } from "@src/pages/models/Group";
-import { constants, FOLLOWED_CHANNELS_KEY } from "@src/pages/utils/constants";
+import { constants, GROUP_NAMES_KEY } from "@src/pages/utils/constants";
 import { messageLogger } from "@src/pages/utils/logger";
 import { AddGroupProps } from "./AddGroupModels";
-import { setLocalStorage } from "@src/pages/background/storage";
 import { GroupNameForm } from "../group-name-form/GroupNameForm";
 
 
 export const AddGroup = ({ groups }: AddGroupProps) => {
-  const addGroupToStorage = (groupName: string) => {
+  const addGroupToStorage = async (groupName: string) => {
     messageLogger(constants.location.UI_COMPONENT, "addGroupToFollowedChannels:addGroupInput", groupName);
-    const groupToAdd: Group = {
-      groupName: groupName,
-      numberOfChannels: 0,
-      followedChannels: [],
-      order: groups.length,
-      default: false,
-      numberOfLiveChannels: 0,
-      dialogOpen: false,
-      dropdownVisible: false
-    };
-    groups.push(groupToAdd);
-    setLocalStorage(FOLLOWED_CHANNELS_KEY, groups);
+    const stored = await chrome.storage.local.get(GROUP_NAMES_KEY);
+    const groupNames: string[] = stored[GROUP_NAMES_KEY] || [];
+    await chrome.storage.local.set({ [GROUP_NAMES_KEY]: [...groupNames, groupName] });
   };
 
   return (

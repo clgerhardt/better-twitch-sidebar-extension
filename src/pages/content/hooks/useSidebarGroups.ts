@@ -1,6 +1,6 @@
 import { messageLogger } from "@src/pages/utils/logger";
-import { CHANNEL_GROUPS_KEY, FOLLOWED_CHANNELS_KEY } from "@src/pages/utils/constants";
-import { useEffect, useState } from "react";
+import { CHANNEL_GROUPS_KEY, FOLLOWED_CHANNELS_KEY, GROUP_NAMES_KEY } from "@src/pages/utils/constants";
+import { useEffect, useRef, useState } from "react";
 
 const TWITCH_API_BASE = "https://api.twitch.tv/helix";
 
@@ -64,10 +64,65 @@ export const useSidebarGroups = (): {
   const [error, setError] = useState<string | null>(null);
   const [channelGroups, setChannelGroups] = useState<Record<string, string>>({});
 
-  const doStuff = async () => {
-    chrome.storage.local.get(["twitchToken", "twitchUserId", CHANNEL_GROUPS_KEY], async (stored) => {
-      const { twitchToken, twitchUserId } = stored;
-      const channelGroups = stored[CHANNEL_GROUPS_KEY];
+  // Followed channels from the Twitch API, kept so group edits can re-layout without refetching
+  const fetchedRef = useRef<{ login: string; channel: SidebarChannel }[] | null>(null);
+
+  const applyLayout = () => {
+    chrome.storage.local.get([CHANNEL_GROUPS_KEY, GROUP_NAMES_KEY], (stored) => {
+      const fetched = fetchedRef.current ?? [];
+      const groupNames: string[] = stored[GROUP_NAMES_KEY] || [];
+      const updatedChannelGroups: Record<string, string> = stored[CHANNEL_GROUPS_KEY] || {};
+      const groupMap: Record<string, SidebarChannel[]> = {};
+
+      let didAddNewMapping = false;
+
+      fetched.forEach(({ login, channel }) => {
+        const groupName = updatedChannelGroups[login] || "Ungrouped";
+
+        if (!updatedChannelGroups[login]) {
+          updatedChannelGroups[login] = "Ungrouped";
+          didAddNewMapping = true;
+        }
+
+        if (!groupMap[groupName]) groupMap[groupName] = [];
+        groupMap[groupName].push(channel);
+      });
+
+      // Ungrouped first, then user-created groups in order (including empty ones),
+      // then any group that only exists in the channel map
+      const orderedNames = [
+        "Ungrouped",
+        ...groupNames,
+        ...Object.keys(groupMap).filter((n) => n !== "Ungrouped" && !groupNames.includes(n)),
+      ];
+
+      const groupList: SidebarGroup[] = orderedNames.map((groupName, index) => {
+        const channels = [...(groupMap[groupName] ?? [])];
+        return {
+          default: groupName === "Ungrouped",
+          dialogOpen: false,
+          dropdownVisible: false,
+          followedChannels: channels.sort((a, b) => a.isLive === b.isLive ? 0 : a.isLive ? -1 : 1),
+          groupName,
+          numberOfChannels: channels.length,
+          numberOfLiveChannels: channels.filter((c) => c.isLive).length,
+          order: index,
+        };
+      });
+
+      if (didAddNewMapping) {
+        chrome.storage.local.set({ [CHANNEL_GROUPS_KEY]: updatedChannelGroups });
+      }
+
+      setChannelGroups(updatedChannelGroups);
+      setGroups(groupList);
+      setError(null);
+      chrome.storage.local.set({ [FOLLOWED_CHANNELS_KEY]: groupList });
+    });
+  };
+
+  const fetchChannels = async () => {
+    chrome.storage.local.get(["twitchToken", "twitchUserId"], async ({ twitchToken, twitchUserId }) => {
       if (!twitchToken || !twitchUserId) {
         setLoading(false);
         setError("Missing Twitch credentials");
@@ -99,18 +154,8 @@ export const useSidebarGroups = (): {
         const followedIds = followRes.map((f: any) => f.broadcaster_id);
 
         if (!followedIds.length) {
-          setGroups([
-            {
-              default: true,
-              dialogOpen: false,
-              dropdownVisible: false,
-              followedChannels: [],
-              groupName: "Ungrouped",
-              numberOfChannels: 0,
-              numberOfLiveChannels: 0,
-              order: 0,
-            },
-          ]);
+          fetchedRef.current = [];
+          applyLayout();
           return;
         }
 
@@ -127,57 +172,21 @@ export const useSidebarGroups = (): {
           ])
         );
 
-        // Initialize or clone existing group map
-        let updatedChannelGroups: Record<string, string> = channelGroups || {};
-        let groupMap: Record<string, SidebarChannel[]> = {};
-
-        let didAddNewMapping = false;
-
-        usersRes.forEach((u: any) => {
-          const login = u.login;
-          const groupName = updatedChannelGroups[login] || "Ungrouped";
-
-          if (!updatedChannelGroups[login]) {
-            updatedChannelGroups[login] = "Ungrouped";
-            didAddNewMapping = true;
-          }
-
+        fetchedRef.current = usersRes.map((u: any) => {
           const liveInfo = liveMap.get(u.id);
-
-          const channel: SidebarChannel = {
-            channelImage: u.profile_image_url,
-            channelLink: `https://twitch.tv/${u.display_name}`,
-            channelName: u.display_name,
-            isLive: !!liveInfo,
-            streamingContent: liveInfo?.streamingContent,
-            viewerCount: liveInfo?.viewerCount,
+          return {
+            login: u.login,
+            channel: {
+              channelImage: u.profile_image_url,
+              channelLink: `https://twitch.tv/${u.display_name}`,
+              channelName: u.display_name,
+              isLive: !!liveInfo,
+              streamingContent: liveInfo?.streamingContent,
+              viewerCount: liveInfo?.viewerCount,
+            },
           };
-
-          if (!groupMap[groupName]) groupMap[groupName] = [];
-          groupMap[groupName].push(channel);
         });
-
-        const groupList: SidebarGroup[] = Object.entries(groupMap).map(
-          ([groupName, channels], index) => ({
-            default: groupName === "Ungrouped",
-            dialogOpen: false,
-            dropdownVisible: false,
-            followedChannels: channels.sort((a, b) => a.isLive === b.isLive ? 0 : a.isLive ? -1 : 1),
-            groupName,
-            numberOfChannels: channels.length,
-            numberOfLiveChannels: channels.filter((c) => c.isLive).length,
-            order: index,
-          })
-        );
-
-        if (didAddNewMapping) {
-          chrome.storage.local.set({ [CHANNEL_GROUPS_KEY]: updatedChannelGroups });
-        }
-
-        setChannelGroups(updatedChannelGroups);
-        setGroups(groupList);
-        setError(null);
-        chrome.storage.local.set({ [FOLLOWED_CHANNELS_KEY]: groupList });
+        applyLayout();
       } catch (err) {
         setError("Failed to fetch followed channels");
       } finally {
@@ -188,12 +197,16 @@ export const useSidebarGroups = (): {
   };
 
   useEffect(() => {
-    doStuff();
+    fetchChannels();
 
     const listener = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
-      if (areaName === "local" && (changes.twitchToken || changes.twitchUserId || changes[CHANNEL_GROUPS_KEY])) {
-        console.log("[HOOK] twitchToken, twitchUserId or channelGroups changed in storage");
-        doStuff();
+      if (areaName !== "local") return;
+      if (changes.twitchToken || changes.twitchUserId) {
+        console.log("[HOOK] twitchToken or twitchUserId changed in storage");
+        fetchChannels();
+      } else if (changes[CHANNEL_GROUPS_KEY] || changes[GROUP_NAMES_KEY]) {
+        if (fetchedRef.current) applyLayout();
+        else fetchChannels();
       }
     };
     chrome.storage.onChanged.addListener(listener);

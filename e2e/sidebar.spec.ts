@@ -29,6 +29,33 @@ test("Manage Groups lists the groups shown in the sidebar", async ({ twitchPage 
   await expect(dialog).not.toContainText("There are no records to display");
 });
 
+test("a group added in Manage Groups appears in the sidebar and the dialog", async ({ twitchPage }) => {
+  await twitchPage.getByRole("button", { name: "Manage Groups" }).click();
+  await twitchPage.getByPlaceholder("Add group").fill("Zebra Squad");
+  await twitchPage.getByRole("button", { name: "Add", exact: true }).click();
+
+  const dialog = twitchPage.getByRole("dialog");
+  await expect(dialog).toContainText("Zebra Squad", { timeout: 5_000 });
+  await twitchPage.keyboard.press("Escape");
+  await expect(twitchPage.locator("#__root")).toContainText("Zebra Squad", { timeout: 5_000 });
+});
+
+test("adding a group does not refetch from the Twitch API", async ({ twitchPage }) => {
+  await twitchPage.getByRole("button", { name: "Manage Groups" }).click();
+  await expect(twitchPage.getByRole("dialog")).toContainText("Ungrouped");
+
+  const apiCalls: string[] = [];
+  twitchPage.on("request", (req) => {
+    if (req.url().startsWith("https://api.twitch.tv/")) apiCalls.push(req.url());
+  });
+
+  await twitchPage.getByPlaceholder("Add group").fill("Quick Group");
+  await twitchPage.getByRole("button", { name: "Add", exact: true }).click();
+  // Fast timeout: the group must appear from stored data, not after a refetch
+  await expect(twitchPage.getByRole("dialog")).toContainText("Quick Group", { timeout: 200 });
+  expect(apiCalls).toEqual([]);
+});
+
 // Known defects. test.fail() keeps the suite green while the bug exists and turns
 // red when it is fixed, which is the cue to remove the annotation.
 test.describe("known defects", () => {
@@ -41,13 +68,4 @@ test.describe("known defects", () => {
     });
   });
 
-  test.fail(true, "dialog writes a different storage key than the sidebar reads");
-  test("a group added in Manage Groups appears in the sidebar", async ({ twitchPage }) => {
-    await twitchPage.getByRole("button", { name: "Manage Groups" }).click();
-    await twitchPage.getByPlaceholder("Add group").fill("Zebra Squad");
-    await twitchPage.getByRole("button", { name: "Add", exact: true }).click();
-    await twitchPage.keyboard.press("Escape");
-
-    await expect(twitchPage.locator("#__root")).toContainText("Zebra Squad", { timeout: 5_000 });
-  });
 });
