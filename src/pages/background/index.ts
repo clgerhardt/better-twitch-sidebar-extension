@@ -9,35 +9,42 @@ import {
   clearAllStorage
 } from "./storage";
 import { getGlobalState, isUserLoggedIn, updateSidebarState } from "./utils";
+import { resolveGlobalState, shouldClearStorage } from "./installState";
 
 messageLogger(constants.location.BACKGROUND, "background script loaded");
 attachStorageListener();
 
-chrome.runtime.onInstalled.addListener(async () => {
+chrome.runtime.onInstalled.addListener(async (details) => {
   messageLogger(
     constants.location.BACKGROUND,
-    "I just installed my chrome extension"
+    "onInstalled: " + details.reason
   );
 
   try {
-    const success = await clearAllStorage();
-    if (success) {
-      const loggedIn = await isUserLoggedIn();
-      const isoNow   = new Date().toISOString();
-      await setLocalStorage(
-        constants.storage.globalState,
-        {
-          loggedIn: loggedIn,
-          followersListInitialized: false,
-          hideOriginalFollowersList: true,
-          hideStories: false,
-          hideLiveChannels: false,
-          initializationDate: isoNow,
-          lastUpdated: isoNow,
-        } as GlobalState
-      );
+    if (shouldClearStorage(details.reason)) {
+      await clearAllStorage();
     }
-    await setLocalStorage(SIDEBAR_STATE_KEY, []);
+
+    const existing = (await getGlobalState().catch(() => undefined)) as Partial<GlobalState> | undefined;
+    const isoNow = new Date().toISOString();
+    const defaults: GlobalState = {
+      loggedIn: await isUserLoggedIn(),
+      followersListInitialized: false,
+      hideOriginalFollowersList: true,
+      hideStories: false,
+      hideLiveChannels: false,
+      initializationDate: isoNow,
+      lastUpdated: isoNow,
+    };
+    await setLocalStorage(
+      constants.storage.globalState,
+      resolveGlobalState(details.reason, existing, defaults)
+    );
+
+    const sidebarState = await getLocalStorage(SIDEBAR_STATE_KEY).catch(() => undefined);
+    if (!sidebarState) {
+      await setLocalStorage(SIDEBAR_STATE_KEY, []);
+    }
   } catch (error) {
     console.error("Error during onInstalled:", error);
   }
