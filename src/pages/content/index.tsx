@@ -110,9 +110,10 @@ const connectToBackground = async () => {
     const globalS: any = await getLocalStorage(GLOBAL_STATE_KEY);
     const success = await waitForSidebarElements([
       "[aria-label='Followed Channels']",
-      "[aria-label='Live Channels']",
-      "[class*='storiesLeftNavSection']"
+      "[aria-label='Live Channels']"
     ]);
+    // Stories is optional (not every page or account has it): only give it a short grace period
+    await waitForSidebarElements(["[class*='storiesLeftNavSection']"], 1000);
 
     if (success) {
       applySidebarVisibilityFromState(globalS);

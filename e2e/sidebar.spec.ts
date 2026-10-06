@@ -172,16 +172,11 @@ test("adding a group does not refetch from the Twitch API", async ({ twitchPage 
   expect(apiCalls).toEqual([]);
 });
 
-// Known defects. test.fail() keeps the suite green while the bug exists and turns
-// red when it is fixed, which is the cue to remove the annotation.
-test.describe("known defects", () => {
-  test.describe("page without a Stories section", () => {
-    test.use({ removeStories: true });
-    test.fail(true, "saved visibility is only applied when all three sidebar selectors are found");
-    test("a fresh install hides the original Followed Channels list on load", async ({ twitchPage }) => {
-      // onInstalled defaults hideOriginalFollowersList to true
-      await expect(twitchPage.locator("[aria-label='Followed Channels']")).toBeHidden({ timeout: 8_000 });
-    });
-  });
+test.describe("page without a Stories section", () => {
+  test.use({ removeStories: true });
 
+  test("a fresh install hides the original Followed Channels list on load", async ({ twitchPage }) => {
+    // onInstalled defaults hideOriginalFollowersList to true
+    await expect(twitchPage.locator("[aria-label='Followed Channels']")).toBeHidden({ timeout: 8_000 });
+  });
 });
