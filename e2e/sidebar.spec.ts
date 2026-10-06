@@ -1,4 +1,22 @@
 import { test, expect } from "./extension";
+import type { Locator, Page } from "@playwright/test";
+
+const addGroup = async (page: Page, name: string) => {
+  await page.getByPlaceholder("Add group").fill(name);
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(page.getByRole("dialog")).toContainText(name);
+};
+
+// Expands the Ungrouped row, selects its first channel and moves it to `group`
+const moveFirstChannelTo = async (dialog: Locator, group: string) => {
+  await dialog.getByRole("button", { name: /expand row/i }).first().click();
+  await dialog.locator("input[name^=select-row]").first().check();
+  await dialog.locator("#groups-select").selectOption({ label: group });
+  await dialog.getByRole("button", { name: "move-channel" }).click();
+  await dialog.getByRole("button", { name: /collapse row/i }).first().click();
+};
+
+const groupRow = (dialog: Locator, name: string) => dialog.getByRole("row").filter({ hasText: name }).first();
 
 test("renders the Ungrouped group and Manage Groups button for a logged-in user", async ({ twitchPage }) => {
   await expect(twitchPage.locator("#__root")).toContainText("Ungrouped");
@@ -60,6 +78,82 @@ test("moving a channel to a group updates the dialog and the sidebar", async ({ 
   const sidebar = twitchPage.locator("#__root");
   await sidebar.getByRole("button", { name: /Zebra Squad/ }).click();
   await expect(sidebar.getByText("Fixture_Live")).toBeVisible();
+});
+
+test("renaming a group keeps its channels and updates the sidebar", async ({ twitchPage }) => {
+  await twitchPage.getByRole("button", { name: "Manage Groups" }).click();
+  const dialog = twitchPage.getByRole("dialog");
+  await addGroup(twitchPage, "Zebra Squad");
+  await moveFirstChannelTo(dialog, "Zebra Squad");
+
+  await groupRow(dialog, "Zebra Squad").getByRole("button", { name: "edit-group-name" }).click();
+  await dialog.getByPlaceholder("Updated Name").fill("Quagga Crew");
+  await dialog.getByRole("button", { name: "save-group-name" }).click();
+
+  await expect(dialog).toContainText("Quagga Crew");
+  await expect(dialog).not.toContainText("Zebra Squad");
+  await expect(groupRow(dialog, "Quagga Crew")).toContainText("1");
+  await twitchPage.keyboard.press("Escape");
+
+  const sidebar = twitchPage.locator("#__root");
+  await expect(sidebar).not.toContainText("Zebra Squad");
+  await sidebar.getByRole("button", { name: /Quagga Crew/ }).click();
+  await expect(sidebar.getByText("Fixture_Live")).toBeVisible();
+});
+
+test("a group can be renamed to a different capitalisation of its own name", async ({ twitchPage }) => {
+  await twitchPage.getByRole("button", { name: "Manage Groups" }).click();
+  const dialog = twitchPage.getByRole("dialog");
+  await addGroup(twitchPage, "zebra squad");
+
+  await groupRow(dialog, "zebra squad").getByRole("button", { name: "edit-group-name" }).click();
+  await dialog.getByPlaceholder("Updated Name").fill("Zebra Squad");
+  await expect(dialog).not.toContainText("already exists");
+  await dialog.getByRole("button", { name: "save-group-name" }).click();
+
+  await expect(dialog.getByText("Zebra Squad", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("zebra squad", { exact: true })).toHaveCount(0);
+});
+
+test("group names are unique regardless of case", async ({ twitchPage }) => {
+  await twitchPage.getByRole("button", { name: "Manage Groups" }).click();
+  const dialog = twitchPage.getByRole("dialog");
+  await addGroup(twitchPage, "Alpha");
+  await addGroup(twitchPage, "Beta");
+
+  // Adding a different-case duplicate is rejected
+  await twitchPage.getByPlaceholder("Add group").fill("ALPHA");
+  await expect(dialog).toContainText("Group name already exists");
+  await expect(dialog.getByRole("button", { name: "Add", exact: true })).toBeDisabled();
+
+  // So is renaming another group to it
+  await groupRow(dialog, "Beta").getByRole("button", { name: "edit-group-name" }).click();
+  await dialog.getByPlaceholder("Updated Name").fill("alpha");
+  await expect(dialog).toContainText("Group name already exists");
+  await expect(dialog.getByRole("button", { name: "save-group-name" })).toBeDisabled();
+});
+
+test("deleting a group sends its channels back to Ungrouped", async ({ twitchPage }) => {
+  await twitchPage.getByRole("button", { name: "Manage Groups" }).click();
+  const dialog = twitchPage.getByRole("dialog");
+  await addGroup(twitchPage, "Zebra Squad");
+  await moveFirstChannelTo(dialog, "Zebra Squad");
+  await expect(groupRow(dialog, "Ungrouped")).toContainText("2");
+
+  await groupRow(dialog, "Zebra Squad").getByRole("button", { name: "delete-group" }).click();
+  await dialog.getByRole("button", { name: "Are you sure?" }).click();
+
+  await expect(dialog).not.toContainText("Zebra Squad");
+  await expect(groupRow(dialog, "Ungrouped")).toContainText("3");
+  await twitchPage.keyboard.press("Escape");
+  await expect(twitchPage.locator("#__root")).not.toContainText("Zebra Squad");
+});
+
+test("the default group cannot be renamed or deleted", async ({ twitchPage }) => {
+  await twitchPage.getByRole("button", { name: "Manage Groups" }).click();
+  const row = groupRow(twitchPage.getByRole("dialog"), "Ungrouped");
+  await expect(row).toContainText("Cannot delete default group");
+  await expect(row.getByRole("button", { name: "edit-group-name" })).toHaveCount(0);
 });
 
 test("adding a group does not refetch from the Twitch API", async ({ twitchPage }) => {

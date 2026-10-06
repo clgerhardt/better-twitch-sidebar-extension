@@ -1,12 +1,9 @@
-import { setLocalStorage } from "@src/pages/background/storage";
-import { mergeChannels } from "@src/pages/content/utils/merging";
 import { Group } from "@src/pages/models/Group";
-import { FOLLOWED_CHANNELS_KEY } from "@src/pages/utils/constants";
+import { CHANNEL_GROUPS_KEY, GROUP_NAMES_KEY } from "@src/pages/utils/constants";
 import { useState } from "react";
 import {
   TrashIcon,
 } from "@heroicons/react/24/outline";
-import { updateChannelGroupMap } from "@src/pages/content/utils/channelGroupMap";
 
 export default function DeleteGroup({
   allGroups,
@@ -19,15 +16,17 @@ export default function DeleteGroup({
 }) {
   const [showAreYouSure, setShowAreYouSure] = useState(false);
 
-  const deleteGroup = () => {
+  const deleteGroup = async () => {
     setShowAreYouSure(false);
-    setLocalStorage(
-      FOLLOWED_CHANNELS_KEY,
-      mergeChannels(allGroups, group.followedChannels).filter(
-        (g) => g.groupName !== group.groupName
-      )
-    );
-    updateChannelGroupMap(channelGroupMap, group.followedChannels, "Default");
+    const stored = await chrome.storage.local.get([GROUP_NAMES_KEY, CHANNEL_GROUPS_KEY]);
+    const groupNames: string[] = stored[GROUP_NAMES_KEY] || [];
+    const channelGroups: Record<string, string> = stored[CHANNEL_GROUPS_KEY] || {};
+    await chrome.storage.local.set({
+      [GROUP_NAMES_KEY]: groupNames.filter((n) => n !== group.groupName),
+      [CHANNEL_GROUPS_KEY]: Object.fromEntries(
+        Object.entries(channelGroups).map(([login, name]) => [login, name === group.groupName ? "Ungrouped" : name])
+      ),
+    });
   };
 
   return group.default ? (

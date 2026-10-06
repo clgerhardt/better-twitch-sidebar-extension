@@ -2,9 +2,7 @@ import { PencilIcon } from "@heroicons/react/24/outline";
 import { Group } from "@src/pages/models/Group";
 import { useState } from "react";
 import { GroupNameForm } from "../../group-name-form/GroupNameForm";
-import { setLocalStorage } from "@src/pages/background/storage";
-import { FOLLOWED_CHANNELS_KEY } from "@src/pages/utils/constants";
-import { updateChannelGroupMap } from "@src/pages/content/utils/channelGroupMap";
+import { CHANNEL_GROUPS_KEY, GROUP_NAMES_KEY } from "@src/pages/utils/constants";
 
 export const EditGroupName = ({
   allGroups,
@@ -17,18 +15,20 @@ export const EditGroupName = ({
 }) => {
   const [showForm, setShowForm] = useState(false);
 
-  const submit = (groupName: string) => {
+  const submit = async (groupName: string) => {
     if (groupName === group.groupName) {
       setShowForm(false);
       return;
     }
-    allGroups.map((g) => {
-      if (g.groupName === group.groupName) {
-        g.groupName = groupName;
-      }
+    const stored = await chrome.storage.local.get([GROUP_NAMES_KEY, CHANNEL_GROUPS_KEY]);
+    const groupNames: string[] = stored[GROUP_NAMES_KEY] || [];
+    const channelGroups: Record<string, string> = stored[CHANNEL_GROUPS_KEY] || {};
+    await chrome.storage.local.set({
+      [GROUP_NAMES_KEY]: groupNames.map((n) => (n === group.groupName ? groupName : n)),
+      [CHANNEL_GROUPS_KEY]: Object.fromEntries(
+        Object.entries(channelGroups).map(([login, name]) => [login, name === group.groupName ? groupName : name])
+      ),
     });
-    setLocalStorage(FOLLOWED_CHANNELS_KEY, allGroups);
-    updateChannelGroupMap(channelGroupMap, group.followedChannels, groupName);
     setShowForm(false);
   };
 
@@ -46,7 +46,7 @@ export const EditGroupName = ({
             submit={submit}
             value={group.groupName}
             initialValue={group.groupName}
-            groupNames={allGroups.map((g) => g.groupName.toLowerCase())}
+            groupNames={allGroups.filter((g) => g.groupName !== group.groupName).map((g) => g.groupName.toLowerCase())}
             action="edit"
             initialErrorState={{
               invalid: false,
@@ -57,9 +57,10 @@ export const EditGroupName = ({
           />
         )}
       </div>
-      {!showForm && (
+      {!showForm && !group.default && (
         <div className="col-end-5">
           <button
+            aria-label="edit-group-name"
             onClick={() => {
               setShowForm(!showForm);
             }}

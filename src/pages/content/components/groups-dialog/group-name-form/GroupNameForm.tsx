@@ -148,6 +148,7 @@ export const GroupNameForm = ({
                 <button
                   disabled={errors.invalid}
                   type="submit"
+                  aria-label="save-group-name"
                   className="rounded hover:bg-slate-200 ml-16 disabled:hover:bg-slate-500 disabled:cursor-not-allowed"
                 >
                   <CheckCircleIcon className="w-8 h-8 text-black"></CheckCircleIcon>
