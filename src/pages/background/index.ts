@@ -91,17 +91,6 @@ chrome.runtime.onConnect.addListener((port) => {
 
       try {
         switch (response.message) {
-          case "SYS:Followers:INITIALIZE":
-            // eslint-disable-next-line no-case-declarations
-            const storageGlobalState: any = await getGlobalState();
-            messageLogger(constants.location.BACKGROUND,
-              "Attempting to Initialize Followers List",
-              response);
-            if (!storageGlobalState.followersListInitialized) {
-              tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-              chrome.tabs.sendMessage(tabs[0].id ?? 0, { message: "SYS:Followers:INITALIZE_FOLLOWED_CHANNELS_FROM_HTML" });
-            }
-            break;
           case "SYS:Followers:FOLLOWED_CHANNELS_LOADED":
               messageLogger(constants.location.BACKGROUND, "UI Loaded");
               // eslint-disable-next-line no-case-declarations
@@ -116,9 +105,6 @@ chrome.runtime.onConnect.addListener((port) => {
                 }
               }
               break;
-          case "SYS:Followers:CHANNEL_CARD_UPDATED":
-            messageLogger(constants.location.BACKGROUND, "CHANNEL_CARD_UPDATED", response);
-            break;
           case "SYS:Followers:EXPANDED_SIDEBAR":
           case "SYS:Followers:COLLAPSED_SIDEBAR":
             // eslint-disable-next-line no-case-declarations

@@ -2,25 +2,16 @@ import { createRoot } from "react-dom/client";
 import "./style.css";
 import "react-accessible-accordion/dist/fancy-example.css";
 import { messageLogger } from "../utils/logger";
-import { CHANNEL_GROUPS_KEY, FOLLOWED_CHANNELS_KEY, constants, GLOBAL_STATE_KEY } from "../utils/constants";
+import { constants, GLOBAL_STATE_KEY } from "../utils/constants";
 import AccordianChannels from "./components/side-navigation/AccordianChannels";
 import ManageGroups from "./components/manage-groups-cta/ManageGroupsCta";
-import { followersListParser } from "../utils/parser";
 import { getLocalStorage, setLocalStorage } from "../background/storage";
-import { getElementBySelector, createElement, insertBefore, waitUntilNoMoreShowMoreButton } from './utils/domUtils';
-import { createMutationObserver, createChannelCardObserver } from './observer';
-import { initFollowersData } from "../utils/transformer";
+import { getElementBySelector, createElement, insertBefore } from './utils/domUtils';
+import { createMutationObserver } from './observer';
 
 // Global variables
 let port: chrome.runtime.Port;
-let followersDOMNode: HTMLElement | null = null;
 let mainObserver: MutationObserver;
-let followerCardsObservers : any[] = [];
-
-const setFollowersDOMNode = (node: HTMLElement) => {
-  messageLogger(constants.location.CONTENT_SCRIPT, "Setting followersDOMNode", node);
-  followersDOMNode = node;
-};
 
 const applySidebarVisibilityFromState = (globalState: any) => {
   if (!globalState) return;
@@ -94,9 +85,6 @@ const connectToBackground = async () => {
       messageLogger(constants.location.CONTENT_SCRIPT, "Received message from port", response);
       try {
         switch (response.message) {
-          case "SYS:Followers:PARSE_FOLLOWED_CHANNELS_HTML":
-            await parseFollowersHTML();
-            break;
           case "SYS:Followers:RenderFollowersInSideBar":
             await renderToUI(response.tabId);
             break;
@@ -120,7 +108,7 @@ const connectToBackground = async () => {
     } else {
       messageLogger(constants.location.CONTENT_SCRIPT, "Sidebar elements not found in time");
     }
-    mainObserver = createMutationObserver(port, globalS, setFollowersDOMNode);
+    mainObserver = createMutationObserver(port);
     mainObserver.observe(document.body, {
       attributes: true,
       childList: true,
@@ -130,47 +118,8 @@ const connectToBackground = async () => {
     const initialNode = getElementBySelector("[aria-label='Followed Channels']");
     if (initialNode) {
       messageLogger(constants.location.OBSERVER, "Followed Channels Node already in DOM", initialNode);
-      setFollowersDOMNode(initialNode);
       port.postMessage({ message: "SYS:Followers:FOLLOWED_CHANNELS_LOADED" });
     }
-};
-
-const parseFollowersHTML = async () => {
-  messageLogger(constants.location.CONTENT_SCRIPT, "Entering parseFollowersHTML function");
-  try {
-    const expandBtn = getElementBySelector('[data-a-target="side-nav-arrow"]');
-    let hadToExpandSideBar = false;
-    if (expandBtn?.ariaLabel === "Expand Side Nav") {
-      expandBtn.click();
-      hadToExpandSideBar = true;
-    }
-
-    await waitUntilNoMoreShowMoreButton();
-
-    const followerCards = followersDOMNode?.querySelectorAll("[data-a-id]");
-    const followerData = followerCards ? followersListParser(followerCards) : [];
-
-    messageLogger(constants.location.CONTENT_SCRIPT, "Parsed follower cards", followerCards);
-    followerCardsObservers = Array.from(followerCards ?? []).map(card => {
-      messageLogger(constants.location.CONTENT_SCRIPT, "Creating Channel Card Observer for card", card);
-      const channelCardObserver = createChannelCardObserver(port);
-      channelCardObserver.observe(card, { attributes: true, childList: true, subtree: true });
-      messageLogger(constants.location.CONTENT_SCRIPT, "Channel Card Observer created for card", channelCardObserver);
-      return channelCardObserver
-    });
-    // messageLogger(constants.location.CONTENT_SCRIPT, "Created Channel Card Observers", followerCardsObservers);
-    // Array.from(followerCards ?? []).forEach((card) => followerCardsObservers.forEach((observer: any) => observer.observe(card, { attributes: true, childList: true, subtree: true })));
-
-    if (hadToExpandSideBar) {
-      expandBtn.click();
-    }
-
-    messageLogger(constants.location.CONTENT_SCRIPT, "Exiting parseFollowersHTML function");
-    return followerData;
-
-  } catch (error) {
-    messageLogger(constants.location.CONTENT_SCRIPT, "Error in parseFollowersHTML function", error);
-  }
 };
 
 const renderToUI = async (tabId: any) => {
@@ -213,24 +162,6 @@ const addMessageListener = () => {
   chrome.runtime.onMessage.addListener(async (request) => {
     let success = false;
 
-    if (request.message === "SYS:Followers:INITALIZE_FOLLOWED_CHANNELS_FROM_HTML") {
-      messageLogger(constants.location.CONTENT_SCRIPT, "Initializing followed channels from HTML");
-      const followedData = await parseFollowersHTML();
-      const { groupsList, channelGroupMap } = initFollowersData(followedData);
-      messageLogger(constants.location.CONTENT_SCRIPT, "Followed channels initialized", groupsList);
-      messageLogger(constants.location.CONTENT_SCRIPT, "Channel group map initialized", channelGroupMap);
-      await setLocalStorage(
-        FOLLOWED_CHANNELS_KEY,
-        groupsList
-      );
-      await setLocalStorage(
-        CHANNEL_GROUPS_KEY,
-        channelGroupMap
-      );
-      const globalS: any = await getLocalStorage(GLOBAL_STATE_KEY)
-      await setLocalStorage(GLOBAL_STATE_KEY, { ...globalS, followersListInitialized: true, initializationDate: new Date().toISOString() });
-    }
-
     switch (request.message) {
       case "SYS:Followers:TOGGLE_FOLLOWERS_SIDEBAR":
       case "SYS:Followers:TOGGLE_LIVE_CHANNELS":
@@ -265,16 +196,6 @@ try {
       port.postMessage({ type: "HEARTBEAT" });
     }
   }, 20_000);
-
-  document.body.addEventListener('click', async (e: MouseEvent) => {
-    const globalS: any = await getLocalStorage(GLOBAL_STATE_KEY);
-    if (!globalS.followersListInitialized || !(e.target instanceof Element)) return;
-
-    const followBtn = e.target.closest('button[data-a-target="follow-button"]');
-    const unfollowBtn = e.target.closest('button[data-a-target="unfollow-button"]');
-    if (!followBtn && !unfollowBtn) return;
-    followBtn ? console.log('clicked follow-button:', followBtn) : console.log('clicked unfollow-button:', unfollowBtn);
-  });
 } catch (e) {
   messageLogger(constants.location.CONTENT_SCRIPT, "Error in content script initialization", e);
 }
