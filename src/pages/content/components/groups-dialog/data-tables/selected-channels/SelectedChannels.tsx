@@ -1,28 +1,21 @@
 import { Channel } from "@src/pages/models/Channel";
-import { Group } from "@src/pages/models/Group";
 import { CHANNEL_GROUPS_KEY } from "@src/pages/utils/constants";
 import React, { FormEvent } from "react";
 
 interface Props {
-  currentGroup: string;
-  groups: Group[];
   groupNames: string[];
   selectedRows: Channel[];
   setToggleCleared: (value: boolean) => void;
   selectedCount?: string;
   setSelectedRows: (value: Channel[]) => void;
-  channelGroupMap?: any;
 }
 
 export const SelectedChannels = ({
   selectedCount,
   groupNames,
   selectedRows,
-  groups,
-  currentGroup,
   setToggleCleared,
   setSelectedRows,
-  channelGroupMap,
 }: Props): React.ReactNode => {
   const selectedChannelsText = `Selected Channels: ${selectedCount}`;
   const [selectedGroup, setSelectedGroup] = React.useState<string>("default");

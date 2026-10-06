@@ -6,13 +6,9 @@ import {
 } from "@heroicons/react/24/outline";
 
 export default function DeleteGroup({
-  allGroups,
   group,
-  channelGroupMap,
 }: {
-  allGroups: Group[];
   group: Group;
-  channelGroupMap: any;
 }) {
   const [showAreYouSure, setShowAreYouSure] = useState(false);
 

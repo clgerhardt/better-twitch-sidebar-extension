@@ -7,11 +7,9 @@ import { CHANNEL_GROUPS_KEY, GROUP_NAMES_KEY } from "@src/pages/utils/constants"
 export const EditGroupName = ({
   allGroups,
   group,
-  channelGroupMap,
 }: {
   allGroups: Group[];
   group: Group;
-  channelGroupMap: any;
 }) => {
   const [showForm, setShowForm] = useState(false);
 
