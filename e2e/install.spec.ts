@@ -4,11 +4,9 @@ import { resolveGlobalState, shouldClearStorage } from "../src/pages/background/
 
 const defaults = {
   loggedIn: false,
-  followersListInitialized: false,
   hideOriginalFollowersList: true,
   hideStories: false,
   hideLiveChannels: false,
-  initializationDate: "2026-01-01T00:00:00.000Z",
   lastUpdated: "2026-01-01T00:00:00.000Z",
 };
 
@@ -25,7 +23,7 @@ unit.describe("onInstalled state", () => {
     unitExpect(state.loggedIn).toBe(true);
     unitExpect(state.hideOriginalFollowersList).toBe(false);
     unitExpect(state.hideStories).toBe(false);
-    unitExpect(state.initializationDate).toBe(defaults.initializationDate);
+    unitExpect(state.lastUpdated).toBe(defaults.lastUpdated);
   });
 
   unit("an update with no saved state falls back to defaults", () => {
@@ -44,5 +42,5 @@ test("a fresh install gets default state", async ({ worker }) => {
     .toBe(true);
   const { globalState } = await worker.evaluate(() => chrome.storage.local.get("globalState"));
   expect(globalState.hideOriginalFollowersList).toBe(true);
-  expect(globalState.followersListInitialized).toBe(false);
+  expect(globalState.hideStories).toBe(false);
 });

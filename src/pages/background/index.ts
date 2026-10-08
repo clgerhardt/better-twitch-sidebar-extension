@@ -29,11 +29,9 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     const isoNow = new Date().toISOString();
     const defaults: GlobalState = {
       loggedIn: await isUserLoggedIn(),
-      followersListInitialized: false,
       hideOriginalFollowersList: true,
       hideStories: false,
       hideLiveChannels: false,
-      initializationDate: isoNow,
       lastUpdated: isoNow,
     };
     await setLocalStorage(
