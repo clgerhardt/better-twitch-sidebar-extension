@@ -1,4 +1,4 @@
-import { createRoot } from "react-dom/client";
+import { createRoot, Root } from "react-dom/client";
 import "./style.css";
 import "react-accessible-accordion/dist/fancy-example.css";
 import { messageLogger } from "../utils/logger";
@@ -12,6 +12,27 @@ import { createMutationObserver } from './observer';
 // Global variables
 let port: chrome.runtime.Port;
 let mainObserver: MutationObserver;
+let pageSetupDone = false;
+// One React root per container: creating a second root on the same container duplicates the UI
+const reactRoots = new WeakMap<Element, Root>();
+
+const getReactRoot = (container: Element) => {
+  let root = reactRoots.get(container);
+  if (!root) {
+    root = createRoot(container);
+    reactRoots.set(container, root);
+  }
+  return root;
+};
+
+// Always posts through the current port, since the port is replaced whenever the background restarts
+const postToBackground = (message: any) => {
+  try {
+    port.postMessage(message);
+  } catch (error) {
+    messageLogger(constants.location.CONTENT_SCRIPT, "Could not post to background", error);
+  }
+};
 
 const applySidebarVisibilityFromState = (globalState: any) => {
   if (!globalState) return;
@@ -72,13 +93,23 @@ const waitForSidebarElements = async (selectors: string[], timeoutMs = 5000): Pr
 };
 
 
-const connectToBackground = async () => {
+const RECONNECT_DELAY_MS = 500;
+
+const openPort = () => {
+    // After the extension is reloaded or updated this script is orphaned and cannot reconnect
+    if (!chrome.runtime?.id) return;
     messageLogger(constants.location.CONTENT_SCRIPT, "Connecting to long-lived port : " + new Date(Date.now()).toLocaleString());
     port = chrome.runtime.connect({ name: "content-script" });
 
     port.onDisconnect.addListener(() => {
       messageLogger(constants.location.CONTENT_SCRIPT, "Disconnected from background. Attempting to reconnect... : " + new Date(Date.now()).toLocaleString());
-      setTimeout(connectToBackground, 1);
+      setTimeout(() => {
+        openPort();
+        // The render request may have been lost with the old port
+        if (pageSetupDone && !getElementBySelector("#__root")) {
+          postToBackground({ message: constants.portMessages.FOLLOWED_CHANNELS_LOADED });
+        }
+      }, RECONNECT_DELAY_MS);
     });
 
     port.onMessage.addListener(async (response: any) => {
@@ -95,6 +126,10 @@ const connectToBackground = async () => {
         messageLogger(constants.location.CONTENT_SCRIPT, "Error handling port message", error);
       }
     });
+};
+
+// Runs once per page, not on every reconnect
+const setUpPage = async () => {
     const globalS: any = await getLocalStorage(GLOBAL_STATE_KEY);
     const success = await waitForSidebarElements([
       "[aria-label='Followed Channels']",
@@ -108,18 +143,24 @@ const connectToBackground = async () => {
     } else {
       messageLogger(constants.location.CONTENT_SCRIPT, "Sidebar elements not found in time");
     }
-    mainObserver = createMutationObserver(port);
+    mainObserver = createMutationObserver(postToBackground);
     mainObserver.observe(document.body, {
       attributes: true,
       childList: true,
       characterData: true,
       subtree: true,
     });
+    pageSetupDone = true;
     const initialNode = getElementBySelector("[aria-label='Followed Channels']");
     if (initialNode) {
       messageLogger(constants.location.OBSERVER, "Followed Channels Node already in DOM", initialNode);
-      port.postMessage({ message: "SYS:Followers:FOLLOWED_CHANNELS_LOADED" });
+      postToBackground({ message: constants.portMessages.FOLLOWED_CHANNELS_LOADED });
     }
+};
+
+const connectToBackground = async () => {
+    openPort();
+    await setUpPage();
 };
 
 const renderToUI = async (tabId: any) => {
@@ -146,11 +187,8 @@ const renderToUI = async (tabId: any) => {
     insertBefore(rootContainer, recommendedFollowers);
     insertBefore(manageGroupsContainer, recommendedFollowers);
 
-    const root = createRoot(rootContainer);
-    const manageGroupsRoot = createRoot(manageGroupsContainer);
-
-    root.render(<AccordianChannels tabId={tabId} />);
-    manageGroupsRoot.render(<ManageGroups tabId={tabId} />);
+    getReactRoot(rootContainer).render(<AccordianChannels tabId={tabId} />);
+    getReactRoot(manageGroupsContainer).render(<ManageGroups tabId={tabId} />);
 
     messageLogger(constants.location.CONTENT_SCRIPT, "Exiting renderToUI function");
   } catch (error) {
@@ -192,8 +230,8 @@ try {
   connectToBackground();
   addMessageListener();
   setInterval(() => {
-    if (port && port.postMessage) {
-      port.postMessage({ type: "HEARTBEAT" });
+    if (port) {
+      postToBackground({ type: "HEARTBEAT" });
     }
   }, 20_000);
 } catch (e) {

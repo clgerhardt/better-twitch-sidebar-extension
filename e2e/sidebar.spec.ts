@@ -180,3 +180,52 @@ test.describe("page without a Stories section", () => {
     await expect(twitchPage.locator("[aria-label='Followed Channels']")).toBeHidden({ timeout: 8_000 });
   });
 });
+
+test("reconnecting to the background does not rebuild the sidebar UI", async ({ twitchPage, context }) => {
+  const manageButtons = twitchPage.locator("#__manage-groups-root").getByRole("button", { name: "Manage Groups" });
+  await expect(manageButtons).toHaveCount(1);
+  await expect(twitchPage.locator("#__root [role=button]").first()).toBeVisible();
+  // Tag the rendered elements; a rebuilt UI would replace them and lose the tags
+  await twitchPage.evaluate(() => {
+    document.querySelector("#__manage-groups-root button")?.setAttribute("data-render-marker", "kept");
+    document.querySelector("#__root [role=button]")?.setAttribute("data-render-marker", "kept");
+  });
+
+  // Chrome stops the service worker when idle and the content script reconnects each time
+  const cdp = await context.newCDPSession(twitchPage);
+  await cdp.send("ServiceWorker.enable");
+  for (let i = 0; i < 6; i++) {
+    await cdp.send("ServiceWorker.stopAllWorkers");
+    await twitchPage.waitForTimeout(700);
+  }
+  await twitchPage.waitForTimeout(2_000);
+
+  await expect(manageButtons).toHaveCount(1);
+  await expect(twitchPage.locator("#__manage-groups-root button[data-render-marker=kept]")).toHaveCount(1);
+  await expect(twitchPage.locator("#__root [role=button][data-render-marker=kept]")).toHaveCount(1);
+});
+
+// The fixture has no Twitch JavaScript, so flip the arrow's label the way Twitch does when the side nav changes
+const setSideNavLabel = (page: Page, label: "Expand Side Nav" | "Collapse Side Nav") =>
+  page.locator("[data-a-target=side-nav-arrow]").evaluate((el, l) => el.setAttribute("aria-label", l), label);
+
+test("collapsing the side nav hides the Manage Groups button", async ({ twitchPage }) => {
+  const manage = twitchPage.locator("#__manage-groups-root").getByRole("button", { name: "Manage Groups" });
+  await expect(manage).toHaveCount(1);
+  await setSideNavLabel(twitchPage, "Expand Side Nav");
+  await expect(manage).toHaveCount(0, { timeout: 5_000 });
+  await setSideNavLabel(twitchPage, "Collapse Side Nav");
+  await expect(manage).toHaveCount(1, { timeout: 5_000 });
+});
+
+test("collapse and expand are still reported after the background reconnects", async ({ twitchPage, context }) => {
+  const cdp = await context.newCDPSession(twitchPage);
+  await cdp.send("ServiceWorker.enable");
+  await cdp.send("ServiceWorker.stopAllWorkers");
+  await twitchPage.waitForTimeout(1_500);
+
+  const manage = twitchPage.locator("#__manage-groups-root").getByRole("button", { name: "Manage Groups" });
+  await expect(manage).toHaveCount(1);
+  await setSideNavLabel(twitchPage, "Expand Side Nav");
+  await expect(manage).toHaveCount(0, { timeout: 5_000 });
+});
