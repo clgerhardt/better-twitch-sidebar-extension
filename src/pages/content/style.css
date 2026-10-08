@@ -1,3 +1,5 @@
+@import "./scoped-preflight.css";
+@config "../../../tailwind.content.cjs";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
