@@ -22,7 +22,7 @@ test.describe("manifest.json", () => {
   });
 
   test("only requests the permissions the code uses", () => {
-    expect([...manifest.permissions].sort()).toEqual(["cookies", "identity", "storage"]);
+    expect([...manifest.permissions].sort()).toEqual(["identity", "storage"]);
   });
 
   test("has no template leftovers", () => {

@@ -17,8 +17,7 @@
   "incognito": "split",
   "permissions": [
     "storage",
-    "identity",
-    "cookies"
+    "identity"
   ],
   "host_permissions": [
     "https://*.twitch.tv/*"

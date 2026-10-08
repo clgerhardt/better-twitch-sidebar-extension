@@ -8,7 +8,7 @@ import {
   setLocalStorage,
   clearAllStorage
 } from "./storage";
-import { getGlobalState, isUserLoggedIn, updateSidebarState } from "./utils";
+import { getGlobalState, updateSidebarState } from "./utils";
 import { resolveGlobalState, shouldClearStorage } from "./installState";
 
 messageLogger(constants.location.BACKGROUND, "background script loaded");
@@ -28,7 +28,8 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     const existing = (await getGlobalState().catch(() => undefined)) as Partial<GlobalState> | undefined;
     const isoNow = new Date().toISOString();
     const defaults: GlobalState = {
-      loggedIn: await isUserLoggedIn(),
+      // Set to true when the popup confirms a Twitch user; a fresh install has no token yet
+      loggedIn: false,
       hideOriginalFollowersList: true,
       hideStories: false,
       hideLiveChannels: false,
