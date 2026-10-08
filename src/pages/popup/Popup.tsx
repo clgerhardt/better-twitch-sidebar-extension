@@ -3,7 +3,6 @@ import UserGreeting from "./UserGreeting/UserGreeting";
 import GuestGreeting from "./GuestGreeting/GuestGreeting";
 import { messageLogger } from "../utils/logger";
 import { constants } from "../utils/constants";
-import Authenticate from "../content/components/shared/Authenticate";
 import { useTwitchToken } from "../content/hooks/userTwitchToken";
 
 const CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID;

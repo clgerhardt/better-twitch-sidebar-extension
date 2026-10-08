@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getLocalStorage, setLocalStorage } from "@src/pages/background/storage";
+import { getLocalStorage } from "@src/pages/background/storage";
 import { constants } from "@src/pages/utils/constants";
 import { messageLogger } from "@src/pages/utils/logger";
 
