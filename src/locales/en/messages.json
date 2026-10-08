@@ -1,10 +1,10 @@
 {
   "extName": {
-    "message": "name in src/locales/en/messages.json",
+    "message": "Better Twitch Sidebar",
     "description": "Extension name"
   },
   "extDescription": {
-    "message": "description in src/locales/en/messages.json",
+    "message": "Group the channels you follow into custom groups in Twitch's sidebar.",
     "description": "Extension description"
   }
 }
