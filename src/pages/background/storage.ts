@@ -1,8 +1,5 @@
 import { constants } from "../utils/constants";
 import { messageLogger } from "../utils/logger";
-import { followerDataV1 } from "../mock/followers_data_v1";
-import { followerDataV2 } from "../mock/followers_data_v2";
-import { followerDataV3 } from "../mock/followers_data_v3";
 
 export const getSyncStorage = async (key: string) => {
   return new Promise((resolve, reject) => {
@@ -28,17 +25,8 @@ export const getLocalStorage = (key: string) => {
       messageLogger(constants.location.STORAGE, `getLocalStorage key ${key} result`, result[key])
       if(result[key])
         resolve(result[key]);
-      else {
-        // const useMock = import.meta.env.VITE_USE_MOCK as boolean;
-        // messageLogger(constants.location.STORAGE, "getLocalStorage useMock", useMock)
-        // if(useMock) {
-        //   const mockValue = getMockStorage();
-        //   setLocalStorage(key, mockValue);
-        //   resolve(mockValue)
-        // } else {
-          reject("cannot get value from local storage: " + key);
-        // }
-      }
+      else
+        reject("cannot get value from local storage: " + key);
     });
   });
 }
@@ -80,21 +68,3 @@ export const attachStorageListener = () => {
     }
   });
 };
-
-const getMockStorage = () => {
-  let mockedValue;
-  switch(import.meta.env.VITE_MOCK_FILE) {
-    case "v3":
-      mockedValue = followerDataV3;
-      break;
-    case "v2":
-      mockedValue = followerDataV2;
-      break;
-    case "v1":
-    default:
-      mockedValue = followerDataV1;
-      break;
-  }
-  messageLogger(constants.location.STORAGE, "getMockStorage", mockedValue);
-  return mockedValue;
-}
