@@ -101,6 +101,15 @@ src/
 3. **`devtools` and `panel` pages: dropped** (template leftovers, unused by the product). Removed in phase 5, along with the `devtools_page` manifest entry.
 4. **Rules of engagement for AI-driven test runs** are recorded in the repo `CLAUDE.md`.
 
+## Backlog (found during manual testing)
+
+Ordered by priority. Items 1 and 2 involve one account's data being visible to another and should be fixed before anything else here.
+
+1. **Groups and follow list survive a logout and are shared across accounts (privacy).** `logoutTwitch` clears only the auth keys. `groupNames`, `channelGroups` and the cached follow list (`followedChannels`) stay in storage, so a second Twitch account on the same browser profile loads the first account's groups and sees their followed channels. Cause verified from the code.
+   Proposed fix: scope groups per Twitch user id (the same user keeps their groups on reconnect, another account starts empty) and clear the cached follow list on logout. As a safe interim step: remember the owning user id and reset groups when a different account connects. Fits naturally with the `storage.sync` work and with the user-scoped `channelSnapshot` in `background-fetch.md`.
+2. **Logging in after a logout silently reuses the previous account (privacy, to be reproduced).** The login flow asks Twitch to authorize the extension while the browser still holds the previous Twitch session, so Twitch approves immediately without asking. Likely fix, to be checked against Twitch's docs: send `force_verify=true` on the authorize URL, and revoke the token on logout (`id.twitch.tv/oauth2/revoke`). The extension cannot sign the user out of twitch.tv itself.
+3. **Offline channels do not look offline.** Our own rows have no dimming and no "Offline" label, unlike Twitch's offline rows (the real row has an "Offline" status text; see `e2e/fixtures/rows/offline.html`). Resolved by the template-based rows phase; a quick interim fix is a label and reduced opacity.
+
 ## Proposed phasing (each a reviewable commit/PR)
 
 0. **E2E harness (Playwright):** bundled Chromium with persistent context and the extension loaded; a local fixture page imitating the Twitch sidebar (captured HTML, covering the row variants); `api.twitch.tv` stubbed with `page.route`; token seeded into extension storage via the service worker. Login is never automated; a real-Twitch smoke check stays manual. Start with tests that capture the two known defects.
