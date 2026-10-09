@@ -4,7 +4,7 @@ import {
   extractTokenFromRedirectUrl,
 } from "../../utils/getValidTwitchToken";
 import { messageLogger } from "@src/pages/utils/logger";
-import { constants } from "@src/pages/utils/constants";
+import { constants, TWITCH_LOGGED_OUT_KEY } from "@src/pages/utils/constants";
 import { useTwitchToken } from "../../hooks/userTwitchToken";
 
 const CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID;
@@ -99,7 +99,7 @@ const Authenticate = ({ isSidebarExpanded }: { isSidebarExpanded: any }) => {
                   return;
                 }
                 await chrome.storage.local.set(
-                  { twitchToken: accessToken, tokenIssuedAt: Date.now() },
+                  { twitchToken: accessToken, tokenIssuedAt: Date.now(), [TWITCH_LOGGED_OUT_KEY]: false },
                   () => {
                     console.log("[AUTH] Twitch token stored");
                   }

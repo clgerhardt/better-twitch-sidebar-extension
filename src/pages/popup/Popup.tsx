@@ -4,6 +4,7 @@ import GuestGreeting from "./GuestGreeting/GuestGreeting";
 import { messageLogger } from "../utils/logger";
 import { constants } from "../utils/constants";
 import { useTwitchToken } from "../content/hooks/userTwitchToken";
+import { logoutTwitch } from "../content/utils/getValidTwitchToken";
 
 const CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID;
 
@@ -21,11 +22,10 @@ const Popup = () => {
 
   const twitchToken = useTwitchToken();
 
-  const logout = () => {
-    chrome.storage.local.remove("twitchToken", () => {
-      setUserSession(null);
-      messageLogger(constants.location.POPUP, "User logged out");
-    });
+  const logout = async () => {
+    await logoutTwitch();
+    setUserSession(null);
+    messageLogger(constants.location.POPUP, "User logged out");
   };
 
   const fetchTwitchUser = async (accessToken: string) => {

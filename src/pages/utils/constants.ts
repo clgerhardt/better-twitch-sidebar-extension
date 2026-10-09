@@ -40,3 +40,5 @@ export const SIDEBAR_STATE_KEY = STORAGE_PREFIX + constants.storage.sideBarState
 export const FOLLOWED_CHANNELS_KEY = constants.storage.followedChannels;
 export const CHANNEL_GROUPS_KEY = constants.storage.channelGroups;
 export const GROUP_NAMES_KEY = constants.storage.groupNames;
+// True after an explicit logout: stops silent re-login until the user connects again
+export const TWITCH_LOGGED_OUT_KEY = 'twitchLoggedOut';
