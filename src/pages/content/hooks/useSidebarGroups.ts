@@ -1,29 +1,9 @@
 import { messageLogger } from "@src/pages/utils/logger";
 import { CHANNEL_GROUPS_KEY, FOLLOWED_CHANNELS_KEY, GROUP_NAMES_KEY } from "@src/pages/utils/constants";
 import { useEffect, useRef, useState } from "react";
+import { FetchedChannel, SidebarGroup, layoutGroups } from "@src/pages/utils/layoutGroups";
 
 const TWITCH_API_BASE = "https://api.twitch.tv/helix";
-
-export type SidebarChannel = {
-  login: string;
-  channelImage: string;
-  channelLink: string;
-  channelName: string;
-  isLive: boolean;
-  streamingContent?: string;
-  viewerCount?: string;
-};
-
-export type SidebarGroup = {
-  default: boolean;
-  dialogOpen: boolean;
-  dropdownVisible: boolean;
-  followedChannels: SidebarChannel[];
-  groupName: string;
-  numberOfChannels: number;
-  numberOfLiveChannels: number;
-  order: number;
-};
 
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
@@ -66,59 +46,24 @@ export const useSidebarGroups = (): {
   const [channelGroups, setChannelGroups] = useState<Record<string, string>>({});
 
   // Followed channels from the Twitch API, kept so group edits can re-layout without refetching
-  const fetchedRef = useRef<{ login: string; channel: SidebarChannel }[] | null>(null);
+  const fetchedRef = useRef<FetchedChannel[] | null>(null);
 
   const applyLayout = () => {
     chrome.storage.local.get([CHANNEL_GROUPS_KEY, GROUP_NAMES_KEY], (stored) => {
-      const fetched = fetchedRef.current ?? [];
-      const groupNames: string[] = stored[GROUP_NAMES_KEY] || [];
-      const updatedChannelGroups: Record<string, string> = stored[CHANNEL_GROUPS_KEY] || {};
-      const groupMap: Record<string, SidebarChannel[]> = {};
-
-      let didAddNewMapping = false;
-
-      fetched.forEach(({ login, channel }) => {
-        const groupName = updatedChannelGroups[login] || "Ungrouped";
-
-        if (!updatedChannelGroups[login]) {
-          updatedChannelGroups[login] = "Ungrouped";
-          didAddNewMapping = true;
-        }
-
-        if (!groupMap[groupName]) groupMap[groupName] = [];
-        groupMap[groupName].push(channel);
+      const result = layoutGroups({
+        fetched: fetchedRef.current ?? [],
+        groupNames: stored[GROUP_NAMES_KEY] || [],
+        channelGroups: stored[CHANNEL_GROUPS_KEY] || {},
       });
 
-      // Ungrouped first, then user-created groups in order (including empty ones),
-      // then any group that only exists in the channel map
-      const orderedNames = [
-        "Ungrouped",
-        ...groupNames,
-        ...Object.keys(groupMap).filter((n) => n !== "Ungrouped" && !groupNames.includes(n)),
-      ];
-
-      const groupList: SidebarGroup[] = orderedNames.map((groupName, index) => {
-        const channels = [...(groupMap[groupName] ?? [])];
-        return {
-          default: groupName === "Ungrouped",
-          dialogOpen: false,
-          dropdownVisible: false,
-          followedChannels: channels.sort((a, b) => a.isLive === b.isLive ? 0 : a.isLive ? -1 : 1),
-          groupName,
-          numberOfChannels: channels.length,
-          numberOfLiveChannels: channels.filter((c) => c.isLive).length,
-          order: index,
-        };
-      });
-
-      if (didAddNewMapping) {
-        chrome.storage.local.set({ [CHANNEL_GROUPS_KEY]: updatedChannelGroups });
+      if (result.addedMappings) {
+        chrome.storage.local.set({ [CHANNEL_GROUPS_KEY]: result.channelGroups });
       }
 
-      setChannelGroups(updatedChannelGroups);
-      setGroups(groupList);
+      setChannelGroups(result.channelGroups);
+      setGroups(result.groups);
       setError(null);
-      chrome.storage.local.set({ [FOLLOWED_CHANNELS_KEY]: groupList });
+      chrome.storage.local.set({ [FOLLOWED_CHANNELS_KEY]: result.groups });
     });
   };
 
