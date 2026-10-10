@@ -80,7 +80,7 @@ Kept as they are, for now: the content-script port for render trigger and expand
 
 - `chrome.alarms` (needs the `alarms` permission) fires about every 60 seconds. The handler refreshes only if at least one Twitch tab is open and visible, so no network activity when you are not on Twitch.
 - Content sends `REFRESH` on page load. The background skips the network if the snapshot is younger than a few seconds.
-- All fetches go through one deduplicated in-flight promise. Drop the `delay(250)` per chunk in favour of a small concurrency limit.
+- All fetches go through one deduplicated in-flight promise. Requests stay **sequential and paced** (concurrency 1). The existing `delay(250)` and 429 retry exist because rapid calls were rejected in practice; the reason was not recorded, so do not remove them on a hunch. Make the pacing header-driven: read `Ratelimit-Remaining` and `Ratelimit-Reset` from every response, wait until the reset time on a 429 (not a fixed second), and log each 429 with its endpoint so we learn what actually triggers them.
 
 ### Auth
 
@@ -101,7 +101,7 @@ Kept as they are, for now: the content-script port for render trigger and expand
 ## Risks and open points
 
 - **Service worker lifetime.** The worker is stopped when idle and restarted by alarms and messages. All state lives in storage, never in memory; the in-flight dedupe is only an optimisation.
-- **Rate limits.** The live tier is a handful of requests per minute, well under Twitch's documented per-token limit. Confirm the numbers against the Helix docs in phase 2.
+- **Rate limits.** Measured on a real account (2026-10-09): `Ratelimit-Limit` was 800 per minute for the user token, each request costs 1, and 179 followed channels needed 6 calls (2 follow pages, 2 `users`, 2 `streams`), leaving the bucket almost untouched. That does not explain the 429s seen with unpaced sequential calls: the docs say some 429s are endpoint-specific, so keep the pacing and learn from logged 429s. The calls in the page also each cost a CORS preflight; from the background there is none, so the same fetch takes about half the requests.
 - **Silent re-auth** only works while the browser still has a Twitch session. If it does not, the user must click Connect again. Twitch's implicit flow gives no refresh token.
 - **Token readable by content scripts.** It stays in `storage.local` (agreed: avoid repeated logins). Content scripts could read it, but they run in an isolated world the page cannot reach. After this change nothing in content needs it, so access could be tightened later.
 - **Incognito.** The manifest uses `"incognito": "split"`; each profile keeps its own storage and snapshot, as today.
