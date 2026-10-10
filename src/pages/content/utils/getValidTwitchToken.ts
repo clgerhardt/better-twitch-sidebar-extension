@@ -1,4 +1,10 @@
-import { GLOBAL_STATE_KEY, TWITCH_LOGGED_OUT_KEY } from "../../utils/constants";
+import {
+  CHANNEL_GROUPS_KEY,
+  FOLLOWED_CHANNELS_KEY,
+  GLOBAL_STATE_KEY,
+  GROUP_NAMES_KEY,
+  TWITCH_LOGGED_OUT_KEY,
+} from "../../utils/constants";
 
 const TWITCH_AUTH_BASE = "https://id.twitch.tv/oauth2/authorize";
 const EXPIRES_IN_MS = 4 * 60 * 60 * 1000; // 4 hours
@@ -97,7 +103,17 @@ export const logoutTwitch = async () => {
     [TWITCH_LOGGED_OUT_KEY]: true,
     [GLOBAL_STATE_KEY]: { ...(stored[GLOBAL_STATE_KEY] || {}), loggedIn: false },
   });
-  await chrome.storage.local.remove(["twitchToken", "tokenIssuedAt", "twitchUserId", "twitchUserImage"]);
+  // Everything the account created goes too (its groups, which channels it grouped, and its cached
+  // follow list), so on a shared machine the next account never sees it
+  await chrome.storage.local.remove([
+    "twitchToken",
+    "tokenIssuedAt",
+    "twitchUserId",
+    "twitchUserImage",
+    GROUP_NAMES_KEY,
+    CHANNEL_GROUPS_KEY,
+    FOLLOWED_CHANNELS_KEY,
+  ]);
   if (stored.twitchToken) await revokeTwitchToken(stored.twitchToken);
 };
 

@@ -147,3 +147,61 @@ test("cancelling the Twitch login leaves the popup ready to try again", async ({
   await expect(popup.getByRole("button", { name: "Connect Twitch" })).toBeEnabled();
   expect((await worker.evaluate(() => chrome.storage.local.get("twitchToken"))).twitchToken).toBeUndefined();
 });
+
+// Shared machines: nothing the previous account created may be visible to the next one
+test("logging out clears the account's groups and cached follow list", async ({ twitchPage, context, worker, extensionId }) => {
+  await worker.evaluate(() => chrome.storage.local.set({ groupNames: ["Zebra Squad"], channelGroups: { fixture_live: "Zebra Squad" } }));
+  await expect(twitchPage.locator("#__root")).toContainText("Zebra Squad");
+  expect(Object.keys(await worker.evaluate(() => chrome.storage.local.get(null)))).toContain("followedChannels");
+
+  const popup = await openPopup(context, extensionId);
+  await popup.getByRole("button", { name: "Logout" }).click();
+  await expect(popup.getByRole("button", { name: "Connect Twitch" })).toBeVisible();
+
+  const keys = Object.keys(await worker.evaluate(() => chrome.storage.local.get(null)));
+  for (const key of ["groupNames", "channelGroups", "followedChannels", "twitchToken", "twitchUserId", "twitchUserImage"]) {
+    expect(keys, `${key} should be cleared`).not.toContain(key);
+  }
+});
+
+test("the next account to connect starts with no groups", async ({ twitchPage, context, worker, extensionId }) => {
+  await worker.evaluate(() => chrome.storage.local.set({ groupNames: ["Zebra Squad"], channelGroups: { fixture_live: "Zebra Squad" } }));
+  await expect(twitchPage.locator("#__root")).toContainText("Zebra Squad");
+
+  const popup = await openPopup(context, extensionId);
+  await popup.getByRole("button", { name: "Logout" }).click();
+  await expect(popup.getByRole("button", { name: "Connect Twitch" })).toBeVisible();
+
+  await stubWorkerLogin(worker, REDIRECT);
+  await popup.getByRole("button", { name: "Connect Twitch" }).click();
+  await expect(popup.getByRole("button", { name: "Logout" })).toBeVisible({ timeout: 5_000 });
+
+  await expect(twitchPage.locator("#__root [role=button]")).toHaveCount(1, { timeout: 5_000 }); // only Ungrouped
+  await expect(twitchPage.locator("#__root")).not.toContainText("Zebra Squad");
+  await twitchPage.getByRole("button", { name: "Manage Groups" }).click();
+  await expect(twitchPage.getByRole("dialog")).not.toContainText("Zebra Squad");
+});
+
+test("after connecting, the sidebar shows loading and not the logged-out intro while channels download", async ({ twitchPage, context, worker, extensionId }) => {
+  const popup = await openPopup(context, extensionId);
+  await popup.getByRole("button", { name: "Logout" }).click();
+  await expect(popup.getByRole("button", { name: "Connect Twitch" })).toBeVisible();
+  await expect(twitchPage.locator("#__root")).toContainText("not logged in");
+
+  // A slow follow list, like the real Twitch API
+  await context.route("https://api.twitch.tv/helix/channels/followed*", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+    await route.fallback();
+  });
+  await stubWorkerLogin(worker, REDIRECT);
+  await popup.getByRole("button", { name: "Connect Twitch" }).click();
+  await expect(popup.getByRole("button", { name: "Logout" })).toBeVisible({ timeout: 5_000 });
+
+  // Mid-download: the account is connected, so the intro must be gone
+  await twitchPage.waitForTimeout(400);
+  const sidebarText = await twitchPage.locator("#__root").innerText();
+  expect(sidebarText).not.toContain("not logged in");
+  expect(sidebarText).toContain("Loading");
+
+  await expect(twitchPage.locator("#__root")).toContainText("Ungrouped", { timeout: 8_000 });
+});

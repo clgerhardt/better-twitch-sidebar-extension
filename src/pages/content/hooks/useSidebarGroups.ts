@@ -122,15 +122,32 @@ export const useSidebarGroups = (): {
     });
   };
 
+  // Each fetch gets a number; a fetch that is no longer the latest (the user logged out, or another
+  // account connected) must not write its results, or the previous account's channels reappear
+  const fetchGeneration = useRef(0);
+
   const fetchChannels = async () => {
+    const generation = ++fetchGeneration.current;
+    const isStale = () => generation !== fetchGeneration.current;
+
     chrome.storage.local.get(["twitchToken", "twitchUserId"], async ({ twitchToken, twitchUserId }) => {
+      if (isStale()) return;
       if (!twitchToken || !twitchUserId) {
+        // Logged out: drop the previous account's channels and groups from memory too
+        fetchedRef.current = null;
+        setGroups([]);
         setLoading(false);
         setError("Missing Twitch credentials");
         return;
       }
 
       messageLogger("useSidebarGroups", "start fetching followed channels", performance.now());
+
+      // Connected, so show loading (not the logged-out intro left over from the previous error)
+      fetchedRef.current = null;
+      setGroups([]);
+      setError(null);
+      setLoading(true);
 
       const headers = {
         Authorization: `Bearer ${twitchToken}`,
@@ -148,6 +165,7 @@ export const useSidebarGroups = (): {
 
           const res = await fetch(url.toString(), { headers });
           const data = await res.json();
+          if (isStale()) return;
           followRes = [...followRes, ...data.data];
           cursor = data.pagination?.cursor || null;
         } while (cursor);
@@ -162,6 +180,7 @@ export const useSidebarGroups = (): {
 
         const usersRes = await fetchChunked(`${TWITCH_API_BASE}/users`, headers, "id", followedIds);
         const streamsRes = await fetchChunked(`${TWITCH_API_BASE}/streams`, headers, "user_id", followedIds);
+        if (isStale()) return;
 
         const liveMap = new Map(
           streamsRes.map((s: any) => [
@@ -190,10 +209,10 @@ export const useSidebarGroups = (): {
         });
         applyLayout();
       } catch (err) {
-        setError("Failed to fetch followed channels");
+        if (!isStale()) setError("Failed to fetch followed channels");
       } finally {
         messageLogger("useSidebarGroups", "total process time", performance.now());
-        setLoading(false);
+        if (!isStale()) setLoading(false);
       }
     });
   };
