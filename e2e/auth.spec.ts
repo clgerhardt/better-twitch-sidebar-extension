@@ -1,5 +1,5 @@
 import { test, expect } from "./extension";
-import type { Page } from "@playwright/test";
+import type { Page, Worker } from "@playwright/test";
 
 const REDIRECT = "https://fixture.chromiumapp.org/#access_token=silent-token&scope=user%3Aread%3Afollows&token_type=bearer";
 
@@ -31,17 +31,119 @@ test("logging out stays logged out, even while Twitch still has a session", asyn
   await expect(twitchPage.locator("#__root")).toContainText("not logged in");
 });
 
-test("connecting again after a logout works", async ({ twitchPage, context, worker, extensionId }) => {
+test("logging out revokes the token with Twitch", async ({ twitchPage, context, extensionId }) => {
+  const revokes: string[] = [];
+  await context.route("https://id.twitch.tv/oauth2/revoke", (route) => {
+    revokes.push(`${route.request().method()} ${route.request().postData()}`);
+    return route.fulfill({ status: 200, body: "" });
+  });
+
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
-  await fakeTwitchSession(popup);
   await popup.getByRole("button", { name: "Logout" }).click();
   await expect(popup.getByRole("button", { name: "Connect Twitch" })).toBeVisible();
 
+  await expect.poll(() => revokes.length).toBe(1);
+  expect(revokes[0]).toMatch(/^POST /);
+  expect(revokes[0]).toContain("token=fixture-token");
+  expect(revokes[0]).toMatch(/client_id=/);
+});
+
+test("a revoke failure does not block logging out", async ({ twitchPage, context, worker, extensionId }) => {
+  await context.route("https://id.twitch.tv/oauth2/revoke", (route) => route.abort());
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
+  await popup.getByRole("button", { name: "Logout" }).click();
+  await expect(popup.getByRole("button", { name: "Connect Twitch" })).toBeVisible();
+  expect((await worker.evaluate(() => chrome.storage.local.get("twitchToken"))).twitchToken).toBeUndefined();
+});
+
+// The interactive login runs in the service worker (the toolbar popup closes as soon as the
+// Twitch window takes focus). Stub its login window and the Helix user lookup there.
+const stubWorkerLogin = (worker: Worker, redirect: string | null) =>
+  worker.evaluate((redirectUrl) => {
+    const g = self as any;
+    g.__authCalls = [];
+    (chrome.identity as any).launchWebAuthFlow = (options: { url: string; interactive: boolean }, callback: (url?: string) => void) => {
+      g.__authCalls.push({ interactive: options.interactive, url: options.url });
+      callback(redirectUrl ?? undefined);
+    };
+    const realFetch = g.fetch.bind(self);
+    g.fetch = (input: any, init?: any) =>
+      /api\.twitch\.tv\/helix\/users/.test(String(input))
+        ? Promise.resolve(new Response(JSON.stringify({ data: [{ id: "999", login: "fixture_viewer", display_name: "Fixture_Viewer", profile_image_url: "https://img.example/viewer.png" }] }), { status: 200 }))
+        : realFetch(input, init);
+  }, redirect);
+
+const authCalls = (worker: Worker) => worker.evaluate(() => (self as any).__authCalls as { interactive: boolean; url: string }[]);
+
+const openPopup = async (context: any, extensionId: string) => {
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
+  return popup;
+};
+
+// A session that was never logged out: no token and no logged-out flag
+const clearSession = (worker: Worker) =>
+  worker.evaluate(() => chrome.storage.local.remove(["twitchToken", "tokenIssuedAt", "twitchUserId", "twitchUserImage", "twitchLoggedOut"]));
+
+test("Connect runs in the background and stores the session", async ({ twitchPage, context, worker, extensionId }) => {
+  await clearSession(worker);
+  await stubWorkerLogin(worker, REDIRECT);
+  const popup = await openPopup(context, extensionId);
   await popup.getByRole("button", { name: "Connect Twitch" }).click();
   await expect(popup.getByRole("button", { name: "Logout" })).toBeVisible({ timeout: 5_000 });
 
   const stored = await worker.evaluate(() => chrome.storage.local.get(null));
   expect(stored.twitchToken).toBe("silent-token");
-  await expect(twitchPage.locator("#__root")).toContainText("Ungrouped", { timeout: 5_000 });
+  expect(stored.twitchUserId).toBe("999");
+  expect(stored.twitchUserImage).toBe("https://img.example/viewer.png");
+  expect(stored.twitchLoggedOut).toBe(false);
+  expect(stored.globalState.loggedIn).toBe(true);
+  expect((await authCalls(worker)).filter((c) => c.interactive)).toHaveLength(1);
+});
+
+test("the first Connect uses Twitch's authorize page and forces re-verification", async ({ twitchPage, context, worker, extensionId }) => {
+  await clearSession(worker);
+  await stubWorkerLogin(worker, REDIRECT);
+  const popup = await openPopup(context, extensionId);
+  await popup.getByRole("button", { name: "Connect Twitch" }).click();
+  await expect(popup.getByRole("button", { name: "Logout" })).toBeVisible({ timeout: 5_000 });
+
+  const url = new URL((await authCalls(worker))[0].url);
+  expect(url.origin + url.pathname).toBe("https://id.twitch.tv/oauth2/authorize");
+  expect(url.searchParams.get("force_verify")).toBe("true");
+  expect(url.searchParams.get("response_type")).toBe("token");
+});
+
+test("Connect after a logout signs out of Twitch first, then authorizes", async ({ twitchPage, context, worker, extensionId }) => {
+  const popup = await openPopup(context, extensionId);
+  await popup.getByRole("button", { name: "Logout" }).click();
+  await expect(popup.getByRole("button", { name: "Connect Twitch" })).toBeVisible();
+
+  await stubWorkerLogin(worker, REDIRECT);
+  await popup.getByRole("button", { name: "Connect Twitch" }).click();
+  await expect(popup.getByRole("button", { name: "Logout" })).toBeVisible({ timeout: 5_000 });
+
+  const url = new URL((await authCalls(worker))[0].url);
+  expect(url.origin + url.pathname).toBe("https://id.twitch.tv/logout/redirect");
+  expect(url.searchParams.get("redirect_path")).toBe("https://id.twitch.tv/oauth2/authorize/data");
+  // The authorize request Twitch continues with after signing the browser out
+  const next = new URLSearchParams(url.searchParams.get("redirect_params")!);
+  expect(next.get("client_id")).toBeTruthy();
+  expect(next.get("response_type")).toBe("token");
+  expect(next.get("scope")).toBe("user:read:follows");
+  expect(next.get("force_verify")).toBe("true");
+  expect(next.get("redirect_uri")).toMatch(/^https:\/\/[a-z]{32}\.chromiumapp\.org\/$/);
+});
+
+test("cancelling the Twitch login leaves the popup ready to try again", async ({ twitchPage, context, worker, extensionId }) => {
+  await clearSession(worker);
+  await stubWorkerLogin(worker, null); // the login window was closed
+  const popup = await openPopup(context, extensionId);
+  await popup.getByRole("button", { name: "Connect Twitch" }).click();
+
+  await expect(popup.getByText(/could not connect/i)).toBeVisible({ timeout: 5_000 });
+  await expect(popup.getByRole("button", { name: "Connect Twitch" })).toBeEnabled();
+  expect((await worker.evaluate(() => chrome.storage.local.get("twitchToken"))).twitchToken).toBeUndefined();
 });

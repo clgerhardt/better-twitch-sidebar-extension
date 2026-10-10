@@ -1,16 +1,14 @@
 import { useEffect, useState } from "react";
-import {
-  buildAuthUrl,
-  extractTokenFromRedirectUrl,
-} from "../../utils/getValidTwitchToken";
 import { messageLogger } from "@src/pages/utils/logger";
-import { constants, TWITCH_LOGGED_OUT_KEY } from "@src/pages/utils/constants";
+import { constants } from "@src/pages/utils/constants";
 import { useTwitchToken } from "../../hooks/userTwitchToken";
 
 const CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID;
 
 const Authenticate = ({ isSidebarExpanded }: { isSidebarExpanded: any }) => {
   const [tokenChecked, setTokenChecked] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [connectError, setConnectError] = useState(false);
   const twitchToken = useTwitchToken();
 
   const logout = () => {
@@ -72,45 +70,20 @@ const Authenticate = ({ isSidebarExpanded }: { isSidebarExpanded: any }) => {
     return (
       <div>
         <button
-          className="bg-purple-500 text-white font-bold py-2 px-4 mt-2 rounded"
-          onClick={() => {
-            chrome.identity.launchWebAuthFlow(
-              {
-                url: buildAuthUrl(),
-                interactive: true,
-              },
-              async (redirectUrl) => {
-                if (chrome.runtime.lastError) {
-                  console.error("Auth failed", chrome.runtime.lastError);
-                  return;
-                }
-
-                if (!redirectUrl) {
-                  console.error("No redirect URL received");
-                  return;
-                }
-
-                const accessToken = extractTokenFromRedirectUrl(redirectUrl);
-
-                if (!accessToken) {
-                  console.error(
-                    "Failed to extract access token from redirect URL"
-                  );
-                  return;
-                }
-                await chrome.storage.local.set(
-                  { twitchToken: accessToken, tokenIssuedAt: Date.now(), [TWITCH_LOGGED_OUT_KEY]: false },
-                  () => {
-                    console.log("[AUTH] Twitch token stored");
-                  }
-                );
-                fetchTwitchUser(accessToken);
-              }
-            );
+          disabled={connecting}
+          className="bg-purple-500 text-white font-bold py-2 px-4 mt-2 rounded disabled:opacity-60"
+          onClick={async () => {
+            setConnecting(true);
+            setConnectError(false);
+            // The login runs in the background so it survives this popup closing
+            const result = await chrome.runtime.sendMessage({ type: "CONNECT_TWITCH" }).catch(() => undefined);
+            setConnecting(false);
+            if (!result?.ok) setConnectError(true);
           }}
         >
-          Connect Twitch
+          {connecting ? "Waiting for Twitch..." : "Connect Twitch"}
         </button>
+        {connectError && <p className="text-red-500 text-sm mt-2">Could not connect to Twitch. Please try again.</p>}
       </div>
     );
   }

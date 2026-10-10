@@ -10,6 +10,7 @@ import {
 } from "./storage";
 import { getGlobalState, updateSidebarState } from "./utils";
 import { resolveGlobalState, shouldClearStorage } from "./installState";
+import { connectTwitch } from "./auth";
 
 messageLogger(constants.location.BACKGROUND, "background script loaded");
 attachStorageListener();
@@ -46,6 +47,14 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     }
   } catch (error) {
     console.error("Error during onInstalled:", error);
+  }
+});
+
+// One-shot requests from the popup. Returning true keeps the channel open for the async reply.
+chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+  if (request?.type === "CONNECT_TWITCH") {
+    connectTwitch().then(sendResponse);
+    return true;
   }
 });
 
