@@ -17,11 +17,12 @@ import NotLoggedInContent from "./NotLoggedInContent";
 import { messageLogger } from "@src/pages/utils/logger";
 import { constants } from "@src/pages/utils/constants";
 import { useSidebarGroups } from "../../hooks/useSidebarGroups";
+import RefreshProgress from "./RefreshProgress";
 
 const AccordianChannels = ({ tabId }: { tabId: string }) => {
   const isSidebarExpanded = useSidebarState(tabId);
   const globalState = useGlobalState();
-  const { groups, loading, error } = useSidebarGroups();
+  const { groups, loading, error, fetchedAt } = useSidebarGroups();
   const [visibleGroups, setVisibleGroups] = useState(groups);
 
   const handleChannelClick = useCallback((channelLink: string) => {
@@ -51,6 +52,7 @@ const AccordianChannels = ({ tabId }: { tabId: string }) => {
 
   return (
     <div>
+      <RefreshProgress fetchedAt={fetchedAt} />
       <div className="overflow-y-auto" style={{ maxHeight: "50vh" }}>
         <Accordion allowZeroExpanded>
           {visibleGroups.map((group) => (

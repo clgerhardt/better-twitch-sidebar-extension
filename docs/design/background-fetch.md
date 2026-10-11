@@ -78,8 +78,8 @@ Kept as they are, for now: the content-script port for render trigger and expand
 
 ### Refresh schedule
 
-- `chrome.alarms` (needs the `alarms` permission) fires about every 60 seconds. The handler refreshes only if at least one Twitch tab is open and visible, so no network activity when you are not on Twitch.
-- Content sends `REFRESH` on page load. The background skips the network if the snapshot is younger than a few seconds.
+- **The visible tab drives it.** While a Twitch tab is visible, the sidebar asks for a refresh once the stored data is 60 seconds old (retrying every 15 seconds if that produces no new data), and again whenever the user switches back to the tab. Scheduling by the age of the data, not a fixed timer, keeps a thin progress bar above the groups honest: it fills over 60 seconds, restarts when fresh data arrives, and stays full while refreshes keep failing. Hidden tabs ask for nothing, so there is no network activity when nobody is looking at Twitch. This needs no new permission (the earlier idea of `chrome.alarms` is dropped: it would add a permission and wake the worker with no tab to show the result).
+- The background skips any refresh if the snapshot is younger than 10 seconds, so several visible tabs (or tabs loading together) cause one fetch, not several.
 - All fetches go through one deduplicated in-flight promise. Requests stay **sequential and paced** (concurrency 1). The existing `delay(250)` and 429 retry exist because rapid calls were rejected in practice; the reason was not recorded, so do not remove them on a hunch. Make the pacing header-driven: read `Ratelimit-Remaining` and `Ratelimit-Reset` from every response, wait until the reset time on a 429 (not a fixed second), and log each 429 with its endpoint so we learn what actually triggers them.
 
 ### Auth
@@ -94,7 +94,7 @@ Kept as they are, for now: the content-script port for render trigger and expand
 1. **Pure layout function.** Extract `applyLayout` from `useSidebarGroups` into `shared/` (`layoutGroups(snapshot, groupNames, channelGroups)`). Node-only tests: ordering, empty groups, Ungrouped first, orphan groups, channels with no mapping. No behaviour change.
 2. **Background Helix client + snapshot.** Add `shared/twitch/` and the `REFRESH` handler that writes `channelSnapshot`. Content's hook switches to reading the snapshot and sending `REFRESH`; its direct fetch code is deleted. Test: with the Helix stub, content-script frames make no `api.twitch.tv` requests (Playwright can tell service-worker requests from page requests); the sidebar still renders and group edits stay instant.
 3. **Stale-while-revalidate.** Render from the stored snapshot immediately. Test: with a seeded snapshot and a slow stub, the sidebar shows channels before the stub responds.
-4. **Alarms and live updates.** Add the `alarms` permission and the visible-tab check. Test: change the stub's viewer count, trigger a refresh, and see the number change without a reload; with no Twitch tab open, no calls are made.
+4. **Live updates and progress bar.** The sidebar asks for a refresh when the stored data is 60 seconds old while its tab is visible, and when the user returns to the tab; a progress bar shows the data's age. Tests: the scheduling rules in node with a fake clock; returning to the tab updates viewer counts end to end; the bar's fill is measured on screen.
 5. **Auth in the background.** `CONNECT`, `LOGOUT`, 401 recovery, real expiry, `authState`. Popup and `Authenticate.tsx` use messages. Tests: a 401 followed by a successful silent re-auth results in a retry that succeeds; a failed re-auth sets `needs_login` and the sidebar shows the logged-out view.
 6. **Cleanup.** Remove `followedChannels`, the unused duplicates, and the content-script heartbeat if nothing needs it.
 

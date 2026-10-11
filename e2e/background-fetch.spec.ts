@@ -137,3 +137,35 @@ test("connecting fetches the channels right away", async ({ context, session, wo
   await expect.poll(() => snapshotOf(worker).then((s: any) => s?.channels.length)).toBe(3);
   expect((await snapshotOf(worker)).user.id).toBe("999");
 });
+
+// Live refresh: the sidebar asks the background for fresh data while its tab is visible
+const makeSnapshotStale = (worker: any) =>
+  worker.evaluate(async () => {
+    const { channelSnapshot } = await chrome.storage.local.get("channelSnapshot");
+    await chrome.storage.local.set({ channelSnapshot: { ...channelSnapshot, fetchedAt: 0 } });
+  });
+
+// Twitch now says Fixture_Live has 2,222 viewers
+const liveViewersChange = (context: BrowserContext) =>
+  context.route("https://api.twitch.tv/helix/streams/followed*", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [{ user_id: "1", user_login: "fixture_live", user_name: "Fixture_Live", game_name: "Lootbound", viewer_count: 2222, type: "live" }],
+        pagination: {},
+      }),
+    })
+  );
+
+test("coming back to the tab refreshes it", async ({ context, session, worker, openTwitch }) => {
+  const page = await openTwitch();
+  await page.locator("#__root").getByRole("button", { name: /Ungrouped/ }).click();
+  await expect(page.locator("#__root")).toContainText("1.1K viewers");
+
+  await makeSnapshotStale(worker);
+  await liveViewersChange(context);
+  // What the browser fires when the user switches back to this tab
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+
+  await expect(page.locator("#__root")).toContainText("2.2K viewers", { timeout: 8_000 });
+});

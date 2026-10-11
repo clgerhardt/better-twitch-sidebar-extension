@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { FetchedChannel, SidebarGroup, layoutGroups } from "@src/pages/utils/layoutGroups";
 import { isSnapshotFor, snapshotToFetched } from "@src/pages/shared/twitch/snapshot";
 import { MESSAGES } from "@src/pages/shared/messages";
+import { LIVE_REFRESH_MS, LIVE_RETRY_MS, startLiveRefresh } from "@src/pages/shared/liveRefresh";
 
 // The sidebar never talks to Twitch. The background fetches the followed channels into a stored
 // snapshot; this hook shows that snapshot (instantly, if there is one), groups it with the user's
@@ -18,6 +19,8 @@ export const useSidebarGroups = (): {
   groups: SidebarGroup[];
   loading: boolean;
   error: string | null;
+  // When the stored channel data was last refreshed (null while there is none)
+  fetchedAt: number | null;
   channelGroups: Record<string, string>;
   setChannelGroups: (map: Record<string, string>) => void;
 } => {
@@ -25,6 +28,13 @@ export const useSidebarGroups = (): {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [channelGroups, setChannelGroups] = useState<Record<string, string>>({});
+  const [fetchedAt, setFetchedAt] = useState<number | null>(null);
+  // The live refresh timer reads this, so it is always the latest value
+  const fetchedAtRef = useRef<number | null>(null);
+  const updateFetchedAt = (value: number | null) => {
+    fetchedAtRef.current = value;
+    setFetchedAt(value);
+  };
 
   // The channels of the current snapshot, kept so group edits can re-layout without reading it again
   const fetchedRef = useRef<FetchedChannel[] | null>(null);
@@ -55,6 +65,7 @@ export const useSidebarGroups = (): {
       if (!twitchToken || !twitchUserId) {
         // Logged out: drop the previous account's channels and groups from memory too
         fetchedRef.current = null;
+        updateFetchedAt(null);
         setGroups([]);
         setLoading(false);
         setError("Missing Twitch credentials");
@@ -64,6 +75,7 @@ export const useSidebarGroups = (): {
       const snapshot = stored[CHANNEL_SNAPSHOT_KEY];
       if (isSnapshotFor(snapshot, twitchUserId)) {
         fetchedRef.current = snapshotToFetched(snapshot);
+        updateFetchedAt(snapshot.fetchedAt);
         setLoading(false);
         applyLayout();
         return;
@@ -71,6 +83,7 @@ export const useSidebarGroups = (): {
 
       // Nothing stored for this account yet: wait for the first refresh, or say why it failed
       fetchedRef.current = null;
+      updateFetchedAt(null);
       setGroups([]);
       const reason = stored[SNAPSHOT_ERROR_KEY];
       if (reason) {
@@ -105,8 +118,20 @@ export const useSidebarGroups = (): {
       }
     };
     chrome.storage.onChanged.addListener(listener);
-    return () => chrome.storage.onChanged.removeListener(listener);
+
+    // Keep live status and viewer counts fresh, but only while someone is looking at the tab
+    const stopLiveRefresh = startLiveRefresh({
+      intervalMs: LIVE_REFRESH_MS,
+      retryMs: LIVE_RETRY_MS,
+      request: requestRefresh,
+      getFetchedAt: () => fetchedAtRef.current,
+    });
+
+    return () => {
+      chrome.storage.onChanged.removeListener(listener);
+      stopLiveRefresh();
+    };
   }, []);
 
-  return { groups, loading, error, channelGroups, setChannelGroups };
+  return { groups, loading, error, fetchedAt, channelGroups, setChannelGroups };
 };
