@@ -13,6 +13,9 @@ const CHANNELS = [
   { id: "3", login: "fixture_offline", display_name: "fixture_offline", game: null, viewers: 0 },
 ];
 
+// A 1x1 image as a data URI, so avatars need no network
+const AVATAR = "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
+
 const json = (data: unknown) => ({ contentType: "application/json", body: JSON.stringify(data) });
 
 async function stubTwitch(context: BrowserContext) {
@@ -28,18 +31,27 @@ async function stubTwitch(context: BrowserContext) {
     const url = new URL(route.request().url());
     switch (url.pathname) {
       case "/helix/channels/followed":
-        return route.fulfill(json({ data: CHANNELS.map((c) => ({ broadcaster_id: c.id })), pagination: {} }));
+        return route.fulfill(
+          json({
+            total: CHANNELS.length,
+            data: CHANNELS.map((c) => ({ broadcaster_id: c.id, broadcaster_login: c.login, broadcaster_name: c.display_name, followed_at: "2026-01-01T00:00:00Z" })),
+            pagination: {},
+          })
+        );
       case "/helix/users": {
         const ids = url.searchParams.getAll("id");
         if (ids.length === 0) {
           return route.fulfill(json({ data: [{ id: "999", login: "fixture_viewer", display_name: "Fixture_Viewer", profile_image_url: "" }] }));
         }
-        return route.fulfill(json({ data: CHANNELS.filter((c) => ids.includes(c.id)).map((c) => ({ id: c.id, login: c.login, display_name: c.display_name, profile_image_url: "" })) }));
+        return route.fulfill(json({ data: CHANNELS.filter((c) => ids.includes(c.id)).map((c) => ({ id: c.id, login: c.login, display_name: c.display_name, profile_image_url: AVATAR })) }));
       }
-      case "/helix/streams": {
-        const ids = url.searchParams.getAll("user_id");
-        return route.fulfill(json({ data: CHANNELS.filter((c) => c.viewers > 0 && ids.includes(c.id)).map((c) => ({ user_id: c.id, game_name: c.game, viewer_count: c.viewers })) }));
-      }
+      case "/helix/streams/followed":
+        return route.fulfill(
+          json({
+            data: CHANNELS.filter((c) => c.viewers > 0).map((c) => ({ user_id: c.id, user_login: c.login, user_name: c.display_name, game_name: c.game, viewer_count: c.viewers, type: "live" })),
+            pagination: {},
+          })
+        );
       default:
         return route.fulfill(json({ data: [] }));
     }
@@ -55,6 +67,10 @@ type Fixtures = {
   context: BrowserContext;
   worker: Worker;
   extensionId: string;
+  // Logs the extension in (fake token and user) without opening a page
+  session: void;
+  // Opens a Twitch tab and waits for the extension's UI to mount
+  openTwitch: () => Promise<Page>;
   twitchPage: Page;
 };
 
@@ -89,9 +105,9 @@ export const test = base.extend<Fixtures & Options>({
     await use(new URL(worker.url()).host);
   },
 
-  // A Twitch tab with a seeded, logged-in extension state. onInstalled resets storage
-  // asynchronously, so wait for its default globalState before overwriting.
-  twitchPage: async ({ context, worker }, use) => {
+  // A seeded, logged-in extension state. onInstalled resets storage asynchronously, so wait for
+  // its default globalState before overwriting.
+  session: async ({ worker }, use) => {
     await expect
       .poll(() => worker.evaluate(async () => !!(await chrome.storage.local.get("globalState")).globalState))
       .toBe(true);
@@ -104,11 +120,21 @@ export const test = base.extend<Fixtures & Options>({
         globalState: { ...globalState, loggedIn: true },
       });
     });
-    const page = await context.newPage();
-    await page.goto("https://www.twitch.tv/");
-    // The content script mounts #__root once it is listening for messages
-    await page.locator("#__root").waitFor();
-    await use(page);
+    await use();
+  },
+
+  openTwitch: async ({ context, session }, use) => {
+    await use(async () => {
+      const page = await context.newPage();
+      await page.goto("https://www.twitch.tv/");
+      // The content script mounts #__root once it is listening for messages
+      await page.locator("#__root").waitFor();
+      return page;
+    });
+  },
+
+  twitchPage: async ({ openTwitch }, use) => {
+    await use(await openTwitch());
   },
 });
 

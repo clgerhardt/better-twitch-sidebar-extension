@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { messageLogger } from "@src/pages/utils/logger";
 import { constants } from "@src/pages/utils/constants";
 import { useTwitchToken } from "../../hooks/userTwitchToken";
+import { MESSAGES } from "../../../shared/messages";
 
 const CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID;
 
@@ -76,7 +77,7 @@ const Authenticate = ({ isSidebarExpanded }: { isSidebarExpanded: any }) => {
             setConnecting(true);
             setConnectError(false);
             // The login runs in the background so it survives this popup closing
-            const result = await chrome.runtime.sendMessage({ type: "CONNECT_TWITCH" }).catch(() => undefined);
+            const result = await chrome.runtime.sendMessage({ type: MESSAGES.CONNECT_TWITCH }).catch(() => undefined);
             setConnecting(false);
             if (!result?.ok) setConnectError(true);
           }}

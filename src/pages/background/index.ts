@@ -11,6 +11,8 @@ import {
 import { getGlobalState, updateSidebarState } from "./utils";
 import { resolveGlobalState, shouldClearStorage } from "./installState";
 import { connectTwitch } from "./auth";
+import { refreshChannels } from "./refresh";
+import { MESSAGES } from "../shared/messages";
 
 messageLogger(constants.location.BACKGROUND, "background script loaded");
 attachStorageListener();
@@ -52,8 +54,16 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 
 // One-shot requests from the popup. Returning true keeps the channel open for the async reply.
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
-  if (request?.type === "CONNECT_TWITCH") {
-    connectTwitch().then(sendResponse);
+  if (request?.type === MESSAGES.CONNECT_TWITCH) {
+    connectTwitch().then((result) => {
+      // Fetch the channels right away, even if no Twitch tab is open to ask for them
+      if (result.ok) void refreshChannels(true);
+      sendResponse(result);
+    });
+    return true;
+  }
+  if (request?.type === MESSAGES.REFRESH_CHANNELS) {
+    refreshChannels(request.force === true).then(sendResponse);
     return true;
   }
 });

@@ -1,38 +1,19 @@
 import { messageLogger } from "@src/pages/utils/logger";
-import { CHANNEL_GROUPS_KEY, FOLLOWED_CHANNELS_KEY, GROUP_NAMES_KEY } from "@src/pages/utils/constants";
+import {
+  CHANNEL_GROUPS_KEY,
+  CHANNEL_SNAPSHOT_KEY,
+  FOLLOWED_CHANNELS_KEY,
+  GROUP_NAMES_KEY,
+  SNAPSHOT_ERROR_KEY,
+} from "@src/pages/utils/constants";
 import { useEffect, useRef, useState } from "react";
 import { FetchedChannel, SidebarGroup, layoutGroups } from "@src/pages/utils/layoutGroups";
+import { isSnapshotFor, snapshotToFetched } from "@src/pages/shared/twitch/snapshot";
+import { MESSAGES } from "@src/pages/shared/messages";
 
-const TWITCH_API_BASE = "https://api.twitch.tv/helix";
-
-const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
-
-const fetchChunked = async (
-  baseUrl: string,
-  headers: any,
-  paramKey: string,
-  ids: string[]
-) => {
-  const chunks = [];
-  for (let i = 0; i < ids.length; i += 100) {
-    const idParams = ids
-      .slice(i, i + 100)
-      .map((id) => `${paramKey}=${id}`)
-      .join("&");
-    const res = await fetch(`${baseUrl}?${idParams}`, { headers });
-
-    if (res.status === 429) {
-      await delay(1000);
-      i -= 100;
-      continue;
-    }
-
-    chunks.push(...(await res.json()).data);
-    await delay(250);
-  }
-  return chunks;
-};
-
+// The sidebar never talks to Twitch. The background fetches the followed channels into a stored
+// snapshot; this hook shows that snapshot (instantly, if there is one), groups it with the user's
+// groups, and asks the background to refresh it.
 export const useSidebarGroups = (): {
   groups: SidebarGroup[];
   loading: boolean;
@@ -45,7 +26,7 @@ export const useSidebarGroups = (): {
   const [error, setError] = useState<string | null>(null);
   const [channelGroups, setChannelGroups] = useState<Record<string, string>>({});
 
-  // Followed channels from the Twitch API, kept so group edits can re-layout without refetching
+  // The channels of the current snapshot, kept so group edits can re-layout without reading it again
   const fetchedRef = useRef<FetchedChannel[] | null>(null);
 
   const applyLayout = () => {
@@ -67,16 +48,10 @@ export const useSidebarGroups = (): {
     });
   };
 
-  // Each fetch gets a number; a fetch that is no longer the latest (the user logged out, or another
-  // account connected) must not write its results, or the previous account's channels reappear
-  const fetchGeneration = useRef(0);
-
-  const fetchChannels = async () => {
-    const generation = ++fetchGeneration.current;
-    const isStale = () => generation !== fetchGeneration.current;
-
-    chrome.storage.local.get(["twitchToken", "twitchUserId"], async ({ twitchToken, twitchUserId }) => {
-      if (isStale()) return;
+  // Shows whatever the background has stored for the connected account
+  const showStoredSnapshot = () => {
+    chrome.storage.local.get(["twitchToken", "twitchUserId", CHANNEL_SNAPSHOT_KEY, SNAPSHOT_ERROR_KEY], (stored) => {
+      const { twitchToken, twitchUserId } = stored;
       if (!twitchToken || !twitchUserId) {
         // Logged out: drop the previous account's channels and groups from memory too
         fetchedRef.current = null;
@@ -86,93 +61,47 @@ export const useSidebarGroups = (): {
         return;
       }
 
-      messageLogger("useSidebarGroups", "start fetching followed channels", performance.now());
+      const snapshot = stored[CHANNEL_SNAPSHOT_KEY];
+      if (isSnapshotFor(snapshot, twitchUserId)) {
+        fetchedRef.current = snapshotToFetched(snapshot);
+        setLoading(false);
+        applyLayout();
+        return;
+      }
 
-      // Connected, so show loading (not the logged-out intro left over from the previous error)
+      // Nothing stored for this account yet: wait for the first refresh, or say why it failed
       fetchedRef.current = null;
       setGroups([]);
-      setError(null);
-      setLoading(true);
-
-      const headers = {
-        Authorization: `Bearer ${twitchToken}`,
-        "Client-Id": import.meta.env.VITE_TWITCH_CLIENT_ID,
-      };
-
-      try {
-        let cursor;
-        let followRes: any[] = [];
-        do {
-          const url = new URL(`${TWITCH_API_BASE}/channels/followed`);
-          url.searchParams.set("user_id", twitchUserId);
-          url.searchParams.set("first", "100");
-          if (cursor) url.searchParams.set("after", cursor);
-
-          const res = await fetch(url.toString(), { headers });
-          const data = await res.json();
-          if (isStale()) return;
-          followRes = [...followRes, ...data.data];
-          cursor = data.pagination?.cursor || null;
-        } while (cursor);
-
-        const followedIds = followRes.map((f: any) => f.broadcaster_id);
-
-        if (!followedIds.length) {
-          fetchedRef.current = [];
-          applyLayout();
-          return;
-        }
-
-        const usersRes = await fetchChunked(`${TWITCH_API_BASE}/users`, headers, "id", followedIds);
-        const streamsRes = await fetchChunked(`${TWITCH_API_BASE}/streams`, headers, "user_id", followedIds);
-        if (isStale()) return;
-
-        const liveMap = new Map(
-          streamsRes.map((s: any) => [
-            s.user_id,
-            {
-              streamingContent: s.game_name,
-              viewerCount: `${Intl.NumberFormat("en", { notation: "compact" }).format(s.viewer_count)} viewers`,
-            },
-          ])
-        );
-
-        fetchedRef.current = usersRes.map((u: any) => {
-          const liveInfo = liveMap.get(u.id);
-          return {
-            login: u.login,
-            channel: {
-              login: u.login,
-              channelImage: u.profile_image_url,
-              channelLink: `https://twitch.tv/${u.display_name}`,
-              channelName: u.display_name,
-              isLive: !!liveInfo,
-              streamingContent: liveInfo?.streamingContent,
-              viewerCount: liveInfo?.viewerCount,
-            },
-          };
-        });
-        applyLayout();
-      } catch (err) {
-        if (!isStale()) setError("Failed to fetch followed channels");
-      } finally {
-        messageLogger("useSidebarGroups", "total process time", performance.now());
-        if (!isStale()) setLoading(false);
+      const reason = stored[SNAPSHOT_ERROR_KEY];
+      if (reason) {
+        setError(reason === "unauthorized" ? "Twitch login expired. Please reconnect in the extension popup." : "Failed to fetch followed channels");
+        setLoading(false);
+      } else {
+        setError(null);
+        setLoading(true);
       }
     });
   };
 
+  const requestRefresh = () => {
+    chrome.runtime.sendMessage({ type: MESSAGES.REFRESH_CHANNELS }).catch((error) => {
+      messageLogger("useSidebarGroups", "could not reach the background", error);
+    });
+  };
+
   useEffect(() => {
-    fetchChannels();
+    showStoredSnapshot();
+    requestRefresh();
 
     const listener = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
       if (areaName !== "local") return;
       if (changes.twitchToken || changes.twitchUserId) {
-        console.log("[HOOK] twitchToken or twitchUserId changed in storage");
-        fetchChannels();
+        showStoredSnapshot();
+        requestRefresh();
+      } else if (changes[CHANNEL_SNAPSHOT_KEY] || changes[SNAPSHOT_ERROR_KEY]) {
+        showStoredSnapshot();
       } else if (changes[CHANNEL_GROUPS_KEY] || changes[GROUP_NAMES_KEY]) {
         if (fetchedRef.current) applyLayout();
-        else fetchChannels();
       }
     };
     chrome.storage.onChanged.addListener(listener);
@@ -181,4 +110,3 @@ export const useSidebarGroups = (): {
 
   return { groups, loading, error, channelGroups, setChannelGroups };
 };
-
