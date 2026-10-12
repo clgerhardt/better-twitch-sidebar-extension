@@ -115,7 +115,7 @@ export const test = base.extend<Fixtures & Options>({
       const { globalState } = await chrome.storage.local.get("globalState");
       await chrome.storage.local.set({
         twitchToken: "fixture-token",
-        tokenIssuedAt: Date.now(),
+        tokenExpiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
         twitchUserId: "999",
         globalState: { ...globalState, loggedIn: true },
       });

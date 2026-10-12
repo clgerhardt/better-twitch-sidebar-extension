@@ -5,11 +5,13 @@ import {
   GLOBAL_STATE_KEY,
   GROUP_NAMES_KEY,
   SNAPSHOT_ERROR_KEY,
+  TOKEN_EXPIRES_AT_KEY,
   TWITCH_LOGGED_OUT_KEY,
 } from "../../utils/constants";
 
 const TWITCH_AUTH_BASE = "https://id.twitch.tv/oauth2/authorize";
-const EXPIRES_IN_MS = 4 * 60 * 60 * 1000; // 4 hours
+// Renew a little before the real expiry so a request never goes out with a token about to die
+const EXPIRY_MARGIN_MS = 60_000;
 const SCOPES = ["user:read:follows"];
 const REDIRECT_URI = `https://${chrome.runtime.id}.chromiumapp.org/`;
 
@@ -52,19 +54,41 @@ export const extractTokenFromRedirectUrl = (redirectUrl: string): string | null 
   return null;
 };
 
-const isTokenExpired = (issuedAt: number | undefined): boolean => {
-  if (!issuedAt) return true;
-  return Date.now() > issuedAt + EXPIRES_IN_MS;
+// The redirect does not say how long the token lasts, so ask Twitch. Returns null when it cannot
+// be determined (offline); the token is then used until Twitch rejects it.
+export const fetchTokenExpiry = async (token: string): Promise<number | null> => {
+  try {
+    const res = await fetch("https://id.twitch.tv/oauth2/validate", { headers: { Authorization: `OAuth ${token}` } });
+    if (!res.ok) return null;
+    const { expires_in } = await res.json();
+    return typeof expires_in === "number" ? Date.now() + expires_in * 1000 : null;
+  } catch {
+    return null;
+  }
 };
 
-const trySilentReauth = async (): Promise<string | null> => {
+const isTokenExpired = (expiresAt: number | undefined): boolean => {
+  if (!expiresAt) return false;
+  return Date.now() >= expiresAt - EXPIRY_MARGIN_MS;
+};
+
+// Concurrent callers (several hooks, strict-mode remounts) share one login attempt
+let silentReauth: Promise<string | null> | null = null;
+const trySilentReauth = (): Promise<string | null> => {
+  silentReauth ??= runSilentReauth().finally(() => {
+    silentReauth = null;
+  });
+  return silentReauth;
+};
+
+const runSilentReauth = async (): Promise<string | null> => {
   return new Promise((resolve) => {
     chrome.identity.launchWebAuthFlow(
       {
         url: buildAuthUrl(),
         interactive: false,
       },
-      (redirectUrl) => {
+      async (redirectUrl) => {
         if (chrome.runtime.lastError || !redirectUrl) {
           resolve(null);
           return;
@@ -73,9 +97,11 @@ const trySilentReauth = async (): Promise<string | null> => {
         const match = extractTokenFromRedirectUrl(redirectUrl);
         if (match) {
           const token = match;
-          const tokenIssuedAt = Date.now();
+          const expiresAt = await fetchTokenExpiry(token);
 
-          chrome.storage.local.set({ twitchToken: token, tokenIssuedAt });
+          // One write: a listener reacting to the new token must already see its expiry
+          if (!expiresAt) await chrome.storage.local.remove(TOKEN_EXPIRES_AT_KEY);
+          await chrome.storage.local.set({ twitchToken: token, ...(expiresAt ? { [TOKEN_EXPIRES_AT_KEY]: expiresAt } : {}) });
           resolve(token);
         } else {
           resolve(null);
@@ -109,6 +135,7 @@ export const logoutTwitch = async () => {
   // follow list), so on a shared machine the next account never sees it
   await chrome.storage.local.remove([
     "twitchToken",
+    TOKEN_EXPIRES_AT_KEY,
     "tokenIssuedAt",
     "twitchUserId",
     "twitchUserImage",
@@ -122,15 +149,15 @@ export const logoutTwitch = async () => {
 };
 
 export const getValidTwitchToken = async (): Promise<string | null> => {
-  const { twitchToken, tokenIssuedAt, [TWITCH_LOGGED_OUT_KEY]: loggedOut } = await chrome.storage.local.get([
+  const { twitchToken, [TOKEN_EXPIRES_AT_KEY]: expiresAt, [TWITCH_LOGGED_OUT_KEY]: loggedOut } = await chrome.storage.local.get([
     "twitchToken",
-    "tokenIssuedAt",
+    TOKEN_EXPIRES_AT_KEY,
     TWITCH_LOGGED_OUT_KEY,
   ]);
 
   if (loggedOut) return null;
 
-  if (!twitchToken || isTokenExpired(tokenIssuedAt)) {
+  if (!twitchToken || isTokenExpired(expiresAt)) {
     return await trySilentReauth();
   }
 

@@ -70,7 +70,9 @@ const stubWorkerLogin = (worker: Worker, redirect: string | null) =>
     };
     const realFetch = g.fetch.bind(self);
     g.fetch = (input: any, init?: any) =>
-      /api\.twitch\.tv\/helix\/users/.test(String(input))
+      /id\.twitch\.tv\/oauth2\/validate/.test(String(input))
+        ? Promise.resolve(new Response(JSON.stringify({ expires_in: 4_881_074 }), { status: 200 }))
+        : /api\.twitch\.tv\/helix\/users/.test(String(input))
         ? Promise.resolve(new Response(JSON.stringify({ data: [{ id: "999", login: "fixture_viewer", display_name: "Fixture_Viewer", profile_image_url: "https://img.example/viewer.png" }] }), { status: 200 }))
         : realFetch(input, init);
   }, redirect);
@@ -85,7 +87,7 @@ const openPopup = async (context: any, extensionId: string) => {
 
 // A session that was never logged out: no token and no logged-out flag
 const clearSession = (worker: Worker) =>
-  worker.evaluate(() => chrome.storage.local.remove(["twitchToken", "tokenIssuedAt", "twitchUserId", "twitchUserImage", "twitchLoggedOut"]));
+  worker.evaluate(() => chrome.storage.local.remove(["twitchToken", "tokenExpiresAt", "twitchUserId", "twitchUserImage", "twitchLoggedOut"]));
 
 test("Connect runs in the background and stores the session", async ({ twitchPage, context, worker, extensionId }) => {
   await clearSession(worker);
@@ -98,6 +100,8 @@ test("Connect runs in the background and stores the session", async ({ twitchPag
   expect(stored.twitchToken).toBe("silent-token");
   expect(stored.twitchUserId).toBe("999");
   expect(stored.twitchUserImage).toBe("https://img.example/viewer.png");
+  // The expiry is what Twitch reports (about 56 days here), not an assumed few hours
+  expect(stored.tokenExpiresAt).toBeGreaterThan(Date.now() + 50 * 24 * 60 * 60 * 1000);
   expect(stored.twitchLoggedOut).toBe(false);
   expect(stored.globalState.loggedIn).toBe(true);
   expect((await authCalls(worker)).filter((c) => c.interactive)).toHaveLength(1);
@@ -240,4 +244,38 @@ test("a rejected token (401) while opening the popup logs out", async ({ twitchP
   await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
   await expect(popup.getByRole("button", { name: "Connect Twitch" })).toBeVisible();
   expect((await worker.evaluate(() => chrome.storage.local.get("twitchToken"))).twitchToken).toBeUndefined();
+});
+
+// Count the popup's login attempts from the moment it loads
+const openPopupCountingLogins = async (context: any, extensionId: string) => {
+  const popup: Page = await context.newPage();
+  await popup.addInitScript((redirect) => {
+    (window as any).__logins = 0;
+    (chrome.identity as any).launchWebAuthFlow = (_options: unknown, callback: (url: string) => void) => {
+      (window as any).__logins++;
+      callback(redirect);
+    };
+  }, REDIRECT);
+  await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
+  return popup;
+};
+
+test("a token that has not reached its real expiry is used without logging in again", async ({ twitchPage, context, worker, extensionId }) => {
+  // Older than the old 4 hour guess, but Twitch says it is good for weeks
+  await worker.evaluate(() => chrome.storage.local.set({ tokenExpiresAt: Date.now() + 40 * 24 * 60 * 60 * 1000 }));
+  const popup = await openPopupCountingLogins(context, extensionId);
+  await expect(popup.getByRole("button", { name: "Logout" })).toBeVisible();
+  await popup.waitForTimeout(1_000);
+  expect(await popup.evaluate(() => (window as any).__logins)).toBe(0);
+  expect((await worker.evaluate(() => chrome.storage.local.get("twitchToken"))).twitchToken).toBe("fixture-token");
+});
+
+test("a token past its real expiry is renewed quietly and the new expiry is stored", async ({ twitchPage, context, worker, extensionId }) => {
+  await context.route("https://id.twitch.tv/oauth2/validate", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ expires_in: 5_000_000 }) }));
+  await worker.evaluate(() => chrome.storage.local.set({ tokenExpiresAt: Date.now() - 1_000 }));
+  const popup = await openPopupCountingLogins(context, extensionId);
+  await expect.poll(async () => (await worker.evaluate(() => chrome.storage.local.get("twitchToken"))).twitchToken).toBe("silent-token");
+  expect(await popup.evaluate(() => (window as any).__logins)).toBe(1);
+  const { tokenExpiresAt } = await worker.evaluate(() => chrome.storage.local.get("tokenExpiresAt"));
+  expect(tokenExpiresAt).toBeGreaterThan(Date.now() + 50 * 24 * 60 * 60 * 1000);
 });

@@ -1,8 +1,9 @@
-import { GLOBAL_STATE_KEY, TWITCH_LOGGED_OUT_KEY } from "../utils/constants";
+import { GLOBAL_STATE_KEY, TOKEN_EXPIRES_AT_KEY, TWITCH_LOGGED_OUT_KEY } from "../utils/constants";
 import {
   buildAuthUrl,
   buildSwitchAccountUrl,
   extractTokenFromRedirectUrl,
+  fetchTokenExpiry,
 } from "../content/utils/getValidTwitchToken";
 
 export type ConnectResult = { ok: true } | { ok: false; reason: "cancelled" | "no_token" | "user_lookup_failed" };
@@ -27,10 +28,13 @@ export const connectTwitch = async (): Promise<ConnectResult> => {
   const user = await fetchTwitchUser(token);
   if (!user) return { ok: false, reason: "user_lookup_failed" };
 
+  const expiresAt = await fetchTokenExpiry(token);
+  if (expiresAt) await chrome.storage.local.set({ [TOKEN_EXPIRES_AT_KEY]: expiresAt });
+  else await chrome.storage.local.remove(TOKEN_EXPIRES_AT_KEY);
+
   const current = await chrome.storage.local.get(GLOBAL_STATE_KEY);
   await chrome.storage.local.set({
     twitchToken: token,
-    tokenIssuedAt: Date.now(),
     twitchUserId: user.id,
     twitchUserImage: user.profile_image_url,
     [TWITCH_LOGGED_OUT_KEY]: false,
