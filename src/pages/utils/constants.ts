@@ -46,3 +46,6 @@ export const TWITCH_LOGGED_OUT_KEY = 'twitchLoggedOut';
 export const CHANNEL_SNAPSHOT_KEY = 'channelSnapshot';
 // Why the last refresh failed ('unauthorized' | 'rate_limited' | 'failed'); absent when it succeeded
 export const SNAPSHOT_ERROR_KEY = 'snapshotError';
+// The last Twitch channel row captured from the page, blanked of any account data, used to build
+// rows when the page has none of its own
+export const ROW_TEMPLATE_KEY = 'rowTemplate';

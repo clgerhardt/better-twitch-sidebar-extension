@@ -85,12 +85,17 @@ src/
 - Page `localStorage` is not used (per-origin, invisible to popup).
 - Every record versioned (`schemaVersion`); migration on `onInstalled(reason: "update")`, never `clear()`.
 
-**DOM approach (decided: templates filled from API data):**
-- Group sections and rows are rendered by the extension, but each row is built from an HTML *template* copied from Twitch's own row markup so it looks native, then filled with API data (name, game, viewers, image, link).
-- Row variants seen so far: live with viewer count, offline (dimmed), "Watch Streak N", "Hype Train • Level N", shared stream ("+1"). Partner/verified badge and others to be confirmed during capture.
-- Template source: prefer a real row cloned from the user's page at runtime (so we follow Twitch markup changes); fall back to captured fixtures checked into the repo. The same fixtures feed the e2e tests.
-- Selectors and template variants live in one module with a smoke check, since Twitch markup changes without notice.
-- Extension UI (group headers, Manage Groups button, dialog) rendered as React islands in a Shadow DOM so Tailwind and Twitch CSS stop bleeding into each other (also fixes the dark-input styling in the dialog).
+**DOM approach (decided: Twitch's own rows, cloned and filled with API data):**
+- Group sections are rendered by the extension; each channel row is built from Twitch's own row markup so it looks native. Twitch's CSS applies because the rows live in the same document.
+- **Where a row comes from, in order:**
+  1. The channel's own row in Twitch's (hidden) Followed Channels section, when it has one: cloned, so badges such as Watch Streak, Hype Train and shared-stream "+1" come along, then synced to the snapshot (name, game, viewers, avatar). If Twitch's row and the snapshot disagree about live/offline, the template path below is used instead.
+  2. A template for channels without a native row: a plain live row cloned from a native one, or an offline row derived from it (Twitch's readable modifier classes `side-nav-card__avatar--offline` and `side-nav-card__link--offline`, an empty game line, and the plain "Offline" status label).
+  3. When the page has no native row at all (for example nothing followed is live): the last template captured from a native row, kept in storage; then the row bundled with the extension (captured fixture).
+- The extension cannot invent badges for channels Twitch did not render a row for (the data is Twitch-internal, not in the public API). Those channels get plain live/offline rows.
+- **Clicking** a row triggers Twitch's own link when its native row exists (smooth in-app navigation); otherwise it navigates normally. Modifier clicks (open in new tab) are left to the browser.
+- Native rows change as Twitch loads more of them, so the sidebar rebuilds its rows when the native section changes.
+- Selectors and template variants live in one module, since Twitch markup changes without notice.
+- Extension UI (group headers, Manage Groups button, dialog) is still rendered as React; the reset that Tailwind used to apply to the whole page is now scoped to the extension's own containers.
 
 **Data flow:** background owns fetching Helix data on an alarm + on demand, writes snapshot to storage; content/popup/options only read storage and send intent messages (create group, assign channel, refresh). No per-page API calls, no active-tab queries.
 
@@ -108,7 +113,7 @@ Ordered by priority. Items 1 and 2 involve one account's data being visible to a
 1. **Groups and follow list survive a logout and are shared across accounts (privacy). Fixed:** logout now clears `groupNames`, `channelGroups` and the cached follow list (decision: clear everything). The original problem: `logoutTwitch` clears only the auth keys. `groupNames`, `channelGroups` and the cached follow list (`followedChannels`) stay in storage, so a second Twitch account on the same browser profile loads the first account's groups and sees their followed channels. Cause verified from the code.
    Proposed fix: scope groups per Twitch user id (the same user keeps their groups on reconnect, another account starts empty) and clear the cached follow list on logout. As a safe interim step: remember the owning user id and reset groups when a different account connects. Fits naturally with the `storage.sync` work and with the user-scoped `channelSnapshot` in `background-fetch.md`.
 2. **Logging in after a logout silently reuses the previous account (privacy). Fixed:** logout revokes the token, Connect sends `force_verify=true`, and the first Connect after a logout signs the browser out of Twitch first via Twitch's logout/redirect endpoint (undocumented, so it may change). The original problem: The login flow asks Twitch to authorize the extension while the browser still holds the previous Twitch session, so Twitch approves immediately without asking. Likely fix, to be checked against Twitch's docs: send `force_verify=true` on the authorize URL, and revoke the token on logout (`id.twitch.tv/oauth2/revoke`). The extension cannot sign the user out of twitch.tv itself.
-3. **Offline channels do not look offline.** Our own rows have no dimming and no "Offline" label, unlike Twitch's offline rows (the real row has an "Offline" status text; see `e2e/fixtures/rows/offline.html`). Resolved by the template-based rows phase; a quick interim fix is a label and reduced opacity.
+3. **Offline channels do not look offline. Covered by the template rows work (no separate fix).** Our own rows have no dimming and no "Offline" label, unlike Twitch's offline rows (the real row has an "Offline" status text; see `e2e/fixtures/rows/offline.html`). Resolved by the template-based rows phase; a quick interim fix is a label and reduced opacity.
 4. **To discuss: keeping groups across machines for the same user.** Because logout now clears everything, groups do not follow a user between logins or machines. Options to talk through: `chrome.storage.sync` (free and simple, but scoped to the signed-in Chrome profile, not the Twitch account, and small in size, so a shared Chrome profile would still mix accounts unless keyed by Twitch user id); our own backend keyed by Twitch user id (works anywhere and survives logout, but needs hosting, storage of users' follow lists, and a privacy story); export/import of a file (no server, manual). Needs a decision before the `storage.sync` phase.
 
 ## Proposed phasing (each a reviewable commit/PR)

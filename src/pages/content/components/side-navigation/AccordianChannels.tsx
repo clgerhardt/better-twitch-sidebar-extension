@@ -6,7 +6,7 @@ import {
   AccordionItemPanel,
   AccordionItemState,
 } from "react-accessible-accordion";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ChevronDoubleDownIcon,
   ChevronDoubleUpIcon,
@@ -18,6 +18,8 @@ import { messageLogger } from "@src/pages/utils/logger";
 import { constants } from "@src/pages/utils/constants";
 import { useSidebarGroups } from "../../hooks/useSidebarGroups";
 import RefreshProgress from "./RefreshProgress";
+import ChannelRow from "./ChannelRow";
+import { useNativeRowsVersion } from "../../hooks/useNativeRows";
 
 const AccordianChannels = ({ tabId }: { tabId: string }) => {
   const isSidebarExpanded = useSidebarState(tabId);
@@ -25,9 +27,7 @@ const AccordianChannels = ({ tabId }: { tabId: string }) => {
   const { groups, loading, error, fetchedAt } = useSidebarGroups();
   const [visibleGroups, setVisibleGroups] = useState(groups);
 
-  const handleChannelClick = useCallback((channelLink: string) => {
-    document.location = channelLink;
-  }, []);
+  const nativeVersion = useNativeRowsVersion();
 
   useEffect(() => {
     messageLogger(constants.location.UI_COMPONENT, "groups", groups);
@@ -101,28 +101,10 @@ const AccordianChannels = ({ tabId }: { tabId: string }) => {
             </div>
             <AccordionItemPanel className="p-0 pt-1">
               <div data-testid="group-container">
-                <ul role="list" className="divide-y divide-gray-100">
-                  {group.followedChannels.map((channel, idx) => (
-                    <li
-                      key={idx}
-                      className="has-tooltip hover:bg-custom-twitch-light-gray p-2 cursor-pointer"
-                      onClick={() => handleChannelClick(channel.channelLink)}
-                    >
-                      <div className="flex items-center gap-2">
-                        <img
-                          src={channel.channelImage}
-                          alt=""
-                          className="w-8 h-8 rounded-full"
-                        />
-                        <div className="text-sm">
-                          <div className="font-semibold">{channel.channelName}</div>
-                          {channel.isLive && (
-                            <div className="text-xs text-green-500">
-                              {channel.streamingContent} · {channel.viewerCount}
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                <ul role="list" className="m-0 list-none p-0">
+                  {group.followedChannels.map((channel) => (
+                    <li key={channel.login}>
+                      <ChannelRow channel={channel} nativeVersion={nativeVersion} />
                     </li>
                   ))}
                 </ul>
