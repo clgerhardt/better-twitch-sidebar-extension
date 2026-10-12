@@ -271,7 +271,7 @@ test("a token that has not reached its real expiry is used without logging in ag
 });
 
 test("a token past its real expiry is renewed quietly and the new expiry is stored", async ({ twitchPage, context, worker, extensionId }) => {
-  await context.route("https://id.twitch.tv/oauth2/validate", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ expires_in: 5_000_000 }) }));
+  await context.route("https://id.twitch.tv/oauth2/validate", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ user_id: "999", expires_in: 5_000_000 }) }));
   await worker.evaluate(() => chrome.storage.local.set({ tokenExpiresAt: Date.now() - 1_000 }));
   const popup = await openPopupCountingLogins(context, extensionId);
   await expect.poll(async () => (await worker.evaluate(() => chrome.storage.local.get("twitchToken"))).twitchToken).toBe("silent-token");

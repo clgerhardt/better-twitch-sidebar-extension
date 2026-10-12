@@ -26,6 +26,9 @@ type Deps = {
   client: Pick<HelixClient, "getFollowedChannels" | "getUsers" | "getLiveFollowed">;
   storage: RefreshStorage;
   now: () => number;
+  // Gets a new token for the same account after Twitch rejected the stored one, writes it to
+  // storage and returns it; null when that is not possible (the user must reconnect)
+  renewToken?: () => Promise<string | null>;
   log?: (message: string, detail?: unknown) => void;
 };
 
@@ -38,7 +41,7 @@ export const createRefresher = (deps: Deps) => {
     return { token: stored.twitchToken as string | undefined, userId: stored.twitchUserId as string | undefined };
   };
 
-  const run = async (force: boolean): Promise<RefreshResult> => {
+  const run = async (force: boolean, renewed = false): Promise<RefreshResult> => {
     const stored = await storage.get(["twitchToken", "twitchUserId", CHANNEL_SNAPSHOT_KEY]);
     const token: string | undefined = stored.twitchToken;
     const userId: string | undefined = stored.twitchUserId;
@@ -76,6 +79,12 @@ export const createRefresher = (deps: Deps) => {
       return { ok: true };
     } catch (error) {
       if (!(await sameSession())) return { ok: false, reason: "discarded" };
+      // A rejected token gets one quiet renewal and one retry, never a loop
+      if (error instanceof HelixError && error.kind === "unauthorized" && deps.renewToken && !renewed) {
+        log?.("token rejected, renewing");
+        if (await deps.renewToken()) return run(true, true);
+        if (!(await sameSession())) return { ok: false, reason: "discarded" };
+      }
       const reason: RefreshFailure =
         error instanceof HelixError ? (error.kind === "unauthorized" ? "unauthorized" : error.kind === "rate_limited" ? "rate_limited" : "failed") : "failed";
       log?.(`refresh failed: ${reason}`, error);

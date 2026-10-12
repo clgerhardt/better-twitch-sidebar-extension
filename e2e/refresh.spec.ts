@@ -34,11 +34,16 @@ const fakeClient = (overrides: Record<string, (...args: any[]) => any> = {}) => 
   return { client, calls };
 };
 
-const setup = (stored: Record<string, any> = connected, overrides: Record<string, (...args: any[]) => any> = {}, start = 1_000_000) => {
+const setup = (
+  stored: Record<string, any> = connected,
+  overrides: Record<string, (...args: any[]) => any> = {},
+  start = 1_000_000,
+  renewToken?: (data: Record<string, any>) => Promise<string | null>
+) => {
   let time = start;
   const mem = memoryStorage(stored);
   const { client, calls } = fakeClient(overrides);
-  const refresher = createRefresher({ client, storage: mem.storage, now: () => time });
+  const refresher = createRefresher({ client, storage: mem.storage, now: () => time, renewToken: renewToken && (() => renewToken(mem.data)) });
   return { refresher, calls, data: mem.data, advance: (ms: number) => (time += ms), now: () => time };
 };
 
@@ -188,5 +193,61 @@ test.describe("refresh", () => {
     fail(new HelixError("unauthorized", "x", 401));
     expect(await pending).toEqual({ ok: false, reason: "discarded" });
     expect(t.data.snapshotError).toBeUndefined();
+  });
+
+  test.describe("a rejected token", () => {
+    const rejectOldToken = (renewedFails = false) => ({
+      getFollowedChannels: async (token: string) => {
+        if (renewedFails || token === "tok") throw new HelixError("unauthorized", "x", 401);
+        return { total: 2, channels: follows };
+      },
+    });
+
+    test("is renewed once and the refresh is retried with the new token", async () => {
+      let renewals = 0;
+      const used: string[] = [];
+      const t = setup(connected, {
+        ...rejectOldToken(),
+        getLiveFollowed: async (token: string) => (used.push(token), []),
+      }, 1_000_000, async (data) => {
+        renewals++;
+        data.twitchToken = "renewed";
+        return "renewed";
+      });
+      expect(await t.refresher.refresh()).toMatchObject({ ok: true });
+      expect(renewals).toBe(1);
+      expect(used).toEqual(["renewed"]);
+      expect(t.data.channelSnapshot.channels).toHaveLength(2);
+      expect(t.data.snapshotError).toBeUndefined();
+    });
+
+    test("is reported as unauthorized when it cannot be renewed", async () => {
+      let renewals = 0;
+      const t = setup(connected, rejectOldToken(), 1_000_000, async () => (renewals++, null));
+      expect(await t.refresher.refresh()).toEqual({ ok: false, reason: "unauthorized" });
+      expect(renewals).toBe(1);
+      expect(t.data.snapshotError).toBe("unauthorized");
+    });
+
+    test("is not renewed in a loop when the new token is rejected too", async () => {
+      let renewals = 0;
+      const t = setup(connected, rejectOldToken(true), 1_000_000, async (data) => (renewals++, (data.twitchToken = "renewed")));
+      expect(await t.refresher.refresh()).toEqual({ ok: false, reason: "unauthorized" });
+      expect(renewals).toBe(1);
+      expect(t.data.snapshotError).toBe("unauthorized");
+    });
+
+    test("is not renewed after the user logged out meanwhile", async () => {
+      let renewals = 0;
+      const t = setup(connected, {
+        getFollowedChannels: async () => {
+          delete t.data.twitchToken;
+          delete t.data.twitchUserId;
+          throw new HelixError("unauthorized", "x", 401);
+        },
+      }, 1_000_000, async () => (renewals++, "renewed"));
+      expect(await t.refresher.refresh()).toEqual({ ok: false, reason: "discarded" });
+      expect(renewals).toBe(0);
+    });
   });
 });

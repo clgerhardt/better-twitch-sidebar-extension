@@ -54,18 +54,24 @@ export const extractTokenFromRedirectUrl = (redirectUrl: string): string | null 
   return null;
 };
 
-// The redirect does not say how long the token lasts, so ask Twitch. Returns null when it cannot
-// be determined (offline); the token is then used until Twitch rejects it.
-export const fetchTokenExpiry = async (token: string): Promise<number | null> => {
+// The redirect says neither how long the token lasts nor whose it is, so ask Twitch. Returns null
+// when that cannot be determined (offline).
+export const validateToken = async (token: string): Promise<{ userId: string | null; expiresAt: number | null } | null> => {
   try {
     const res = await fetch("https://id.twitch.tv/oauth2/validate", { headers: { Authorization: `OAuth ${token}` } });
     if (!res.ok) return null;
-    const { expires_in } = await res.json();
-    return typeof expires_in === "number" ? Date.now() + expires_in * 1000 : null;
+    const { user_id, expires_in } = await res.json();
+    return {
+      userId: typeof user_id === "string" ? user_id : null,
+      expiresAt: typeof expires_in === "number" ? Date.now() + expires_in * 1000 : null,
+    };
   } catch {
     return null;
   }
 };
+
+// When the expiry is unknown the token is used until Twitch rejects it
+export const fetchTokenExpiry = async (token: string): Promise<number | null> => (await validateToken(token))?.expiresAt ?? null;
 
 const isTokenExpired = (expiresAt: number | undefined): boolean => {
   if (!expiresAt) return false;
@@ -74,7 +80,7 @@ const isTokenExpired = (expiresAt: number | undefined): boolean => {
 
 // Concurrent callers (several hooks, strict-mode remounts) share one login attempt
 let silentReauth: Promise<string | null> | null = null;
-const trySilentReauth = (): Promise<string | null> => {
+export const trySilentReauth = (): Promise<string | null> => {
   silentReauth ??= runSilentReauth().finally(() => {
     silentReauth = null;
   });
@@ -97,7 +103,15 @@ const runSilentReauth = async (): Promise<string | null> => {
         const match = extractTokenFromRedirectUrl(redirectUrl);
         if (match) {
           const token = match;
-          const expiresAt = await fetchTokenExpiry(token);
+          const validated = await validateToken(token);
+          // The browser's Twitch session may belong to someone else by now: never swap in another
+          // account's token under this account's groups
+          const { twitchUserId } = await chrome.storage.local.get("twitchUserId");
+          if (twitchUserId && validated?.userId !== twitchUserId) {
+            resolve(null);
+            return;
+          }
+          const expiresAt = validated?.expiresAt ?? null;
 
           // One write: a listener reacting to the new token must already see its expiry
           if (!expiresAt) await chrome.storage.local.remove(TOKEN_EXPIRES_AT_KEY);

@@ -103,6 +103,51 @@ test("an expired login is reported in the sidebar", async ({ context, session, w
   expect((await worker.evaluate(() => chrome.storage.local.get("snapshotError"))).snapshotError).toBe("unauthorized");
 });
 
+// The service worker's quiet login: it returns this redirect, and Twitch's validate says whose token it is
+const stubQuietLogin = async (context: BrowserContext, worker: any, validatedUserId: string) => {
+  await context.route("https://id.twitch.tv/oauth2/validate", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ user_id: validatedUserId, expires_in: 5_000_000 }) })
+  );
+  await context.route("https://api.twitch.tv/helix/**", (route) =>
+    route.request().headers()["authorization"] === "Bearer fixture-token"
+      ? route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ message: "Invalid OAuth token" }) })
+      : route.fallback()
+  );
+  await worker.evaluate(() => {
+    const g = self as any;
+    g.__quietLogins = 0;
+    (chrome.identity as any).launchWebAuthFlow = (options: { interactive: boolean }, cb: (url?: string) => void) => {
+      if (options.interactive) return cb(undefined);
+      g.__quietLogins++;
+      cb("https://fixture.chromiumapp.org/#access_token=renewed-token&scope=user%3Aread%3Afollows&token_type=bearer");
+    };
+  });
+};
+
+test("a rejected token is renewed quietly in the background and the sidebar loads", async ({ context, session, worker, openTwitch }) => {
+  await stubQuietLogin(context, worker, "999");
+  const page = await openTwitch();
+  await expect(page.locator("#__root")).toContainText("Ungrouped");
+  await expect.poll(() => snapshotOf(worker).then((s: any) => s?.channels.length)).toBe(3);
+
+  const stored = await worker.evaluate(() => chrome.storage.local.get(["twitchToken", "snapshotError", "tokenExpiresAt"]));
+  expect(stored.twitchToken).toBe("renewed-token");
+  expect(stored.snapshotError).toBeUndefined();
+  expect(stored.tokenExpiresAt).toBeGreaterThan(Date.now() + 50 * 24 * 60 * 60 * 1000);
+  expect(await worker.evaluate(() => (self as any).__quietLogins)).toBe(1);
+});
+
+test("a quiet login that returns a different account is refused", async ({ context, session, worker, openTwitch }) => {
+  await stubQuietLogin(context, worker, "123");
+  const page = await openTwitch();
+  await expect(page.locator("#__root")).toContainText("login expired", { timeout: 8_000 });
+
+  const stored = await worker.evaluate(() => chrome.storage.local.get(["twitchToken", "twitchUserId", "snapshotError"]));
+  expect(stored.twitchToken).toBe("fixture-token");
+  expect(stored.twitchUserId).toBe("999");
+  expect(stored.snapshotError).toBe("unauthorized");
+});
+
 test("a Twitch outage keeps showing the last snapshot", async ({ context, session, worker, openTwitch }) => {
   await worker.evaluate(() =>
     chrome.storage.local.set({
@@ -123,7 +168,7 @@ test("a Twitch outage keeps showing the last snapshot", async ({ context, sessio
 });
 
 test("connecting fetches the channels right away", async ({ context, session, worker, extensionId }) => {
-  await worker.evaluate(() => chrome.storage.local.remove(["twitchToken", "tokenIssuedAt", "twitchUserId", "twitchUserImage", "channelSnapshot"]));
+  await worker.evaluate(() => chrome.storage.local.remove(["twitchToken", "tokenExpiresAt", "twitchUserId", "twitchUserImage", "channelSnapshot"]));
   await worker.evaluate(() => {
     (chrome.identity as any).launchWebAuthFlow = (_o: unknown, cb: (url: string) => void) =>
       cb("https://fixture.chromiumapp.org/#access_token=connected-token&scope=user%3Aread%3Afollows&token_type=bearer");
