@@ -147,3 +147,10 @@ test("a shared-stream row keeps its '+1' name and gets the game on the game line
   }
   await expect(rowFor(page, "fixturesharedstreak")).toContainText("Watch Streak");
 });
+
+test("live channels are listed by viewer count, highest first, with offline channels after", async ({ twitchPage }) => {
+  await openGroup(twitchPage);
+  // Twitch's follow order is fixture_live, fixturestreak, fixture_offline; viewers are 1,100 and 4,900
+  const order = await twitchPage.locator("#__root a.side-nav-card__link").evaluateAll((rows) => rows.map((r) => r.getAttribute("href")));
+  expect(order).toEqual(["/fixturestreak", "/fixture_live", "/fixture_offline"]);
+});

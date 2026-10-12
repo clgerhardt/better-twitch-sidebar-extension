@@ -77,7 +77,8 @@ test("moving a channel to a group updates the dialog and the sidebar", async ({ 
 
   const sidebar = twitchPage.locator("#__root");
   await sidebar.getByRole("button", { name: /Zebra Squad/ }).click();
-  await expect(sidebar.getByText("Fixture_Live")).toBeVisible();
+  // The first channel in the list is the one with the most viewers (FixtureStreak)
+  await expect(sidebar.getByText("FixtureStreak").first()).toBeVisible();
 });
 
 test("renaming a group keeps its channels and updates the sidebar", async ({ twitchPage }) => {
@@ -98,7 +99,8 @@ test("renaming a group keeps its channels and updates the sidebar", async ({ twi
   const sidebar = twitchPage.locator("#__root");
   await expect(sidebar).not.toContainText("Zebra Squad");
   await sidebar.getByRole("button", { name: /Quagga Crew/ }).click();
-  await expect(sidebar.getByText("Fixture_Live")).toBeVisible();
+  // The first channel in the list is the one with the most viewers (FixtureStreak)
+  await expect(sidebar.getByText("FixtureStreak").first()).toBeVisible();
 });
 
 test("a group can be renamed to a different capitalisation of its own name", async ({ twitchPage }) => {

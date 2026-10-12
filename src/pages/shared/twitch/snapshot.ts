@@ -92,6 +92,7 @@ export const snapshotToFetched = (snapshot: ChannelSnapshot): FetchedChannel[] =
       channelLink: `https://twitch.tv/${c.displayName}`,
       channelImage: c.image,
       isLive: c.isLive,
+      viewers: c.isLive ? c.viewers : 0,
       streamingContent: c.isLive ? c.game : undefined,
       viewerCount: c.isLive ? `${compact.format(c.viewers)} viewers` : undefined,
     },

@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { layoutGroups, type FetchedChannel } from "../src/pages/utils/layoutGroups";
 
-const ch = (login: string, isLive = false): FetchedChannel => ({
+const ch = (login: string, isLive = false, viewers = isLive ? 1 : 0): FetchedChannel => ({
   login,
   channel: {
     login,
@@ -9,7 +9,8 @@ const ch = (login: string, isLive = false): FetchedChannel => ({
     channelLink: `https://twitch.tv/${login}`,
     channelImage: "",
     isLive,
-    viewerCount: isLive ? "1 viewers" : undefined,
+    viewers,
+    viewerCount: isLive ? `${viewers} viewers` : undefined,
   },
 });
 
@@ -73,13 +74,32 @@ test.describe("layoutGroups", () => {
     expect(result.groups.every((g) => g.dialogOpen === false && g.dropdownVisible === false)).toBe(true);
   });
 
-  test("live channels are listed before offline ones, keeping the original order within each", () => {
+  test("live channels come first, most viewers first; offline ones follow in their original order", () => {
     const result = layoutGroups({
-      fetched: [ch("off1"), ch("live1", true), ch("off2"), ch("live2", true)],
+      fetched: [ch("off1"), ch("small", true, 20), ch("off2"), ch("big", true, 5000), ch("mid", true, 300)],
       groupNames: [],
       channelGroups: {},
     });
-    expect(logins(result, "Ungrouped")).toEqual(["live1", "live2", "off1", "off2"]);
+    expect(logins(result, "Ungrouped")).toEqual(["big", "mid", "small", "off1", "off2"]);
+  });
+
+  test("live channels with the same viewer count keep their original order", () => {
+    const result = layoutGroups({
+      fetched: [ch("a", true, 10), ch("b", true, 99), ch("c", true, 10), ch("d", true, 99)],
+      groupNames: [],
+      channelGroups: {},
+    });
+    expect(logins(result, "Ungrouped")).toEqual(["b", "d", "a", "c"]);
+  });
+
+  test("each group is sorted on its own", () => {
+    const result = layoutGroups({
+      fetched: [ch("a", true, 5), ch("b", true, 50), ch("c", true, 7), ch("d", true, 70)],
+      groupNames: ["G"],
+      channelGroups: { a: "G", b: "G", c: "Ungrouped", d: "Ungrouped" },
+    });
+    expect(logins(result, "G")).toEqual(["b", "a"]);
+    expect(logins(result, "Ungrouped")).toEqual(["d", "c"]);
   });
 
   test("counts include live channels", () => {

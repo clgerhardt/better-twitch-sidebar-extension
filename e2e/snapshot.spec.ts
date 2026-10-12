@@ -94,9 +94,9 @@ test.describe("snapshotToFetched", () => {
     const [offline, online, noAvatar] = snapshotToFetched(snapshot());
     expect(offline).toEqual({
       login: "a",
-      channel: { login: "a", channelName: "Alpha", channelLink: "https://twitch.tv/Alpha", channelImage: "https://img/1.png", isLive: false, streamingContent: undefined, viewerCount: undefined },
+      channel: { login: "a", channelName: "Alpha", channelLink: "https://twitch.tv/Alpha", channelImage: "https://img/1.png", isLive: false, viewers: 0, streamingContent: undefined, viewerCount: undefined },
     });
-    expect(online.channel).toMatchObject({ isLive: true, streamingContent: "Tarkov", viewerCount: "1.5K viewers" });
+    expect(online.channel).toMatchObject({ isLive: true, streamingContent: "Tarkov", viewerCount: "1.5K viewers", viewers: 1500 });
     expect(noAvatar.channel.channelImage).toBe("");
   });
 

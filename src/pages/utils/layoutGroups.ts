@@ -7,6 +7,8 @@ export type SidebarChannel = {
   channelLink: string;
   channelName: string;
   isLive: boolean;
+  // The number behind viewerCount, for sorting (0 when offline)
+  viewers: number;
   streamingContent?: string;
   viewerCount?: string;
 };
@@ -42,6 +44,13 @@ type LayoutResult = {
   addedMappings: boolean;
 };
 
+// Live channels first, most viewers first; offline channels follow. Array.sort is stable, so
+// channels that tie (all offline ones, or equal viewer counts) keep the order Twitch gave them.
+const byLiveThenViewers = (a: SidebarChannel, b: SidebarChannel) => {
+  if (a.isLive !== b.isLive) return a.isLive ? -1 : 1;
+  return a.isLive ? b.viewers - a.viewers : 0;
+};
+
 export const layoutGroups = ({ fetched, groupNames, channelGroups }: LayoutInput): LayoutResult => {
   const updatedChannelGroups: Record<string, string> = { ...channelGroups };
   const groupMap: Record<string, SidebarChannel[]> = {};
@@ -74,8 +83,7 @@ export const layoutGroups = ({ fetched, groupNames, channelGroups }: LayoutInput
       default: groupName === UNGROUPED,
       dialogOpen: false,
       dropdownVisible: false,
-      // Live channels first; Array.sort is stable, so the original order is kept within each half
-      followedChannels: channels.sort((a, b) => (a.isLive === b.isLive ? 0 : a.isLive ? -1 : 1)),
+      followedChannels: channels.sort(byLiveThenViewers),
       groupName,
       numberOfChannels: channels.length,
       numberOfLiveChannels: channels.filter((c) => c.isLive).length,
