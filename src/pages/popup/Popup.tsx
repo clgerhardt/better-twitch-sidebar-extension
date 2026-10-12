@@ -38,6 +38,11 @@ const Popup = () => {
         },
       });
 
+      if (res.status === 401) {
+        messageLogger(constants.location.POPUP, "Twitch token invalid or expired");
+        logout();
+        return;
+      }
       if (!res.ok) throw new Error(`API call failed with status ${res.status}`);
 
       const data = await res.json();
@@ -52,12 +57,8 @@ const Popup = () => {
         chrome.storage.local.set({ twitchUserId: userData.id });
       }
     } catch (error) {
-      messageLogger(
-        constants.location.POPUP,
-        "Twitch token invalid or expired",
-        error
-      );
-      logout(); // clean up on failure
+      // Offline, rate limited or a server error: the session is still good, so keep it
+      messageLogger(constants.location.POPUP, "Could not fetch Twitch user", error);
     }
   };
 

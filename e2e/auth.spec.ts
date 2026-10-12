@@ -206,3 +206,38 @@ test("after connecting, the sidebar shows loading and not the logged-out intro w
 
   await expect(twitchPage.locator("#__root")).toContainText("Ungrouped", { timeout: 8_000 });
 });
+
+// Only a 401 means the token is bad. Being offline or hitting a server error / rate limit
+// must never log the user out or delete their groups.
+for (const [name, fulfill] of [
+  ["a network failure", (route: any) => route.abort()],
+  ["a server error", (route: any) => route.fulfill({ status: 500, body: "" })],
+  ["a rate limit", (route: any) => route.fulfill({ status: 429, body: "" })],
+] as const) {
+  test(`${name} while opening the popup keeps the session and groups`, async ({ twitchPage, context, worker, extensionId }) => {
+    await expect(twitchPage.locator("#__root")).toContainText("Ungrouped");
+    await worker.evaluate(() => chrome.storage.local.set({ groupNames: ["Friends"] }));
+    await context.route("https://api.twitch.tv/helix/users*", fulfill);
+
+    const popup = await context.newPage();
+    await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
+    await expect(popup.getByRole("button", { name: "Logout" })).toBeVisible();
+    await popup.waitForTimeout(1_000);
+
+    const stored = await worker.evaluate(() => chrome.storage.local.get(null));
+    expect(stored.twitchToken).toBeDefined();
+    expect(stored.groupNames).toEqual(["Friends"]);
+    expect(stored.twitchLoggedOut).toBeFalsy();
+    await expect(popup.getByRole("button", { name: "Logout" })).toBeVisible();
+  });
+}
+
+test("a rejected token (401) while opening the popup logs out", async ({ twitchPage, context, worker, extensionId }) => {
+  await expect(twitchPage.locator("#__root")).toContainText("Ungrouped");
+  await context.route("https://api.twitch.tv/helix/users*", (route) => route.fulfill({ status: 401, body: "" }));
+
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
+  await expect(popup.getByRole("button", { name: "Connect Twitch" })).toBeVisible();
+  expect((await worker.evaluate(() => chrome.storage.local.get("twitchToken"))).twitchToken).toBeUndefined();
+});
