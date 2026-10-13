@@ -310,3 +310,60 @@ test("a page that loads with the side nav collapsed starts collapsed", async ({ 
   await setSideNavLabel(page, "Collapse Side Nav");
   await expect(manageButton(page)).toHaveCount(1, { timeout: 5_000 });
 });
+
+test("the page opens no port to the background", async ({ session, context, worker }) => {
+  await worker.evaluate(() => {
+    (self as any).__ports = [];
+    chrome.runtime.onConnect.addListener((port) => (self as any).__ports.push(port.name));
+  });
+  const page = await context.newPage();
+  await page.goto("https://www.twitch.tv/");
+  await expect(page.locator("#__root")).toContainText("Ungrouped");
+  await page.waitForTimeout(1_000);
+  expect(await worker.evaluate(() => (self as any).__ports)).toEqual([]);
+});
+
+test("the sidebar is put back when Twitch removes it from the page", async ({ twitchPage }) => {
+  await expect(manageButton(twitchPage)).toHaveCount(1);
+  await twitchPage.evaluate(() => {
+    document.getElementById("__root")?.remove();
+    document.getElementById("__manage-groups-root")?.remove();
+  });
+  await expect(twitchPage.locator("#__root")).toContainText("Ungrouped", { timeout: 5_000 });
+  await expect(manageButton(twitchPage)).toHaveCount(1, { timeout: 5_000 });
+  await expect(twitchPage.locator("#__root")).toHaveCount(1);
+  await expect(twitchPage.locator("#__manage-groups-root")).toHaveCount(1);
+});
+
+test("the sidebar is put back when the section it sits before is replaced", async ({ twitchPage }) => {
+  await expect(twitchPage.locator("#__root")).toContainText("Ungrouped");
+  // Twitch re-rendering the sidebar replaces the sections with fresh copies and drops our roots
+  await twitchPage.evaluate(() => {
+    const live = document.querySelector("[aria-label='Live Channels']")!;
+    const copy = live.cloneNode(true);
+    document.getElementById("__root")?.remove();
+    document.getElementById("__manage-groups-root")?.remove();
+    live.replaceWith(copy);
+  });
+  await expect(twitchPage.locator("#__root")).toContainText("Ungrouped", { timeout: 5_000 });
+  await expect(twitchPage.locator("#__root")).toHaveCount(1);
+  await expect(manageButton(twitchPage)).toHaveCount(1);
+});
+
+test("the sidebar needs no background to stay put or to come back", async ({ twitchPage, context }) => {
+  await expect(twitchPage.locator("#__root")).toContainText("Ungrouped");
+  const cdp = await context.newCDPSession(twitchPage);
+  await cdp.send("ServiceWorker.enable");
+  await cdp.send("ServiceWorker.stopAllWorkers");
+  await twitchPage.waitForTimeout(1_500);
+  await expect(twitchPage.locator("#__root")).toContainText("Ungrouped");
+  await expect(manageButton(twitchPage)).toHaveCount(1);
+
+  // Even with the worker stopped, a removed sidebar is put back by the page itself
+  await twitchPage.evaluate(() => {
+    document.getElementById("__root")?.remove();
+    document.getElementById("__manage-groups-root")?.remove();
+  });
+  await expect(twitchPage.locator("#__root")).toContainText("Ungrouped", { timeout: 5_000 });
+  await expect(manageButton(twitchPage)).toHaveCount(1, { timeout: 5_000 });
+});

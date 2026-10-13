@@ -7,13 +7,8 @@ import AccordianChannels from "./components/side-navigation/AccordianChannels";
 import ManageGroups from "./components/manage-groups-cta/ManageGroupsCta";
 import { getLocalStorage } from "../background/storage";
 import { getElementBySelector, createElement, insertBefore } from './utils/domUtils';
-import { createMutationObserver } from './observer';
 import { startPageAccountReporting } from "./pageAccount";
 
-// Global variables
-let port: chrome.runtime.Port;
-let mainObserver: MutationObserver;
-let pageSetupDone = false;
 // One React root per container: creating a second root on the same container duplicates the UI
 const reactRoots = new WeakMap<Element, Root>();
 
@@ -24,15 +19,6 @@ const getReactRoot = (container: Element) => {
     reactRoots.set(container, root);
   }
   return root;
-};
-
-// Always posts through the current port, since the port is replaced whenever the background restarts
-const postToBackground = (message: any) => {
-  try {
-    port.postMessage(message);
-  } catch (error) {
-    messageLogger(constants.location.CONTENT_SCRIPT, "Could not post to background", error);
-  }
 };
 
 const applySidebarVisibilityFromState = (globalState: any) => {
@@ -94,42 +80,55 @@ const waitForSidebarElements = async (selectors: string[], timeoutMs = 5000): Pr
 };
 
 
-const RECONNECT_DELAY_MS = 500;
+// The two containers the extension owns. They are created once and kept, so when Twitch drops them
+// from the page the same elements go back in and React keeps its state.
+let rootContainer: HTMLElement | null = null;
+let manageGroupsContainer: HTMLElement | null = null;
 
-const openPort = () => {
-    // After the extension is reloaded or updated this script is orphaned and cannot reconnect
-    if (!chrome.runtime?.id) return;
-    messageLogger(constants.location.CONTENT_SCRIPT, "Connecting to long-lived port : " + new Date(Date.now()).toLocaleString());
-    port = chrome.runtime.connect({ name: "content-script" });
+// Puts the sidebar groups and the Manage Groups button in front of Twitch's "Live Channels" section.
+// Safe to call at any time: it does nothing when they are already in place.
+const mountSidebar = () => {
+  const followed = getElementBySelector("[aria-label='Followed Channels']");
+  const anchor = getElementBySelector(constants.htmlSearchStrings.ARIA_LABEL_RECOMMENDED_CHANNELS);
+  if (!followed || !anchor) return;
 
-    port.onDisconnect.addListener(() => {
-      messageLogger(constants.location.CONTENT_SCRIPT, "Disconnected from background. Attempting to reconnect... : " + new Date(Date.now()).toLocaleString());
-      setTimeout(() => {
-        openPort();
-        // The render request may have been lost with the old port
-        if (pageSetupDone && !getElementBySelector("#__root")) {
-          postToBackground({ message: constants.portMessages.FOLLOWED_CHANNELS_LOADED });
-        }
-      }, RECONNECT_DELAY_MS);
-    });
+  const firstMount = !rootContainer || !manageGroupsContainer;
+  rootContainer ??= createElement("__root");
+  manageGroupsContainer ??= createElement("__manage-groups-root", { maxheight: "3.5rem" });
 
-    port.onMessage.addListener(async (response: any) => {
-      messageLogger(constants.location.CONTENT_SCRIPT, "Received message from port", response);
-      try {
-        switch (response.message) {
-          case "SYS:Followers:RenderFollowersInSideBar":
-            await renderToUI(response.tabId);
-            break;
-          default:
-            messageLogger(constants.location.CONTENT_SCRIPT, "No action found for message", response);
-        }
-      } catch (error) {
-        messageLogger(constants.location.CONTENT_SCRIPT, "Error handling port message", error);
-      }
-    });
+  const inPlace = rootContainer.isConnected && manageGroupsContainer.isConnected && manageGroupsContainer.nextElementSibling === anchor && rootContainer.nextElementSibling === manageGroupsContainer;
+  if (!inPlace) {
+    insertBefore(rootContainer, anchor);
+    insertBefore(manageGroupsContainer, anchor);
+  }
+
+  if (firstMount) {
+    getReactRoot(rootContainer).render(<AccordianChannels />);
+    getReactRoot(manageGroupsContainer).render(<ManageGroups />);
+    messageLogger(constants.location.CONTENT_SCRIPT, "Sidebar mounted");
+  }
 };
 
-// Runs once per page, not on every reconnect
+// Twitch re-renders its sidebar from time to time and can drop what we added; check again after the
+// page changes (batched, since the page changes constantly)
+const keepSidebarMounted = () => {
+  let scheduled = false;
+  const observer = new MutationObserver(() => {
+    if (!chrome.runtime?.id) {
+      // After the extension is reloaded or updated this script is orphaned and must stop
+      observer.disconnect();
+      return;
+    }
+    if (scheduled) return;
+    scheduled = true;
+    setTimeout(() => {
+      scheduled = false;
+      mountSidebar();
+    }, 50);
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+};
+
 const setUpPage = async () => {
     const globalS: any = await getLocalStorage(GLOBAL_STATE_KEY);
     const success = await waitForSidebarElements([
@@ -144,44 +143,8 @@ const setUpPage = async () => {
     } else {
       messageLogger(constants.location.CONTENT_SCRIPT, "Sidebar elements not found in time");
     }
-    mainObserver = createMutationObserver(postToBackground);
-    mainObserver.observe(document.body, {
-      attributes: true,
-      childList: true,
-      characterData: true,
-      subtree: true,
-    });
-    pageSetupDone = true;
-    const initialNode = getElementBySelector("[aria-label='Followed Channels']");
-    if (initialNode) {
-      messageLogger(constants.location.OBSERVER, "Followed Channels Node already in DOM", initialNode);
-      postToBackground({ message: constants.portMessages.FOLLOWED_CHANNELS_LOADED });
-    }
-};
-
-const connectToBackground = async () => {
-    openPort();
-    await setUpPage();
-};
-
-const renderToUI = async (tabId: any) => {
-  messageLogger(constants.location.CONTENT_SCRIPT, "Entering renderToUI function with tabId", tabId);
-  try {
-    const recommendedFollowers = getElementBySelector(constants.htmlSearchStrings.ARIA_LABEL_RECOMMENDED_CHANNELS);
-
-    const rootContainer = getElementBySelector("#__root") || createElement("__root");
-    const manageGroupsContainer = getElementBySelector("#__manage-groups-root") || createElement("__manage-groups-root", { maxheight: "3.5rem" });
-
-    insertBefore(rootContainer, recommendedFollowers);
-    insertBefore(manageGroupsContainer, recommendedFollowers);
-
-    getReactRoot(rootContainer).render(<AccordianChannels />);
-    getReactRoot(manageGroupsContainer).render(<ManageGroups />);
-
-    messageLogger(constants.location.CONTENT_SCRIPT, "Exiting renderToUI function");
-  } catch (error) {
-    messageLogger(constants.location.CONTENT_SCRIPT, "Error in renderToUI function", error);
-  }
+    mountSidebar();
+    keepSidebarMounted();
 };
 
 // The popup only writes the settings; every open Twitch tab applies them from storage
@@ -201,13 +164,8 @@ try {
     isDark.classList.add("dark");
   }
   startPageAccountReporting();
-  connectToBackground();
+  setUpPage();
   watchSettings();
-  setInterval(() => {
-    if (port) {
-      postToBackground({ type: "HEARTBEAT" });
-    }
-  }, 20_000);
 } catch (e) {
   messageLogger(constants.location.CONTENT_SCRIPT, "Error in content script initialization", e);
 }
