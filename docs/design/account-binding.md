@@ -1,6 +1,6 @@
 # Plan: the extension follows the Twitch account signed in on twitch.tv
 
-Status: agreed direction, not built. Follows `background-fetch.md` (phase 5, auth) and changes one earlier decision (see "What this replaces").
+Status: built (phases 1 to 5 below). Follows `background-fetch.md` (phase 5, auth) and changes one earlier decision (see "What this replaces").
 
 ## Rule
 
@@ -58,13 +58,22 @@ The sidebar has limited room, so every non-connected state is one compact block 
 - The `twitch.tv/login` link in the not-logged-in view, which is Twitch's own login and not the extension's Connect.
 - The uncommitted "reconnect row above the groups" draft from the phase 5 work.
 
-## Phases (each a reviewable commit, tests first)
+## Phases (each a reviewable commit, tests first; all done)
 
 1. Read the page account from the cookie (one function, tested against fixture cookies including missing, malformed and logged-out); content script publishes it to the background.
 2. Connect validates the token owner against the page account and refuses a mismatch; drop `force_verify` and the sign-out redirect; Logout stops signing out of Twitch.
 3. Account switch: clear data when the page account differs from the connected one.
 4. Sidebar states: one compact view per state, no groups or Manage Groups button unless connected; wording "extension connection".
 5. Popup mirrors the states.
+
+## How it ended up (differences from the plan above)
+
+- The content script writes the page account straight to `chrome.storage.local` (`pageAccount`, with `seenAt`) instead of sending a message; the background re-checks ownership with Twitch's validate call, so the stored value is only a hint.
+- Signed out of Twitch while connected is "hide and pause": the sidebar and popup show a sign-in message, the background refuses to refresh, and nothing is deleted. The same account signing back in gets its groups back.
+- The popup's user lookup never logs out (a 401 included). A rejected token is handled in the background (one quiet renewal, then the expired view), so the popup cannot wipe the groups.
+- The token's real lifetime comes from Twitch's validate call (`tokenExpiresAt`); a quiet renewal that returns a different account's token is refused.
+- Popup and sidebar share the connect button and its error messages (`ReconnectButton`, `connectMessages.ts`).
+- The popup mirrors every state: connected, signed out of Twitch, expired, not connected (with "Connect for {login}" only when the signed-in account is known), and account unknown ("Open Twitch in a tab and sign in").
 
 ## Risks and open points
 

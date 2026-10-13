@@ -67,7 +67,7 @@ const Authenticate = ({ isSidebarExpanded }: { isSidebarExpanded: any }) => {
   }, [twitchToken]);
 
   if (!tokenChecked) {
-    return <div>Checking Twitch login...</div>;
+    return <div>Checking connection...</div>;
   }
 
   if (!twitchToken) {
