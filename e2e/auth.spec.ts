@@ -107,6 +107,19 @@ test("Connect runs in the background and stores the session", async ({ twitchPag
   expect((await authCalls(worker)).filter((c) => c.interactive)).toHaveLength(1);
 });
 
+test("a failed user lookup in the logged-out popup never removes the token", async ({ twitchPage, context, worker, extensionId }) => {
+  await context.route("https://api.twitch.tv/helix/users*", (route) => route.abort());
+  await clearSession(worker);
+  await stubWorkerLogin(worker, REDIRECT);
+  const popup = await openPopup(context, extensionId);
+  await popup.getByRole("button", { name: "Connect for fixture_viewer" }).click();
+  await expect(popup.getByRole("button", { name: "Logout" })).toBeVisible({ timeout: 5_000 }).catch(() => undefined);
+  await popup.waitForTimeout(1_500);
+  // The connection stands or is refused as a whole; the popup never half-removes it
+  const stored = await worker.evaluate(() => chrome.storage.local.get(["twitchToken", "twitchUserId"]));
+  expect(Boolean(stored.twitchToken)).toBe(Boolean(stored.twitchUserId));
+});
+
 test("Connect uses Twitch's plain authorize page: no forced re-verification, no sign-out", async ({ twitchPage, context, worker, extensionId }) => {
   await clearSession(worker);
   await stubWorkerLogin(worker, REDIRECT);

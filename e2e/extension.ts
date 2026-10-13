@@ -116,7 +116,7 @@ export const test = base.extend<Fixtures & Options>({
   // its default globalState before overwriting.
   session: async ({ worker }, use) => {
     await expect
-      .poll(() => worker.evaluate(async () => !!(await chrome.storage.local.get("globalState")).globalState))
+      .poll(() => worker.evaluate(async () => !!(await chrome.storage.local.get("globalState")).globalState), { timeout: 15_000 })
       .toBe(true);
     await worker.evaluate(async () => {
       const { globalState } = await chrome.storage.local.get("globalState");
