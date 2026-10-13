@@ -18,14 +18,14 @@ test("logging out stays logged out, even while Twitch still has a session", asyn
   await fakeTwitchSession(popup);
   await popup.getByRole("button", { name: "Logout" }).click();
 
-  await expect(popup.getByRole("button", { name: "Connect Twitch" })).toBeVisible();
+  await expect(popup.getByRole("button", { name: "Connect for fixture_viewer" })).toBeVisible();
   await popup.waitForTimeout(1_500); // time for any silent re-login to run
 
   const stored = await worker.evaluate(() => chrome.storage.local.get(null));
   expect(stored.twitchToken).toBeUndefined();
   expect(stored.twitchUserId).toBeUndefined();
   expect(stored.globalState.loggedIn).toBe(false);
-  await expect(popup.getByRole("button", { name: "Connect Twitch" })).toBeVisible();
+  await expect(popup.getByRole("button", { name: "Connect for fixture_viewer" })).toBeVisible();
 
   // The sidebar goes back to the logged-out view
   await expect(twitchPage.locator("#__root")).toContainText("not logged in");
@@ -41,7 +41,7 @@ test("logging out revokes the token with Twitch", async ({ twitchPage, context, 
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
   await popup.getByRole("button", { name: "Logout" }).click();
-  await expect(popup.getByRole("button", { name: "Connect Twitch" })).toBeVisible();
+  await expect(popup.getByRole("button", { name: "Connect for fixture_viewer" })).toBeVisible();
 
   await expect.poll(() => revokes.length).toBe(1);
   expect(revokes[0]).toMatch(/^POST /);
@@ -54,14 +54,14 @@ test("a revoke failure does not block logging out", async ({ twitchPage, context
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
   await popup.getByRole("button", { name: "Logout" }).click();
-  await expect(popup.getByRole("button", { name: "Connect Twitch" })).toBeVisible();
+  await expect(popup.getByRole("button", { name: "Connect for fixture_viewer" })).toBeVisible();
   expect((await worker.evaluate(() => chrome.storage.local.get("twitchToken"))).twitchToken).toBeUndefined();
 });
 
 // The interactive login runs in the service worker (the toolbar popup closes as soon as the
 // Twitch window takes focus). Stub its login window and the Helix user lookup there.
-const stubWorkerLogin = (worker: Worker, redirect: string | null) =>
-  worker.evaluate((redirectUrl) => {
+const stubWorkerLogin = (worker: Worker, redirect: string | null, validatedUserId = "999") =>
+  worker.evaluate(({ redirectUrl, userId }) => {
     const g = self as any;
     g.__authCalls = [];
     (chrome.identity as any).launchWebAuthFlow = (options: { url: string; interactive: boolean }, callback: (url?: string) => void) => {
@@ -71,11 +71,11 @@ const stubWorkerLogin = (worker: Worker, redirect: string | null) =>
     const realFetch = g.fetch.bind(self);
     g.fetch = (input: any, init?: any) =>
       /id\.twitch\.tv\/oauth2\/validate/.test(String(input))
-        ? Promise.resolve(new Response(JSON.stringify({ expires_in: 4_881_074 }), { status: 200 }))
+        ? Promise.resolve(new Response(JSON.stringify({ user_id: userId, expires_in: 4_881_074 }), { status: 200 }))
         : /api\.twitch\.tv\/helix\/users/.test(String(input))
         ? Promise.resolve(new Response(JSON.stringify({ data: [{ id: "999", login: "fixture_viewer", display_name: "Fixture_Viewer", profile_image_url: "https://img.example/viewer.png" }] }), { status: 200 }))
         : realFetch(input, init);
-  }, redirect);
+  }, { redirectUrl: redirect, userId: validatedUserId });
 
 const authCalls = (worker: Worker) => worker.evaluate(() => (self as any).__authCalls as { interactive: boolean; url: string }[]);
 
@@ -93,7 +93,7 @@ test("Connect runs in the background and stores the session", async ({ twitchPag
   await clearSession(worker);
   await stubWorkerLogin(worker, REDIRECT);
   const popup = await openPopup(context, extensionId);
-  await popup.getByRole("button", { name: "Connect Twitch" }).click();
+  await popup.getByRole("button", { name: "Connect for fixture_viewer" }).click();
   await expect(popup.getByRole("button", { name: "Logout" })).toBeVisible({ timeout: 5_000 });
 
   const stored = await worker.evaluate(() => chrome.storage.local.get(null));
@@ -107,48 +107,85 @@ test("Connect runs in the background and stores the session", async ({ twitchPag
   expect((await authCalls(worker)).filter((c) => c.interactive)).toHaveLength(1);
 });
 
-test("the first Connect uses Twitch's authorize page and forces re-verification", async ({ twitchPage, context, worker, extensionId }) => {
+test("Connect uses Twitch's plain authorize page: no forced re-verification, no sign-out", async ({ twitchPage, context, worker, extensionId }) => {
   await clearSession(worker);
   await stubWorkerLogin(worker, REDIRECT);
   const popup = await openPopup(context, extensionId);
-  await popup.getByRole("button", { name: "Connect Twitch" }).click();
+  await popup.getByRole("button", { name: "Connect for fixture_viewer" }).click();
   await expect(popup.getByRole("button", { name: "Logout" })).toBeVisible({ timeout: 5_000 });
 
   const url = new URL((await authCalls(worker))[0].url);
   expect(url.origin + url.pathname).toBe("https://id.twitch.tv/oauth2/authorize");
-  expect(url.searchParams.get("force_verify")).toBe("true");
+  expect(url.searchParams.get("force_verify")).toBeNull();
   expect(url.searchParams.get("response_type")).toBe("token");
+  expect(url.searchParams.get("scope")).toBe("user:read:follows");
 });
 
-test("Connect after a logout signs out of Twitch first, then authorizes", async ({ twitchPage, context, worker, extensionId }) => {
+test("Connect after a logout does not sign the user out of Twitch", async ({ twitchPage, context, worker, extensionId }) => {
   const popup = await openPopup(context, extensionId);
   await popup.getByRole("button", { name: "Logout" }).click();
-  await expect(popup.getByRole("button", { name: "Connect Twitch" })).toBeVisible();
+  await expect(popup.getByRole("button", { name: "Connect for fixture_viewer" })).toBeVisible();
 
   await stubWorkerLogin(worker, REDIRECT);
-  await popup.getByRole("button", { name: "Connect Twitch" }).click();
+  await popup.getByRole("button", { name: "Connect for fixture_viewer" }).click();
   await expect(popup.getByRole("button", { name: "Logout" })).toBeVisible({ timeout: 5_000 });
 
-  const url = new URL((await authCalls(worker))[0].url);
-  expect(url.origin + url.pathname).toBe("https://id.twitch.tv/logout/redirect");
-  expect(url.searchParams.get("redirect_path")).toBe("https://id.twitch.tv/oauth2/authorize/data");
-  // The authorize request Twitch continues with after signing the browser out
-  const next = new URLSearchParams(url.searchParams.get("redirect_params")!);
-  expect(next.get("client_id")).toBeTruthy();
-  expect(next.get("response_type")).toBe("token");
-  expect(next.get("scope")).toBe("user:read:follows");
-  expect(next.get("force_verify")).toBe("true");
-  expect(next.get("redirect_uri")).toMatch(/^https:\/\/[a-z]{32}\.chromiumapp\.org\/$/);
+  const urls = (await authCalls(worker)).map((c) => c.url);
+  expect(urls).toHaveLength(1);
+  expect(urls[0]).toMatch(/^https:\/\/id\.twitch\.tv\/oauth2\/authorize\?/);
+  expect(urls.join(" ")).not.toContain("logout");
+});
+
+test("a login for a different account than the one signed in to Twitch is refused", async ({ twitchPage, context, worker, extensionId }) => {
+  const revokes: string[] = [];
+  await context.route("https://id.twitch.tv/oauth2/revoke", (route) => {
+    revokes.push(route.request().postData() ?? "");
+    return route.fulfill({ status: 200, body: "" });
+  });
+  await clearSession(worker);
+  await stubWorkerLogin(worker, REDIRECT, "123"); // the token belongs to someone else
+  const popup = await openPopup(context, extensionId);
+  await popup.getByRole("button", { name: "Connect for fixture_viewer" }).click();
+
+  await expect(popup.getByText(/not the account signed in to Twitch/i)).toBeVisible({ timeout: 5_000 });
+  await expect(popup.getByRole("button", { name: "Connect for fixture_viewer" })).toBeEnabled();
+  const stored = await worker.evaluate(() => chrome.storage.local.get(null));
+  expect(stored.twitchToken).toBeUndefined();
+  expect(stored.twitchUserId).toBeUndefined();
+  expect(stored.channelSnapshot).toBeUndefined();
+  // The other account's token is not kept around
+  await expect.poll(() => revokes.length).toBe(1);
+  expect(revokes[0]).toContain("token=silent-token");
+});
+
+test("Connect needs a Twitch account signed in on twitch.tv", async ({ twitchPage, context, worker, extensionId }) => {
+  await clearSession(worker);
+  await worker.evaluate(() => chrome.storage.local.set({ pageAccount: { status: "signed_out", seenAt: Date.now() } }));
+  await stubWorkerLogin(worker, REDIRECT);
+  const popup = await openPopup(context, extensionId);
+
+  await expect(popup.getByText("Sign in to Twitch in a tab")).toBeVisible();
+  await expect(popup.getByRole("button", { name: /^Connect/ })).toHaveCount(0);
+  // The background refuses too, whatever the popup shows
+  expect(await popup.evaluate(() => chrome.runtime.sendMessage({ type: "CONNECT_TWITCH" }))).toEqual({ ok: false, reason: "not_signed_in" });
+  expect(await authCalls(worker)).toHaveLength(0);
+});
+
+test("Connect is not offered before any Twitch tab has been seen", async ({ session, context, worker, extensionId }) => {
+  await worker.evaluate(() => chrome.storage.local.remove(["twitchToken", "pageAccount"]));
+  const popup = await openPopup(context, extensionId);
+  await expect(popup.getByText("Open Twitch in a tab")).toBeVisible();
+  await expect(popup.getByRole("button", { name: /^Connect/ })).toHaveCount(0);
 });
 
 test("cancelling the Twitch login leaves the popup ready to try again", async ({ twitchPage, context, worker, extensionId }) => {
   await clearSession(worker);
   await stubWorkerLogin(worker, null); // the login window was closed
   const popup = await openPopup(context, extensionId);
-  await popup.getByRole("button", { name: "Connect Twitch" }).click();
+  await popup.getByRole("button", { name: "Connect for fixture_viewer" }).click();
 
   await expect(popup.getByText(/could not connect/i)).toBeVisible({ timeout: 5_000 });
-  await expect(popup.getByRole("button", { name: "Connect Twitch" })).toBeEnabled();
+  await expect(popup.getByRole("button", { name: "Connect for fixture_viewer" })).toBeEnabled();
   expect((await worker.evaluate(() => chrome.storage.local.get("twitchToken"))).twitchToken).toBeUndefined();
 });
 
@@ -161,7 +198,7 @@ test("logging out clears the account's groups and cached follow list", async ({ 
 
   const popup = await openPopup(context, extensionId);
   await popup.getByRole("button", { name: "Logout" }).click();
-  await expect(popup.getByRole("button", { name: "Connect Twitch" })).toBeVisible();
+  await expect(popup.getByRole("button", { name: "Connect for fixture_viewer" })).toBeVisible();
 
   const keys = Object.keys(await worker.evaluate(() => chrome.storage.local.get(null)));
   for (const key of ["groupNames", "channelGroups", "followedChannels", "channelSnapshot", "snapshotError", "twitchToken", "twitchUserId", "twitchUserImage"]) {
@@ -175,10 +212,10 @@ test("the next account to connect starts with no groups", async ({ twitchPage, c
 
   const popup = await openPopup(context, extensionId);
   await popup.getByRole("button", { name: "Logout" }).click();
-  await expect(popup.getByRole("button", { name: "Connect Twitch" })).toBeVisible();
+  await expect(popup.getByRole("button", { name: "Connect for fixture_viewer" })).toBeVisible();
 
   await stubWorkerLogin(worker, REDIRECT);
-  await popup.getByRole("button", { name: "Connect Twitch" }).click();
+  await popup.getByRole("button", { name: "Connect for fixture_viewer" }).click();
   await expect(popup.getByRole("button", { name: "Logout" })).toBeVisible({ timeout: 5_000 });
 
   await expect(twitchPage.locator("#__root [role=button]")).toHaveCount(1, { timeout: 5_000 }); // only Ungrouped
@@ -190,7 +227,7 @@ test("the next account to connect starts with no groups", async ({ twitchPage, c
 test("after connecting, the sidebar shows loading and not the logged-out intro while channels download", async ({ twitchPage, context, worker, extensionId }) => {
   const popup = await openPopup(context, extensionId);
   await popup.getByRole("button", { name: "Logout" }).click();
-  await expect(popup.getByRole("button", { name: "Connect Twitch" })).toBeVisible();
+  await expect(popup.getByRole("button", { name: "Connect for fixture_viewer" })).toBeVisible();
   await expect(twitchPage.locator("#__root")).toContainText("not logged in");
 
   // A slow follow list, like the real Twitch API
@@ -199,7 +236,7 @@ test("after connecting, the sidebar shows loading and not the logged-out intro w
     await route.fallback();
   });
   await stubWorkerLogin(worker, REDIRECT);
-  await popup.getByRole("button", { name: "Connect Twitch" }).click();
+  await popup.getByRole("button", { name: "Connect for fixture_viewer" }).click();
   await expect(popup.getByRole("button", { name: "Logout" })).toBeVisible({ timeout: 5_000 });
 
   // Mid-download: the account is connected, so the intro must be gone
@@ -241,7 +278,7 @@ const guestPopup = async (context: any, worker: Worker, extensionId: string, pag
   await worker.evaluate((account) => chrome.storage.local.set({ pageAccount: account }), pageAccount);
   const popup = await openPopup(context, extensionId);
   await popup.getByRole("button", { name: "Logout" }).click();
-  await expect(popup.getByRole("button", { name: "Connect Twitch" })).toBeVisible();
+  await expect(popup.getByRole("button", { name: "Logout" })).toHaveCount(0);
   return popup;
 };
 

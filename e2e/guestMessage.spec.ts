@@ -12,8 +12,8 @@ test.describe("guestMessage", () => {
     expect(guestMessage({ status: "signed_out", seenAt: 1 })).toBe("Sign in to Twitch in a tab, then connect the extension to use your groups.");
   });
 
-  test("stays neutral when the account is unknown or has not been seen yet", () => {
-    const neutral = "Connect the extension to Twitch to use your groups.";
+  test("asks to open Twitch when the account is unknown or has not been seen yet", () => {
+    const neutral = "Open Twitch in a tab and sign in, then connect the extension to use your groups.";
     expect(guestMessage({ status: "unknown", seenAt: 1 })).toBe(neutral);
     expect(guestMessage(undefined)).toBe(neutral);
   });

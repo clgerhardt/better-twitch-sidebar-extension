@@ -27,6 +27,9 @@ async function stubTwitch(context: BrowserContext) {
     return route.fulfill({ status: 204, body: "", headers: { "x-fixture": url.pathname } });
   });
 
+  // Twitch says the token belongs to the fake viewer and lasts weeks (tests override this per case)
+  await context.route("https://id.twitch.tv/oauth2/validate", (route) => route.fulfill(json({ user_id: "999", login: "fixture_viewer", expires_in: 5_000_000 })));
+
   await context.route("https://api.twitch.tv/helix/**", (route) => {
     const url = new URL(route.request().url());
     switch (url.pathname) {

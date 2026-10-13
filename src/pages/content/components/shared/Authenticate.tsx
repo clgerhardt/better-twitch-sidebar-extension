@@ -3,14 +3,23 @@ import { messageLogger } from "@src/pages/utils/logger";
 import { constants } from "@src/pages/utils/constants";
 import { useTwitchToken } from "../../hooks/userTwitchToken";
 import { MESSAGES } from "../../../shared/messages";
+import { usePageAccount } from "../../hooks/usePageAccount";
 
 const CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID;
+
+const connectErrorMessage = (reason?: string) =>
+  reason === "wrong_account"
+    ? "That is not the account signed in to Twitch. Sign in to Twitch as the account you want, then try again."
+    : reason === "not_signed_in"
+      ? "Sign in to Twitch in a tab first."
+      : "Could not connect to Twitch. Please try again.";
 
 const Authenticate = ({ isSidebarExpanded }: { isSidebarExpanded: any }) => {
   const [tokenChecked, setTokenChecked] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const [connectError, setConnectError] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
   const twitchToken = useTwitchToken();
+  const pageAccount = usePageAccount();
 
   const logout = () => {
     chrome.storage.local.remove("twitchToken", () => {
@@ -68,6 +77,8 @@ const Authenticate = ({ isSidebarExpanded }: { isSidebarExpanded: any }) => {
   }
 
   if (!twitchToken) {
+    // Only the account signed in to Twitch can be connected, so there is nothing to offer otherwise
+    if (pageAccount?.status !== "signed_in") return null;
     return (
       <div>
         <button
@@ -75,16 +86,16 @@ const Authenticate = ({ isSidebarExpanded }: { isSidebarExpanded: any }) => {
           className="bg-purple-500 text-white font-bold py-2 px-4 mt-2 rounded disabled:opacity-60"
           onClick={async () => {
             setConnecting(true);
-            setConnectError(false);
+            setConnectError(null);
             // The login runs in the background so it survives this popup closing
             const result = await chrome.runtime.sendMessage({ type: MESSAGES.CONNECT_TWITCH }).catch(() => undefined);
             setConnecting(false);
-            if (!result?.ok) setConnectError(true);
+            if (!result?.ok) setConnectError(connectErrorMessage(result?.reason));
           }}
         >
-          {connecting ? "Waiting for Twitch..." : "Connect Twitch"}
+          {connecting ? "Waiting for Twitch..." : `Connect for ${pageAccount.login}`}
         </button>
-        {connectError && <p className="text-red-500 text-sm mt-2">Could not connect to Twitch. Please try again.</p>}
+        {connectError && <p className="text-red-500 text-sm mt-2">{connectError}</p>}
       </div>
     );
   }

@@ -10,6 +10,6 @@ export const guestMessage = (account: StoredPageAccount | undefined): string => 
     case "signed_out":
       return "Sign in to Twitch in a tab, then connect the extension to use your groups.";
     default:
-      return "Connect the extension to Twitch to use your groups.";
+      return "Open Twitch in a tab and sign in, then connect the extension to use your groups.";
   }
 };

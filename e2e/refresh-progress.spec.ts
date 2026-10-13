@@ -64,6 +64,6 @@ test("there is no bar when logged out", async ({ session, worker, openTwitch, co
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
   await popup.getByRole("button", { name: "Logout" }).click();
-  await expect(popup.getByRole("button", { name: "Connect Twitch" })).toBeVisible();
+  await expect(popup.getByRole("button", { name: "Connect for fixture_viewer" })).toBeVisible();
   await expect(page.getByTestId("refresh-progress")).toHaveCount(0);
 });

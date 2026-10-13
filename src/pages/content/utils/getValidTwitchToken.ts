@@ -15,35 +15,16 @@ const EXPIRY_MARGIN_MS = 60_000;
 const SCOPES = ["user:read:follows"];
 const REDIRECT_URI = `https://${chrome.runtime.id}.chromiumapp.org/`;
 
-// forceVerify makes Twitch ask the user to authorize the app again instead of approving silently
-// because the browser still has a Twitch session. Use it for the interactive login only.
-export const buildAuthUrl = (forceVerify = false) => {
+// A plain authorize request: Twitch approves it silently for the account the browser is signed in
+// to, which is the only account the extension connects (the caller checks the token's owner).
+export const buildAuthUrl = () => {
   const params = new URLSearchParams({
     client_id: import.meta.env.VITE_TWITCH_CLIENT_ID,
     redirect_uri: REDIRECT_URI,
     response_type: "token",
     scope: SCOPES.join(" "),
   });
-  if (forceVerify) params.set("force_verify", "true");
   return `${TWITCH_AUTH_BASE}?${params.toString()}`;
-};
-
-// Signs the browser out of Twitch, then continues to the authorize screen, so the next person has to
-// log in with their own credentials instead of reusing the previous Twitch session. This is the
-// same URL Twitch's own "not you? log out" link uses (an undocumented endpoint, so it may change).
-export const buildSwitchAccountUrl = () => {
-  const authorizeParams = new URLSearchParams({
-    client_id: import.meta.env.VITE_TWITCH_CLIENT_ID,
-    redirect_uri: REDIRECT_URI,
-    response_type: "token",
-    scope: SCOPES.join(" "),
-    force_verify: "true",
-  });
-  const url = new URL("https://id.twitch.tv/logout/redirect");
-  url.searchParams.set("login_type", "");
-  url.searchParams.set("redirect_params", authorizeParams.toString());
-  url.searchParams.set("redirect_path", "https://id.twitch.tv/oauth2/authorize/data");
-  return url.toString();
 };
 
 export const extractTokenFromRedirectUrl = (redirectUrl: string): string | null => {
@@ -127,7 +108,7 @@ const runSilentReauth = async (): Promise<string | null> => {
 
 // Ends the session and keeps it ended: without the logged-out flag the next token check would
 // silently log back in, since the browser usually still has a Twitch session.
-const revokeTwitchToken = async (token: string) => {
+export const revokeTwitchToken = async (token: string) => {
   try {
     await fetch("https://id.twitch.tv/oauth2/revoke", {
       method: "POST",

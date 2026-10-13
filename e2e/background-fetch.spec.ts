@@ -86,7 +86,7 @@ test("a refresh that is still running when the user logs out writes nothing", as
   await popup.evaluate(() => void chrome.runtime.sendMessage({ type: "REFRESH_CHANNELS", force: true }));
   await popup.waitForTimeout(400); // the refresh is now waiting on Twitch
   await popup.getByRole("button", { name: "Logout" }).click();
-  await expect(popup.getByRole("button", { name: "Connect Twitch" })).toBeVisible();
+  await expect(popup.getByRole("button", { name: "Connect for fixture_viewer" })).toBeVisible();
   await page.waitForTimeout(3_000); // longer than the slow response
 
   const keys = Object.keys(await worker.evaluate(() => chrome.storage.local.get(null)));
@@ -269,13 +269,15 @@ test("a Twitch outage keeps showing the last snapshot", async ({ context, sessio
 
 test("connecting fetches the channels right away", async ({ context, session, worker, extensionId }) => {
   await worker.evaluate(() => chrome.storage.local.remove(["twitchToken", "tokenExpiresAt", "twitchUserId", "twitchUserImage", "channelSnapshot"]));
+  // A Twitch tab was open earlier (it recorded who is signed in), and is closed now
+  await worker.evaluate(() => chrome.storage.local.set({ pageAccount: { status: "signed_in", id: "999", login: "fixture_viewer", seenAt: Date.now() } }));
   await worker.evaluate(() => {
     (chrome.identity as any).launchWebAuthFlow = (_o: unknown, cb: (url: string) => void) =>
       cb("https://fixture.chromiumapp.org/#access_token=connected-token&scope=user%3Aread%3Afollows&token_type=bearer");
   });
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
-  await popup.getByRole("button", { name: "Connect Twitch" }).click();
+  await popup.getByRole("button", { name: "Connect for fixture_viewer" }).click();
   await expect(popup.getByRole("button", { name: "Logout" })).toBeVisible({ timeout: 5_000 });
 
   // No Twitch tab is open, yet the snapshot is there
