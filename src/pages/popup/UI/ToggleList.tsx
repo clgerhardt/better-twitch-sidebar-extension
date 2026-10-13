@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getLocalStorage, setLocalStorage } from '@src/pages/background/storage';
 import { GLOBAL_STATE_KEY } from '@src/pages/utils/constants';
-import { messageLogger } from '@src/pages/utils/logger';
 
 type ToggleItem = {
   id: number;
@@ -22,15 +21,6 @@ export default function ToggleList() {
       setItems(initialItems);
     });
   }, []);
-
-  const getMessageById = (id: number) => {
-    switch (id) {
-      case 1: return 'SYS:Followers:TOGGLE_FOLLOWERS_SIDEBAR';
-      case 2: return 'SYS:Followers:TOGGLE_STORIES';
-      case 3: return 'SYS:Followers:TOGGLE_LIVE_CHANNELS';
-      default: return '';
-    }
-  };
 
   const updateInLocalStorageById = async (id: number, value: boolean) => {
     const currentState: any = await getLocalStorage(GLOBAL_STATE_KEY);
@@ -54,17 +44,6 @@ export default function ToggleList() {
         if (item.id === id) {
           const newEnabled = !item.enabled;
           updateInLocalStorageById(id, newEnabled);
-
-          chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            const tab = tabs[0];
-            if (!tab?.id) return;
-            chrome.tabs.sendMessage(tab.id, {
-              message: getMessageById(id),
-              payload: { id, enabled: newEnabled }
-            }, (resp) => {
-              messageLogger('POPUP', 'sent toggle', resp);
-            });
-          });
 
           return { ...item, enabled: newEnabled };
         }

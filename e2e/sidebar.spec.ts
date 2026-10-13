@@ -27,17 +27,44 @@ test("a fresh install hides the original Followed Channels list on load", async 
   await expect(twitchPage.locator("[aria-label='Followed Channels']")).toBeHidden({ timeout: 8_000 });
 });
 
-test("toggle message hides the Followed Channels section", async ({ twitchPage, worker }) => {
+test("changing a setting in storage hides the Followed Channels section", async ({ twitchPage, worker }) => {
   const followed = twitchPage.locator("[aria-label='Followed Channels']");
-
   await worker.evaluate(async () => {
     const { globalState } = await chrome.storage.local.get("globalState");
     await chrome.storage.local.set({ globalState: { ...globalState, hideOriginalFollowersList: true } });
-    const [tab] = await chrome.tabs.query({ url: "https://www.twitch.tv/*" });
-    await chrome.tabs.sendMessage(tab.id!, { message: "SYS:Followers:TOGGLE_FOLLOWERS_SIDEBAR" });
   });
-
   await expect(followed).toBeHidden({ timeout: 5_000 });
+});
+
+test("a setting reaches every open Twitch tab, including one in the background", async ({ twitchPage, openTwitch, worker }) => {
+  const front = await openTwitch();
+  await front.bringToFront(); // twitchPage is now in the background
+  await worker.evaluate(async () => {
+    const { globalState } = await chrome.storage.local.get("globalState");
+    await chrome.storage.local.set({ globalState: { ...globalState, hideLiveChannels: true } });
+  });
+  await expect(twitchPage.locator("[aria-label='Live Channels']")).toBeHidden({ timeout: 5_000 });
+  await expect(front.locator("[aria-label='Live Channels']")).toBeHidden({ timeout: 5_000 });
+
+  await worker.evaluate(async () => {
+    const { globalState } = await chrome.storage.local.get("globalState");
+    await chrome.storage.local.set({ globalState: { ...globalState, hideLiveChannels: false } });
+  });
+  await expect(twitchPage.locator("[aria-label='Live Channels']")).toBeVisible({ timeout: 5_000 });
+  await expect(front.locator("[aria-label='Live Channels']")).toBeVisible({ timeout: 5_000 });
+});
+
+test("the popup's toggles work without being tied to the active tab", async ({ twitchPage, context, extensionId }) => {
+  // The popup is open as a tab here, so the Twitch tab is not the active one
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
+  const live = twitchPage.locator("[aria-label='Live Channels']");
+  await expect(live).toBeVisible();
+
+  await popup.getByRole("switch", { name: "Hide Live Channels" }).click();
+  await expect(live).toBeHidden({ timeout: 5_000 });
+  await popup.getByRole("switch", { name: "Hide Live Channels" }).click();
+  await expect(live).toBeVisible({ timeout: 5_000 });
 });
 
 test("Manage Groups lists the groups shown in the sidebar", async ({ twitchPage }) => {

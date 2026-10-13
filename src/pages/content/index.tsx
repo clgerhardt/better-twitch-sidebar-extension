@@ -184,27 +184,12 @@ const renderToUI = async (tabId: any) => {
   }
 };
 
-const addMessageListener = () => {
-  chrome.runtime.onMessage.addListener(async (request) => {
-    let success = false;
-
-    switch (request.message) {
-      case "SYS:Followers:TOGGLE_FOLLOWERS_SIDEBAR":
-      case "SYS:Followers:TOGGLE_LIVE_CHANNELS":
-      case "SYS:Followers:TOGGLE_STORIES":
-        const globalState = await getLocalStorage(GLOBAL_STATE_KEY);
-        applySidebarVisibilityFromState(globalState);
-        success = true;
-        break;
+// The popup only writes the settings; every open Twitch tab applies them from storage
+const watchSettings = () => {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && changes[GLOBAL_STATE_KEY]) {
+      applySidebarVisibilityFromState(changes[GLOBAL_STATE_KEY].newValue);
     }
-
-    if (success) {
-      messageLogger(constants.location.CONTENT_SCRIPT, "Action successful for message", request.message);
-    } else {
-      messageLogger(constants.location.CONTENT_SCRIPT, "Action failed for message", request.message);
-    }
-
-    return true;
   });
 };
 
@@ -217,7 +202,7 @@ try {
   }
   startPageAccountReporting();
   connectToBackground();
-  addMessageListener();
+  watchSettings();
   setInterval(() => {
     if (port) {
       postToBackground({ type: "HEARTBEAT" });
