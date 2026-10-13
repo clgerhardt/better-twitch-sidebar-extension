@@ -211,12 +211,13 @@ test("after connecting, the sidebar shows loading and not the logged-out intro w
   await expect(twitchPage.locator("#__root")).toContainText("Ungrouped", { timeout: 8_000 });
 });
 
-// Only a 401 means the token is bad. Being offline or hitting a server error / rate limit
-// must never log the user out or delete their groups.
+// A failed user lookup in the popup must never log the user out or delete their groups. A rejected
+// token is dealt with by the background, which shows the reconnect view.
 for (const [name, fulfill] of [
   ["a network failure", (route: any) => route.abort()],
   ["a server error", (route: any) => route.fulfill({ status: 500, body: "" })],
   ["a rate limit", (route: any) => route.fulfill({ status: 429, body: "" })],
+  ["a rejected token", (route: any) => route.fulfill({ status: 401, body: "" })],
 ] as const) {
   test(`${name} while opening the popup keeps the session and groups`, async ({ twitchPage, context, worker, extensionId }) => {
     await expect(twitchPage.locator("#__root")).toContainText("Ungrouped");
@@ -235,50 +236,6 @@ for (const [name, fulfill] of [
     await expect(popup.getByRole("button", { name: "Logout" })).toBeVisible();
   });
 }
-
-test("a rejected token (401) while opening the popup logs out", async ({ twitchPage, context, worker, extensionId }) => {
-  await expect(twitchPage.locator("#__root")).toContainText("Ungrouped");
-  await context.route("https://api.twitch.tv/helix/users*", (route) => route.fulfill({ status: 401, body: "" }));
-
-  const popup = await context.newPage();
-  await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
-  await expect(popup.getByRole("button", { name: "Connect Twitch" })).toBeVisible();
-  expect((await worker.evaluate(() => chrome.storage.local.get("twitchToken"))).twitchToken).toBeUndefined();
-});
-
-// Count the popup's login attempts from the moment it loads
-const openPopupCountingLogins = async (context: any, extensionId: string) => {
-  const popup: Page = await context.newPage();
-  await popup.addInitScript((redirect) => {
-    (window as any).__logins = 0;
-    (chrome.identity as any).launchWebAuthFlow = (_options: unknown, callback: (url: string) => void) => {
-      (window as any).__logins++;
-      callback(redirect);
-    };
-  }, REDIRECT);
-  await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
-  return popup;
-};
-
-test("a token that has not reached its real expiry is used without logging in again", async ({ twitchPage, context, worker, extensionId }) => {
-  // Older than the old 4 hour guess, but Twitch says it is good for weeks
-  await worker.evaluate(() => chrome.storage.local.set({ tokenExpiresAt: Date.now() + 40 * 24 * 60 * 60 * 1000 }));
-  const popup = await openPopupCountingLogins(context, extensionId);
-  await expect(popup.getByRole("button", { name: "Logout" })).toBeVisible();
-  await popup.waitForTimeout(1_000);
-  expect(await popup.evaluate(() => (window as any).__logins)).toBe(0);
-  expect((await worker.evaluate(() => chrome.storage.local.get("twitchToken"))).twitchToken).toBe("fixture-token");
-});
-
-test("a token past its real expiry is renewed quietly and the new expiry is stored", async ({ twitchPage, context, worker, extensionId }) => {
-  await context.route("https://id.twitch.tv/oauth2/validate", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ user_id: "999", expires_in: 5_000_000 }) }));
-  await worker.evaluate(() => chrome.storage.local.set({ tokenExpiresAt: Date.now() - 1_000 }));
-  const popup = await openPopupCountingLogins(context, extensionId);
-  await expect.poll(async () => (await worker.evaluate(() => chrome.storage.local.get("twitchToken"))).twitchToken).toBe("silent-token");
-  expect(await popup.evaluate(() => (window as any).__logins)).toBe(1);
-  const { tokenExpiresAt } = await worker.evaluate(() => chrome.storage.local.get("tokenExpiresAt"));
-  expect(tokenExpiresAt).toBeGreaterThan(Date.now() + 50 * 24 * 60 * 60 * 1000);
-});
 
 const guestPopup = async (context: any, worker: Worker, extensionId: string, pageAccount: unknown) => {
   await worker.evaluate((account) => chrome.storage.local.set({ pageAccount: account }), pageAccount);

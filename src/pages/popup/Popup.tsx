@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import UserGreeting from "./UserGreeting/UserGreeting";
 import GuestGreeting from "./GuestGreeting/GuestGreeting";
 import SignedOutGreeting from "./SignedOutGreeting/SignedOutGreeting";
+import ExpiredGreeting from "./ExpiredGreeting/ExpiredGreeting";
+import { useNeedsReconnect } from "../content/hooks/useNeedsReconnect";
 import { usePageAccount } from "../content/hooks/usePageAccount";
 import { messageLogger } from "../utils/logger";
 import { constants } from "../utils/constants";
@@ -24,6 +26,7 @@ const Popup = () => {
 
   const twitchToken = useTwitchToken();
   const pageAccount = usePageAccount();
+  const needsReconnect = useNeedsReconnect();
 
   const logout = async () => {
     await logoutTwitch();
@@ -41,11 +44,6 @@ const Popup = () => {
         },
       });
 
-      if (res.status === 401) {
-        messageLogger(constants.location.POPUP, "Twitch token invalid or expired");
-        logout();
-        return;
-      }
       if (!res.ok) throw new Error(`API call failed with status ${res.status}`);
 
       const data = await res.json();
@@ -60,7 +58,8 @@ const Popup = () => {
         chrome.storage.local.set({ twitchUserId: userData.id });
       }
     } catch (error) {
-      // Offline, rate limited or a server error: the session is still good, so keep it
+      // This lookup only fills in the name and picture. Offline, rate limited, or a rejected token
+      // (the background notices that and the popup shows the reconnect view): never log out here.
       messageLogger(constants.location.POPUP, "Could not fetch Twitch user", error);
     }
   };
@@ -95,6 +94,8 @@ const Popup = () => {
         <>
           {pageAccount?.status === "signed_out" ? (
             <SignedOutGreeting />
+          ) : needsReconnect ? (
+            <ExpiredGreeting />
           ) : (
             <UserGreeting
               userName={userSession?.user}

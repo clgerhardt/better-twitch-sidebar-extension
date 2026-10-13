@@ -99,7 +99,7 @@ test("an expired login is reported in the sidebar", async ({ context, session, w
     route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ message: "Invalid OAuth token" }) })
   );
   const page = await openTwitch();
-  await expect(page.locator("#__root")).toContainText("login expired", { timeout: 8_000 });
+  await expect(page.locator("#__root")).toContainText("connection expired", { timeout: 8_000 });
   expect((await worker.evaluate(() => chrome.storage.local.get("snapshotError"))).snapshotError).toBe("unauthorized");
 });
 
@@ -140,12 +140,112 @@ test("a rejected token is renewed quietly in the background and the sidebar load
 test("a quiet login that returns a different account is refused", async ({ context, session, worker, openTwitch }) => {
   await stubQuietLogin(context, worker, "123");
   const page = await openTwitch();
-  await expect(page.locator("#__root")).toContainText("login expired", { timeout: 8_000 });
+  await expect(page.locator("#__root")).toContainText("connection expired", { timeout: 8_000 });
 
   const stored = await worker.evaluate(() => chrome.storage.local.get(["twitchToken", "twitchUserId", "snapshotError"]));
   expect(stored.twitchToken).toBe("fixture-token");
   expect(stored.twitchUserId).toBe("999");
   expect(stored.snapshotError).toBe("unauthorized");
+});
+
+const seedSnapshot = (worker: any) =>
+  worker.evaluate(() =>
+    chrome.storage.local.set({
+      channelSnapshot: {
+        version: 1,
+        user: { id: "999" },
+        fetchedAt: 0,
+        staticAt: Date.now(),
+        channels: [{ id: "1", login: "fixture_live", displayName: "Fixture_Live", image: "", isLive: true, game: "Cached Game", viewers: 5 }],
+      },
+    })
+  );
+
+// Only the stored token is rejected; a quiet login finds no Twitch session, a window login works
+const stubExpiredLogin = async (context: BrowserContext, worker: any) => {
+  await context.route("https://api.twitch.tv/helix/**", (route) =>
+    route.request().headers()["authorization"] === "Bearer fixture-token"
+      ? route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ message: "Invalid OAuth token" }) })
+      : route.fallback()
+  );
+  await context.route("https://id.twitch.tv/oauth2/validate", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ user_id: "999", expires_in: 5_000_000 }) })
+  );
+  await worker.evaluate(() => {
+    (chrome.identity as any).launchWebAuthFlow = (options: { interactive: boolean }, cb: (url?: string) => void) =>
+      cb(options.interactive ? "https://fixture.chromiumapp.org/#access_token=renewed-token&scope=user%3Aread%3Afollows&token_type=bearer" : undefined);
+  });
+};
+
+test("an expired connection replaces the groups and Manage Groups with a reconnect view", async ({ context, session, worker, openTwitch }) => {
+  await worker.evaluate(() => chrome.storage.local.set({ groupNames: ["Friends"] }));
+  await seedSnapshot(worker);
+  await stubExpiredLogin(context, worker);
+  const page = await openTwitch();
+
+  const view = page.getByTestId("expired-view");
+  await expect(view).toContainText("Extension connection expired", { timeout: 8_000 });
+  await expect(view.getByRole("button", { name: "Reconnect" })).toBeVisible();
+  await expect(page.locator("#__root")).not.toContainText("Ungrouped");
+  await expect(page.locator("#__root")).not.toContainText("Cached Game");
+  await expect(page.locator("#__manage-groups-root")).not.toContainText("Manage Groups");
+
+  // Nothing was deleted: the groups come back after reconnecting
+  expect((await worker.evaluate(() => chrome.storage.local.get("groupNames"))).groupNames).toEqual(["Friends"]);
+});
+
+test("Reconnect logs in from the sidebar and the groups come back", async ({ context, session, worker, openTwitch }) => {
+  await worker.evaluate(() => chrome.storage.local.set({ groupNames: ["Friends"] }));
+  await seedSnapshot(worker);
+  await stubExpiredLogin(context, worker);
+  const page = await openTwitch();
+
+  await page.getByTestId("expired-view").getByRole("button", { name: "Reconnect" }).click();
+  await expect(page.getByTestId("expired-view")).toHaveCount(0, { timeout: 8_000 });
+  await expect(page.locator("#__root")).toContainText("Friends");
+  await expect(page.locator("#__manage-groups-root")).toContainText("Manage Groups");
+  const stored = await worker.evaluate(() => chrome.storage.local.get(["twitchToken", "snapshotError"]));
+  expect(stored.twitchToken).toBe("renewed-token");
+  expect(stored.snapshotError).toBeUndefined();
+});
+
+test("a cancelled reconnect leaves the view so it can be tried again", async ({ context, session, worker, openTwitch }) => {
+  await seedSnapshot(worker);
+  await stubExpiredLogin(context, worker);
+  await worker.evaluate(() => {
+    (chrome.identity as any).launchWebAuthFlow = (_o: unknown, cb: (url?: string) => void) => cb(undefined);
+  });
+  const page = await openTwitch();
+
+  const button = page.getByTestId("expired-view").getByRole("button", { name: "Reconnect" });
+  await button.click();
+  await expect(button).toBeEnabled();
+  await expect(page.getByTestId("expired-view")).toBeVisible();
+});
+
+test("the popup explains the expired connection and offers Reconnect and Logout", async ({ context, session, worker, openTwitch, extensionId }) => {
+  await seedSnapshot(worker);
+  await stubExpiredLogin(context, worker);
+  const page = await openTwitch();
+  await expect(page.getByTestId("expired-view")).toBeVisible({ timeout: 8_000 });
+
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
+  await expect(popup.getByText("connection to Twitch has expired")).toBeVisible();
+  await expect(popup.getByRole("button", { name: "Logout" })).toBeVisible();
+  await popup.getByRole("button", { name: "Reconnect" }).click();
+  await expect(popup.getByText("connection to Twitch has expired")).toHaveCount(0, { timeout: 8_000 });
+  expect((await worker.evaluate(() => chrome.storage.local.get("twitchToken"))).twitchToken).toBe("renewed-token");
+});
+
+test("signed out of Twitch takes priority over an expired connection", async ({ context, session, worker, openTwitch }) => {
+  await seedSnapshot(worker);
+  await stubExpiredLogin(context, worker);
+  await worker.evaluate(() => chrome.storage.local.set({ snapshotError: "unauthorized" }));
+  await context.clearCookies({ name: "twilight-user" });
+  const page = await openTwitch();
+  await expect(page.locator("#__root")).toContainText("Sign in to Twitch to see your groups");
+  await expect(page.getByTestId("expired-view")).toHaveCount(0);
 });
 
 test("a Twitch outage keeps showing the last snapshot", async ({ context, session, worker, openTwitch }) => {
