@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { readPageAccount } from "../src/pages/shared/twitch/pageAccount";
+import { isAccountSwitch, readPageAccount } from "../src/pages/shared/twitch/pageAccount";
 
 const twilight = (value: unknown) => `twilight-user=${encodeURIComponent(typeof value === "string" ? value : JSON.stringify(value))}`;
 const user = { authToken: "secret-auth-token", displayName: "Fixture_Viewer", id: "999", login: "fixture_viewer", roles: {}, version: 2 };
@@ -35,5 +35,27 @@ test.describe("readPageAccount", () => {
 
   test("a cookie name that only ends in twilight-user is not the right cookie", () => {
     expect(readPageAccount(`not-twilight-user=${encodeURIComponent(JSON.stringify(user))}`)).toEqual({ status: "signed_out" });
+  });
+});
+
+test.describe("isAccountSwitch", () => {
+  const signedIn = (id: string) => ({ status: "signed_in" as const, id, login: "x", seenAt: 1 });
+
+  test("is true only when a different account is signed in", () => {
+    expect(isAccountSwitch(signedIn("123"), "999")).toBe(true);
+  });
+
+  test("is false for the same account", () => {
+    expect(isAccountSwitch(signedIn("999"), "999")).toBe(false);
+  });
+
+  test("is false when signed out, unknown or never seen: nothing is deleted on a weak signal", () => {
+    expect(isAccountSwitch({ status: "signed_out", seenAt: 1 }, "999")).toBe(false);
+    expect(isAccountSwitch({ status: "unknown", seenAt: 1 }, "999")).toBe(false);
+    expect(isAccountSwitch(undefined, "999")).toBe(false);
+  });
+
+  test("is false when the extension is not connected to anyone", () => {
+    expect(isAccountSwitch(signedIn("123"), undefined)).toBe(false);
   });
 });

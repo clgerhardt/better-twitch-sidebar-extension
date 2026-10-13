@@ -26,3 +26,8 @@ export const readPageAccount = (cookieString: string): PageAccount => {
     return { status: "unknown" };
   }
 };
+
+// A different account is signed in on twitch.tv than the one the extension is connected as. Only a
+// signed-in account counts: signed out, unknown or never seen is too weak a signal to delete anything.
+export const isAccountSwitch = (page: PageAccount | undefined, connectedUserId: string | undefined): boolean =>
+  page?.status === "signed_in" && !!connectedUserId && page.id !== connectedUserId;

@@ -12,10 +12,12 @@ import { getGlobalState, updateSidebarState } from "./utils";
 import { resolveGlobalState, shouldClearStorage } from "./installState";
 import { connectTwitch } from "./auth";
 import { refreshChannels } from "./refresh";
+import { watchAccountSwitch } from "./accountSwitch";
 import { MESSAGES } from "../shared/messages";
 
 messageLogger(constants.location.BACKGROUND, "background script loaded");
 attachStorageListener();
+watchAccountSwitch();
 
 chrome.runtime.onInstalled.addListener(async (details) => {
   messageLogger(
