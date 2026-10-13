@@ -1,13 +1,12 @@
 import { GlobalState } from "../models/GlobalState";
-import { FOLLOWED_CHANNELS_KEY, SIDEBAR_STATE_KEY, constants } from "../utils/constants";
+import { LEGACY_STORAGE_KEYS, constants } from "../utils/constants";
 import { messageLogger } from "../utils/logger";
 
 import {
-  getLocalStorage,
   setLocalStorage,
   clearAllStorage
 } from "./storage";
-import { getGlobalState, updateSidebarState } from "./utils";
+import { getGlobalState } from "./utils";
 import { resolveGlobalState, shouldClearStorage } from "./installState";
 import { connectTwitch } from "./auth";
 import { refreshChannels } from "./refresh";
@@ -16,6 +15,9 @@ import { MESSAGES } from "../shared/messages";
 
 messageLogger(constants.location.BACKGROUND, "background script loaded");
 watchAccountSwitch();
+// Data older versions left behind (a copy of the group list that could hold a previous account's
+// channels, and per-tab sidebar state). Cheap, so it runs every time the worker starts.
+void chrome.storage.local.remove(LEGACY_STORAGE_KEYS);
 
 chrome.runtime.onInstalled.addListener(async (details) => {
   messageLogger(
@@ -27,9 +29,6 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     if (shouldClearStorage(details.reason)) {
       await clearAllStorage();
     }
-
-    // Older versions kept a copy of the group list here, which could hold a previous account's channels
-    await chrome.storage.local.remove(FOLLOWED_CHANNELS_KEY);
 
     const existing = (await getGlobalState().catch(() => undefined)) as Partial<GlobalState> | undefined;
     const isoNow = new Date().toISOString();
@@ -45,11 +44,6 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       constants.storage.globalState,
       resolveGlobalState(details.reason, existing, defaults)
     );
-
-    const sidebarState = await getLocalStorage(SIDEBAR_STATE_KEY).catch(() => undefined);
-    if (!sidebarState) {
-      await setLocalStorage(SIDEBAR_STATE_KEY, []);
-    }
   } catch (error) {
     console.error("Error during onInstalled:", error);
   }
@@ -68,34 +62,5 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   if (request?.type === MESSAGES.REFRESH_CHANNELS) {
     refreshChannels(request.force === true).then(sendResponse);
     return true;
-  }
-});
-
-chrome.tabs.onRemoved.addListener(async (tabId) => {
-  try {
-    const data: any = await getLocalStorage(SIDEBAR_STATE_KEY);
-    if (data && data[tabId] !== undefined) {
-      delete data[tabId];
-      await setLocalStorage(SIDEBAR_STATE_KEY, data);
-    }
-  } catch (error) {
-    console.error("Error during tab removal:", error);
-  }
-});
-
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (changeInfo.status === "complete" && tab.active && tab.url?.includes("https://twitch.tv")) {
-    try {
-      const data: any = await getLocalStorage(constants.storage.sideBarStateByTab);
-      if (data && data[tabId.toString()] === undefined) {
-        const newState = {
-          sidebarExpanded: true,
-          initialDocStateIdentified: false,
-        };
-        await updateSidebarState(tabId, newState);
-      }
-    } catch (error) {
-      console.error("Error during tab update:", error);
-    }
   }
 });

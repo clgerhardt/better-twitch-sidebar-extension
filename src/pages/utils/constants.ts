@@ -19,7 +19,6 @@ export const constants = {
   storage: {
     generalKey: 'bttvSidebar',
     prefix: 'bttvSidebar_',
-    sideBarStateByTab: 'sideBarStateByTab',
     globalState: 'globalState',
     followedChannels: 'followedChannels',
     channelGroups: 'channelGroups',
@@ -27,18 +26,16 @@ export const constants = {
   },
   htmlSearchStrings: {
     ARIA_LABEL_RECOMMENDED_CHANNELS: '[aria-label="Live Channels"]'
-  },
-  portMessages: {
-    FOLLOWED_CHANNELS_LOADED: 'SYS:Followers:FOLLOWED_CHANNELS_LOADED'
   }
 };
 
 // constants.js
 export const STORAGE_PREFIX = constants.storage.prefix;
 export const GLOBAL_STATE_KEY = constants.storage.globalState;
-export const SIDEBAR_STATE_KEY = STORAGE_PREFIX + constants.storage.sideBarStateByTab;
 // Older versions stored a derived group list here; it is only ever removed now (on logout and update)
 export const FOLLOWED_CHANNELS_KEY = constants.storage.followedChannels;
+// Everything older versions stored that nothing uses now; removed whenever the background starts
+export const LEGACY_STORAGE_KEYS = [FOLLOWED_CHANNELS_KEY, 'sideBarStateByTab', STORAGE_PREFIX + 'sideBarStateByTab'];
 export const CHANNEL_GROUPS_KEY = constants.storage.channelGroups;
 export const GROUP_NAMES_KEY = constants.storage.groupNames;
 // When the stored Twitch token stops working (ms since epoch), from Twitch's own validate call

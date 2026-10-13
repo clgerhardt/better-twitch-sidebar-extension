@@ -15,7 +15,6 @@ Chrome MV3 extension (Vite, React, TypeScript, Tailwind) that adds channel group
 - Reload with `chrome.runtime.reload()` evaluated on an extension page (e.g. open the options page as a tab, then close it). Storage is kept. The profile needs Developer mode on (ask the user to enable it at `chrome://extensions`), otherwise Chrome disables the extension on reload (`unsupportedDeveloperExtension`)
 - `Extensions.uninstall` then `loadUnpacked` gives a clean state: uninstalling wipes the extension's storage, including the Twitch token
 - Never log in or enter credentials. Ask the user to log in inside the test window, or use seeded fixtures
-- Test the popup through the real toolbar action. Opening `popup/index.html` as a tab makes it the "active tab", which breaks the background (it uses `tabs.query({active: true})`)
 - `onInstalled` only clears storage on a genuine install; reloads and updates keep it
 - Background tabs throttle CSS transitions, so screenshots can show half-faded UI. Call `Page.bringToFront` before capturing
 - The service worker goes idle and disappears from `/json/list`. Read extension storage from an extension page instead

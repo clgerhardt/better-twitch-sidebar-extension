@@ -275,13 +275,34 @@ test("Manage Groups lists the channels from the snapshot, grouped, without a sto
 
 const manageButton = (page: Page) => page.locator("#__manage-groups-root").getByRole("button", { name: "Manage Groups" });
 
-test("loading a Twitch page stores no per-tab sidebar state", async ({ twitchPage, worker }) => {
+test("no per-tab sidebar state is stored", async ({ twitchPage, worker }) => {
   await expect(manageButton(twitchPage)).toHaveCount(1);
-  // The background still creates an empty list on install (removed in a later phase); no tab may have an entry
-  const stored = await worker.evaluate(() => chrome.storage.local.get(null));
-  for (const [key, value] of Object.entries(stored)) {
-    if (key.includes("sideBarStateByTab")) expect(Object.keys(value as object), key).toEqual([]);
-  }
+  await setSideNavLabel(twitchPage, "Expand Side Nav");
+  await expect(manageButton(twitchPage)).toHaveCount(0, { timeout: 5_000 });
+  const keys = Object.keys(await worker.evaluate(() => chrome.storage.local.get(null)));
+  expect(keys.filter((key) => key.includes("sideBarStateByTab"))).toEqual([]);
+});
+
+test("data left behind by older versions is removed when the background starts", async ({ session, context, worker, extensionId }) => {
+  await worker.evaluate(() =>
+    chrome.storage.local.set({
+      followedChannels: [{ groupName: "Old", followedChannels: [] }],
+      sideBarStateByTab: { "1": { sidebarExpanded: true } },
+      bttvSidebar_sideBarStateByTab: { "2": { sidebarExpanded: true } },
+    })
+  );
+  // Stop the worker; the message below wakes it, and it cleans up as it starts
+  const page = await context.newPage();
+  await page.goto(`chrome-extension://${extensionId}/src/pages/options/index.html`);
+  const cdp = await context.newCDPSession(page);
+  await cdp.send("ServiceWorker.enable");
+  await cdp.send("ServiceWorker.stopAllWorkers");
+  await page.waitForTimeout(1_000);
+  await page.evaluate(() => chrome.runtime.sendMessage({ type: "REFRESH_CHANNELS" }));
+
+  await expect
+    .poll(async () => Object.keys(await page.evaluate(() => chrome.storage.local.get(null))).filter((key) => ["followedChannels", "sideBarStateByTab", "bttvSidebar_sideBarStateByTab"].includes(key)))
+    .toEqual([]);
 });
 
 test("a tab in the background follows its own collapse button", async ({ twitchPage, openTwitch }) => {
