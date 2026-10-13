@@ -38,12 +38,13 @@ const setup = (
   stored: Record<string, any> = connected,
   overrides: Record<string, (...args: any[]) => any> = {},
   start = 1_000_000,
-  renewToken?: (data: Record<string, any>) => Promise<string | null>
+  renewToken?: (data: Record<string, any>) => Promise<string | null>,
+  isPaused?: () => Promise<boolean>
 ) => {
   let time = start;
   const mem = memoryStorage(stored);
   const { client, calls } = fakeClient(overrides);
-  const refresher = createRefresher({ client, storage: mem.storage, now: () => time, renewToken: renewToken && (() => renewToken(mem.data)) });
+  const refresher = createRefresher({ client, storage: mem.storage, now: () => time, renewToken: renewToken && (() => renewToken(mem.data)), isPaused });
   return { refresher, calls, data: mem.data, advance: (ms: number) => (time += ms), now: () => time };
 };
 
@@ -193,6 +194,18 @@ test.describe("refresh", () => {
     fail(new HelixError("unauthorized", "x", 401));
     expect(await pending).toEqual({ ok: false, reason: "discarded" });
     expect(t.data.snapshotError).toBeUndefined();
+  });
+
+  test("nothing is fetched or recorded while paused (signed out of Twitch)", async () => {
+    let paused = true;
+    const t = setup(connected, {}, 1_000_000, undefined, async () => paused);
+    expect(await t.refresher.refresh(true)).toEqual({ ok: false, reason: "paused" });
+    expect(t.calls).toEqual([]);
+    expect(t.data.channelSnapshot).toBeUndefined();
+    expect(t.data.snapshotError).toBeUndefined();
+
+    paused = false;
+    expect(await t.refresher.refresh(true)).toMatchObject({ ok: true });
   });
 
   test.describe("a rejected token", () => {

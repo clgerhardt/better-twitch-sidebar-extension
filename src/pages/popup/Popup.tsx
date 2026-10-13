@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import UserGreeting from "./UserGreeting/UserGreeting";
 import GuestGreeting from "./GuestGreeting/GuestGreeting";
+import SignedOutGreeting from "./SignedOutGreeting/SignedOutGreeting";
+import { usePageAccount } from "../content/hooks/usePageAccount";
 import { messageLogger } from "../utils/logger";
 import { constants } from "../utils/constants";
 import { useTwitchToken } from "../content/hooks/userTwitchToken";
@@ -21,6 +23,7 @@ const Popup = () => {
   );
 
   const twitchToken = useTwitchToken();
+  const pageAccount = usePageAccount();
 
   const logout = async () => {
     await logoutTwitch();
@@ -90,10 +93,14 @@ const Popup = () => {
     <div id="main-container" className="p-4 text-sm text-gray-200">
       {twitchToken ? (
         <>
-          <UserGreeting
-            userName={userSession?.user}
-            userImage={userSession?.userImage}
-          />
+          {pageAccount?.status === "signed_out" ? (
+            <SignedOutGreeting />
+          ) : (
+            <UserGreeting
+              userName={userSession?.user}
+              userImage={userSession?.userImage}
+            />
+          )}
           <button
             onClick={logout}
             className="bg-red-500 text-white px-3 py-1 rounded mt-4"

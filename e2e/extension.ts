@@ -84,6 +84,10 @@ export const test = base.extend<Fixtures & Options>({
       args: [`--disable-extensions-except=${EXTENSION_PATH}`, `--load-extension=${EXTENSION_PATH}`],
     });
     await stubTwitch(context);
+    // The browser is signed in to the same fake Twitch account the extension is connected as
+    await context.addCookies([
+      { name: "twilight-user", value: encodeURIComponent(JSON.stringify({ id: "999", login: "fixture_viewer", displayName: "Fixture_Viewer" })), url: "https://www.twitch.tv/" },
+    ]);
     if (removeStories) {
       await context.addInitScript(() => {
         document.addEventListener("DOMContentLoaded", () => {

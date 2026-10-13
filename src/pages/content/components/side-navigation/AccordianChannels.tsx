@@ -18,12 +18,15 @@ import { messageLogger } from "@src/pages/utils/logger";
 import { constants } from "@src/pages/utils/constants";
 import { useSidebarGroups } from "../../hooks/useSidebarGroups";
 import RefreshProgress from "./RefreshProgress";
+import SignedOutContent from "./SignedOutContent";
+import { usePageAccount } from "../../hooks/usePageAccount";
 import ChannelRow from "./ChannelRow";
 import { useNativeRowsVersion } from "../../hooks/useNativeRows";
 
 const AccordianChannels = ({ tabId }: { tabId: string }) => {
   const isSidebarExpanded = useSidebarState(tabId);
   const globalState = useGlobalState();
+  const pageAccount = usePageAccount();
   const { groups, loading, error, fetchedAt } = useSidebarGroups();
   const [visibleGroups, setVisibleGroups] = useState(groups);
 
@@ -36,6 +39,10 @@ const AccordianChannels = ({ tabId }: { tabId: string }) => {
 
   if (!globalState.loggedIn) {
     return <div><NotLoggedInContent isSidebarExpanded={isSidebarExpanded} /></div>
+  }
+
+  if (pageAccount?.status === "signed_out") {
+    return <SignedOutContent isSidebarExpanded={isSidebarExpanded} />;
   }
 
   if (loading) {

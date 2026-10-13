@@ -2,7 +2,7 @@ import { createHelixClient } from "../shared/twitch/helix";
 import { createRefresher, type RefreshStorage } from "../shared/twitch/refresh";
 import { trySilentReauth } from "../content/utils/getValidTwitchToken";
 import { messageLogger } from "../utils/logger";
-import { constants, TWITCH_LOGGED_OUT_KEY } from "../utils/constants";
+import { constants, PAGE_ACCOUNT_KEY, TWITCH_LOGGED_OUT_KEY } from "../utils/constants";
 
 // The only place that talks to the Twitch API. Everything else reads the stored snapshot.
 const storage: RefreshStorage = {
@@ -24,6 +24,8 @@ const refresher = createRefresher({
   client,
   storage,
   now: () => Date.now(),
+  // Signed out of Twitch: keep everything, fetch nothing until someone signs in
+  isPaused: async () => (await chrome.storage.local.get(PAGE_ACCOUNT_KEY))[PAGE_ACCOUNT_KEY]?.status === "signed_out",
   // A quiet login (no window) works while the browser still has a Twitch session for this account
   renewToken: async () => {
     if ((await chrome.storage.local.get(TWITCH_LOGGED_OUT_KEY))[TWITCH_LOGGED_OUT_KEY]) return null;

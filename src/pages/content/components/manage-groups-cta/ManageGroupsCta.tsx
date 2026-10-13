@@ -1,18 +1,20 @@
 import { useState } from "react";
 import useFollowedChannels from "../../hooks/useFollowedChannels";
 import useSidebarState from "../../hooks/useSidebarState";
+import { usePageAccount } from "../../hooks/usePageAccount";
 import ManageFollowedChannelsDialog from "../groups-dialog/ManageGroupsDialog";
 
 const ManageGroupsCTA = ({ tabId }: { tabId: string }) => {
   const [openDialog, setOpenDialog] = useState(false);
   const followedChannels = useFollowedChannels();
   const isSidebarExpanded = useSidebarState(tabId);
+  const pageAccount = usePageAccount();
 
   const handleToggleDialog = () => {
     setOpenDialog((prev) => !prev);
   };
 
-  if (!isSidebarExpanded) return null;
+  if (!isSidebarExpanded || pageAccount?.status === "signed_out") return null;
 
   return (
     <div className="m-1">

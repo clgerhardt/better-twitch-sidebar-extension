@@ -19,13 +19,15 @@ export type RefreshStorage = {
   remove: (keys: string[]) => Promise<void>;
 };
 
-export type RefreshFailure = "not_connected" | "unauthorized" | "rate_limited" | "failed" | "discarded";
+export type RefreshFailure = "not_connected" | "unauthorized" | "rate_limited" | "failed" | "discarded" | "paused";
 export type RefreshResult = { ok: true; skipped?: boolean } | { ok: false; reason: RefreshFailure };
 
 type Deps = {
   client: Pick<HelixClient, "getFollowedChannels" | "getUsers" | "getLiveFollowed">;
   storage: RefreshStorage;
   now: () => number;
+  // True while refreshing must not happen (the browser is signed out of Twitch): nothing is fetched or recorded
+  isPaused?: () => Promise<boolean>;
   // Gets a new token for the same account after Twitch rejected the stored one, writes it to
   // storage and returns it; null when that is not possible (the user must reconnect)
   renewToken?: () => Promise<string | null>;
@@ -46,6 +48,7 @@ export const createRefresher = (deps: Deps) => {
     const token: string | undefined = stored.twitchToken;
     const userId: string | undefined = stored.twitchUserId;
     if (!token || !userId) return { ok: false, reason: "not_connected" };
+    if (await deps.isPaused?.()) return { ok: false, reason: "paused" };
 
     const existing = isSnapshotFor(stored[CHANNEL_SNAPSHOT_KEY], userId) ? stored[CHANNEL_SNAPSHOT_KEY] : undefined;
     if (existing && !force && now() - existing.fetchedAt < MIN_REFRESH_AGE_MS) return { ok: true, skipped: true };
