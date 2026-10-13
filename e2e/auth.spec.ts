@@ -305,3 +305,19 @@ test("the logged-out popup asks to sign in to Twitch when nobody is signed in", 
   const popup = await guestPopup(context, worker, extensionId, { status: "signed_out", seenAt: Date.now() });
   await expect(popup.getByText("Sign in to Twitch in a tab")).toBeVisible();
 });
+
+test("the popup does not open a port to the background", async ({ twitchPage, context, extensionId }) => {
+  const popup: Page = await context.newPage();
+  await popup.addInitScript(() => {
+    (window as any).__connects = 0;
+    const connect = chrome.runtime.connect.bind(chrome.runtime);
+    (chrome.runtime as any).connect = (...args: any[]) => {
+      (window as any).__connects++;
+      return (connect as any)(...args);
+    };
+  });
+  await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
+  await expect(popup.getByRole("button", { name: "Logout" })).toBeVisible();
+  await popup.waitForTimeout(500);
+  expect(await popup.evaluate(() => (window as any).__connects)).toBe(0);
+});

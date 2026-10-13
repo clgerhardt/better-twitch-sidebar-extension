@@ -153,40 +153,6 @@ chrome.runtime.onConnect.addListener((port) => {
     });
   }
 
-  if (port.name === "popup") {
-    port.onMessage.addListener(async (response) => {
-      messageLogger(
-        constants.location.BACKGROUND,
-        "popup posted message",
-        response
-      );
-      try {
-        switch (response.message) {
-          case "SYS:User:LoggedIn":
-            // eslint-disable-next-line no-case-declarations
-            messageLogger(constants.location.BACKGROUND, "User logged in", response);
-            const storageGlobalState: any = await getGlobalState();
-            if (!storageGlobalState.loggedIn) {
-              await setLocalStorage(constants.storage.globalState, {
-                ...storageGlobalState,
-                loggedIn: true,
-                lastUpdated: new Date().toISOString(),
-              });
-            }
-            break;
-          default:
-            messageLogger(
-              constants.location.BACKGROUND,
-              "no action found for popup message",
-              response
-            );
-        }
-      } catch (error) {
-        messageLogger(constants.location.BACKGROUND, "Error in popup message handling", error);
-      }
-    });
-  }
-
   port.onDisconnect.addListener(() => {
     messageLogger(constants.location.BACKGROUND, `Disconnected: ${port.name} at ${new Date(Date.now()).toLocaleString()}`);
   });

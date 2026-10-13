@@ -18,7 +18,6 @@ type UserSession = {
 };
 
 const Popup = () => {
-  const port = chrome.runtime.connect({ name: "popup" });
   const [userSession, setUserSession] = useState<UserSession | null>(null);
   const [isIncognito, setIsIncognito] = useState<boolean | null>(
     chrome.extension.inIncognitoContext
@@ -53,7 +52,6 @@ const Popup = () => {
         const user = userData.display_name;
         const userImage = userData.profile_image_url;
         setUserSession({ user, userImage });
-        port.postMessage({ message: "SYS:User:LoggedIn", user });
         messageLogger(constants.location.POPUP, "Fetched Twitch user", user);
         chrome.storage.local.set({ twitchUserId: userData.id });
       }
