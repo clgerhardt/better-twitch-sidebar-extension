@@ -3,7 +3,6 @@ import { FOLLOWED_CHANNELS_KEY, SIDEBAR_STATE_KEY, constants } from "../utils/co
 import { messageLogger } from "../utils/logger";
 
 import {
-  attachStorageListener,
   getLocalStorage,
   setLocalStorage,
   clearAllStorage
@@ -16,7 +15,6 @@ import { watchAccountSwitch } from "./accountSwitch";
 import { MESSAGES } from "../shared/messages";
 
 messageLogger(constants.location.BACKGROUND, "background script loaded");
-attachStorageListener();
 watchAccountSwitch();
 
 chrome.runtime.onInstalled.addListener(async (details) => {

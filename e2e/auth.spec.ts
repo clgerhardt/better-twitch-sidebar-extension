@@ -320,3 +320,12 @@ test("the popup does not open a port to the background", async ({ twitchPage, co
   await popup.waitForTimeout(500);
   expect(await popup.evaluate(() => (window as any).__connects)).toBe(0);
 });
+
+test("the service worker never writes the token or other stored values to its console", async ({ twitchPage, worker }) => {
+  const logged: string[] = [];
+  worker.on("console", (message) => logged.push(message.text()));
+  await worker.evaluate(() => chrome.storage.local.set({ twitchToken: "secret-token-value", groupNames: ["Friends"] }));
+  await twitchPage.waitForTimeout(500);
+  expect(logged.join("\n")).not.toContain("secret-token-value");
+  expect(logged.join("\n")).not.toContain("Friends");
+});
