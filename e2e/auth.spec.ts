@@ -279,3 +279,22 @@ test("a token past its real expiry is renewed quietly and the new expiry is stor
   const { tokenExpiresAt } = await worker.evaluate(() => chrome.storage.local.get("tokenExpiresAt"));
   expect(tokenExpiresAt).toBeGreaterThan(Date.now() + 50 * 24 * 60 * 60 * 1000);
 });
+
+const guestPopup = async (context: any, worker: Worker, extensionId: string, pageAccount: unknown) => {
+  await worker.evaluate((account) => chrome.storage.local.set({ pageAccount: account }), pageAccount);
+  const popup = await openPopup(context, extensionId);
+  await popup.getByRole("button", { name: "Logout" }).click();
+  await expect(popup.getByRole("button", { name: "Connect Twitch" })).toBeVisible();
+  return popup;
+};
+
+test("the logged-out popup names the Twitch account that is signed in", async ({ twitchPage, context, worker, extensionId }) => {
+  const popup = await guestPopup(context, worker, extensionId, { status: "signed_in", id: "999", login: "fixture_viewer", seenAt: Date.now() });
+  await expect(popup.getByText("You're signed in to Twitch as fixture_viewer")).toBeVisible();
+  await expect(popup.getByText(/need to login to twitch/i)).toHaveCount(0);
+});
+
+test("the logged-out popup asks to sign in to Twitch when nobody is signed in", async ({ twitchPage, context, worker, extensionId }) => {
+  const popup = await guestPopup(context, worker, extensionId, { status: "signed_out", seenAt: Date.now() });
+  await expect(popup.getByText("Sign in to Twitch in a tab")).toBeVisible();
+});
