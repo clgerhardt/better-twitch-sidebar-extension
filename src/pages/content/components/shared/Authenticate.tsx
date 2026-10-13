@@ -4,15 +4,9 @@ import { constants } from "@src/pages/utils/constants";
 import { useTwitchToken } from "../../hooks/userTwitchToken";
 import { MESSAGES } from "../../../shared/messages";
 import { usePageAccount } from "../../hooks/usePageAccount";
+import { connectErrorMessage } from "../../../shared/twitch/connectMessages";
 
 const CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID;
-
-const connectErrorMessage = (reason?: string) =>
-  reason === "wrong_account"
-    ? "That is not the account signed in to Twitch. Sign in to Twitch as the account you want, then try again."
-    : reason === "not_signed_in"
-      ? "Sign in to Twitch in a tab first."
-      : "Could not connect to Twitch. Please try again.";
 
 const Authenticate = ({ isSidebarExpanded }: { isSidebarExpanded: any }) => {
   const [tokenChecked, setTokenChecked] = useState(false);

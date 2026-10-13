@@ -3,6 +3,7 @@ import useFollowedChannels from "../../hooks/useFollowedChannels";
 import useSidebarState from "../../hooks/useSidebarState";
 import { usePageAccount } from "../../hooks/usePageAccount";
 import { useNeedsReconnect } from "../../hooks/useNeedsReconnect";
+import useGlobalState from "../../hooks/useGlobalState";
 import ManageFollowedChannelsDialog from "../groups-dialog/ManageGroupsDialog";
 
 const ManageGroupsCTA = ({ tabId }: { tabId: string }) => {
@@ -11,12 +12,13 @@ const ManageGroupsCTA = ({ tabId }: { tabId: string }) => {
   const isSidebarExpanded = useSidebarState(tabId);
   const pageAccount = usePageAccount();
   const needsReconnect = useNeedsReconnect();
+  const globalState = useGlobalState();
 
   const handleToggleDialog = () => {
     setOpenDialog((prev) => !prev);
   };
 
-  if (!isSidebarExpanded || pageAccount?.status === "signed_out" || needsReconnect) return null;
+  if (!isSidebarExpanded || pageAccount?.status === "signed_out" || needsReconnect || !globalState.loggedIn) return null;
 
   return (
     <div className="m-1">

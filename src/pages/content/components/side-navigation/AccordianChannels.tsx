@@ -13,7 +13,7 @@ import {
 } from "@heroicons/react/24/outline";
 import useSidebarState from "../../hooks/useSidebarState";
 import useGlobalState from "../../hooks/useGlobalState";
-import NotLoggedInContent from "./NotLoggedInContent";
+import NotConnectedContent from "./NotConnectedContent";
 import { messageLogger } from "@src/pages/utils/logger";
 import { constants } from "@src/pages/utils/constants";
 import { useSidebarGroups } from "../../hooks/useSidebarGroups";
@@ -40,12 +40,12 @@ const AccordianChannels = ({ tabId }: { tabId: string }) => {
     setVisibleGroups(groups); // ensure re-render if `groups` is a stable reference
   }, [groups]);
 
-  if (!globalState.loggedIn) {
-    return <div><NotLoggedInContent isSidebarExpanded={isSidebarExpanded} /></div>
-  }
-
   if (pageAccount?.status === "signed_out") {
     return <SignedOutContent isSidebarExpanded={isSidebarExpanded} />;
+  }
+
+  if (!globalState.loggedIn) {
+    return <NotConnectedContent isSidebarExpanded={isSidebarExpanded} />;
   }
 
   if (needsReconnect) {
@@ -57,7 +57,7 @@ const AccordianChannels = ({ tabId }: { tabId: string }) => {
   }
 
   if (error === "Missing Twitch credentials") {
-    return <NotLoggedInContent isSidebarExpanded={isSidebarExpanded} />;
+    return <NotConnectedContent isSidebarExpanded={isSidebarExpanded} />;
   }
 
   if (error) {

@@ -28,7 +28,7 @@ test("logging out stays logged out, even while Twitch still has a session", asyn
   await expect(popup.getByRole("button", { name: "Connect for fixture_viewer" })).toBeVisible();
 
   // The sidebar goes back to the logged-out view
-  await expect(twitchPage.locator("#__root")).toContainText("not logged in");
+  await expect(twitchPage.locator("#__root")).toContainText("Connect for fixture_viewer");
 });
 
 test("logging out revokes the token with Twitch", async ({ twitchPage, context, extensionId }) => {
@@ -228,7 +228,7 @@ test("after connecting, the sidebar shows loading and not the logged-out intro w
   const popup = await openPopup(context, extensionId);
   await popup.getByRole("button", { name: "Logout" }).click();
   await expect(popup.getByRole("button", { name: "Connect for fixture_viewer" })).toBeVisible();
-  await expect(twitchPage.locator("#__root")).toContainText("not logged in");
+  await expect(twitchPage.locator("#__root")).toContainText("Connect for fixture_viewer");
 
   // A slow follow list, like the real Twitch API
   await context.route("https://api.twitch.tv/helix/channels/followed*", async (route) => {
@@ -242,7 +242,7 @@ test("after connecting, the sidebar shows loading and not the logged-out intro w
   // Mid-download: the account is connected, so the intro must be gone
   await twitchPage.waitForTimeout(400);
   const sidebarText = await twitchPage.locator("#__root").innerText();
-  expect(sidebarText).not.toContain("not logged in");
+  expect(sidebarText).not.toContain("Connect for");
   expect(sidebarText).toContain("Loading");
 
   await expect(twitchPage.locator("#__root")).toContainText("Ungrouped", { timeout: 8_000 });
