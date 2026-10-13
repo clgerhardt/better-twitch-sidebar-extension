@@ -42,6 +42,8 @@ export const CHANNEL_GROUPS_KEY = constants.storage.channelGroups;
 export const GROUP_NAMES_KEY = constants.storage.groupNames;
 // When the stored Twitch token stops working (ms since epoch), from Twitch's own validate call
 export const TOKEN_EXPIRES_AT_KEY = 'tokenExpiresAt';
+// The Twitch account signed in on twitch.tv, as seen by the content script: { status, id?, login?, seenAt }
+export const PAGE_ACCOUNT_KEY = 'pageAccount';
 // True after an explicit logout: stops silent re-login until the user connects again
 export const TWITCH_LOGGED_OUT_KEY = 'twitchLoggedOut';
 // The channels fetched from Twitch for the connected user (written only by the background)

@@ -8,6 +8,7 @@ import ManageGroups from "./components/manage-groups-cta/ManageGroupsCta";
 import { getLocalStorage, setLocalStorage } from "../background/storage";
 import { getElementBySelector, createElement, insertBefore } from './utils/domUtils';
 import { createMutationObserver } from './observer';
+import { startPageAccountReporting } from "./pageAccount";
 
 // Global variables
 let port: chrome.runtime.Port;
@@ -227,6 +228,7 @@ try {
     messageLogger(constants.location.CONTENT_SCRIPT, "Dark mode detected");
     isDark.classList.add("dark");
   }
+  startPageAccountReporting();
   connectToBackground();
   addMessageListener();
   setInterval(() => {
