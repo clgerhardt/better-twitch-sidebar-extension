@@ -2,7 +2,6 @@ import { messageLogger } from "@src/pages/utils/logger";
 import {
   CHANNEL_GROUPS_KEY,
   CHANNEL_SNAPSHOT_KEY,
-  FOLLOWED_CHANNELS_KEY,
   GROUP_NAMES_KEY,
   SNAPSHOT_ERROR_KEY,
 } from "@src/pages/utils/constants";
@@ -54,7 +53,6 @@ export const useSidebarGroups = (): {
       setChannelGroups(result.channelGroups);
       setGroups(result.groups);
       setError(null);
-      chrome.storage.local.set({ [FOLLOWED_CHANNELS_KEY]: result.groups });
     });
   };
 

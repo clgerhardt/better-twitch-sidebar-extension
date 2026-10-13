@@ -1,5 +1,5 @@
 import { GlobalState } from "../models/GlobalState";
-import { SIDEBAR_STATE_KEY, constants } from "../utils/constants";
+import { FOLLOWED_CHANNELS_KEY, SIDEBAR_STATE_KEY, constants } from "../utils/constants";
 import { messageLogger } from "../utils/logger";
 
 import {
@@ -29,6 +29,9 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     if (shouldClearStorage(details.reason)) {
       await clearAllStorage();
     }
+
+    // Older versions kept a copy of the group list here, which could hold a previous account's channels
+    await chrome.storage.local.remove(FOLLOWED_CHANNELS_KEY);
 
     const existing = (await getGlobalState().catch(() => undefined)) as Partial<GlobalState> | undefined;
     const isoNow = new Date().toISOString();

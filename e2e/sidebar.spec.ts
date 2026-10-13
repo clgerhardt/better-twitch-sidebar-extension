@@ -231,3 +231,17 @@ test("collapse and expand are still reported after the background reconnects", a
   await setSideNavLabel(twitchPage, "Expand Side Nav");
   await expect(manage).toHaveCount(0, { timeout: 5_000 });
 });
+
+test("the sidebar does not store a second copy of the group list", async ({ twitchPage, worker }) => {
+  await expect(twitchPage.locator("#__root")).toContainText("Ungrouped");
+  await expect.poll(async () => Object.keys(await worker.evaluate(() => chrome.storage.local.get(null)))).toContain("channelSnapshot");
+  expect(Object.keys(await worker.evaluate(() => chrome.storage.local.get(null)))).not.toContain("followedChannels");
+});
+
+test("Manage Groups lists the channels from the snapshot, grouped, without a stored group list", async ({ twitchPage, worker }) => {
+  await worker.evaluate(() => chrome.storage.local.set({ groupNames: ["Friends"], channelGroups: { fixture_live: "Friends" } }));
+  await twitchPage.getByRole("button", { name: "Manage Groups" }).click();
+  const dialog = twitchPage.getByRole("dialog");
+  await expect(dialog).toContainText("Friends");
+  await expect(dialog).toContainText("Ungrouped");
+});

@@ -37,6 +37,7 @@ export const constants = {
 export const STORAGE_PREFIX = constants.storage.prefix;
 export const GLOBAL_STATE_KEY = constants.storage.globalState;
 export const SIDEBAR_STATE_KEY = STORAGE_PREFIX + constants.storage.sideBarStateByTab;
+// Older versions stored a derived group list here; it is only ever removed now (on logout and update)
 export const FOLLOWED_CHANNELS_KEY = constants.storage.followedChannels;
 export const CHANNEL_GROUPS_KEY = constants.storage.channelGroups;
 export const GROUP_NAMES_KEY = constants.storage.groupNames;

@@ -206,7 +206,6 @@ test("cancelling the Twitch login leaves the popup ready to try again", async ({
 test("logging out clears the account's groups and cached follow list", async ({ twitchPage, context, worker, extensionId }) => {
   await worker.evaluate(() => chrome.storage.local.set({ groupNames: ["Zebra Squad"], channelGroups: { fixture_live: "Zebra Squad" } }));
   await expect(twitchPage.locator("#__root")).toContainText("Zebra Squad");
-  expect(Object.keys(await worker.evaluate(() => chrome.storage.local.get(null)))).toContain("followedChannels");
   await expect.poll(async () => Object.keys(await worker.evaluate(() => chrome.storage.local.get(null)))).toContain("channelSnapshot");
 
   const popup = await openPopup(context, extensionId);
