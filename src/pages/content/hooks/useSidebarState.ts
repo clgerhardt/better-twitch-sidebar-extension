@@ -1,51 +1,35 @@
 import { useState, useEffect } from 'react';
-import { getLocalStorage } from "@src/pages/background/storage";
-import { constants } from "@src/pages/utils/constants";
-import { messageLogger } from "@src/pages/utils/logger";
 
-const useSidebarState = (tabId: string) => {
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+// Twitch's own collapse button says which state the side nav is in: its label offers the action
+// that is not the current state. The sidebar is expanded unless the button says "Expand Side Nav"
+// (also when the button cannot be found).
+const SIDE_NAV_ARROW = '[data-a-target="side-nav-arrow"]';
+const SIDE_NAV_BAR = '[data-a-target="side-nav-bar"]';
 
-  useEffect(() => {
-    const fetchSidebarState = async () => {
-      try {
-        const sidebarState: any = await getLocalStorage(constants.storage.prefix + constants.storage.sideBarStateByTab) || {};
-        messageLogger(constants.location.UTIL, "setting side bar state - Fetched sidebar state from local storage", sidebarState[tabId]);
-        setIsSidebarExpanded(sidebarState[tabId]?.sidebarExpanded || false);
+const readExpanded = () => document.querySelector(SIDE_NAV_ARROW)?.getAttribute("aria-label") !== "Expand Side Nav";
 
-        const manageGroupRoot = document.getElementById("__manage-groups-root");
-        if (manageGroupRoot) {
-          manageGroupRoot.style.maxHeight = sidebarState[tabId]?.sidebarExpanded ? "3.5rem" : "0rem";
-        }
-
-        messageLogger(constants.location.UI_COMPONENT, "sideBarState", sidebarState);
-      } catch (e) {
-        console.error("Error fetching sidebar state", e);
-      }
-    };
-
-    fetchSidebarState();
-  }, [tabId]);
+const useSidebarState = () => {
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(readExpanded);
 
   useEffect(() => {
-    const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }) => {
-      for (const [key, { newValue }] of Object.entries(changes)) {
-        if (key === constants.storage.prefix + constants.storage.sideBarStateByTab) {
-          const manageGroupRoot = document.getElementById("__manage-groups-root");
-          if (manageGroupRoot) {
-            manageGroupRoot.style.maxHeight = newValue[tabId]?.sidebarExpanded ? "3.5rem" : "0rem";
-          }
-          messageLogger(constants.location.UTIL, "setting side bar state - local storage changing", newValue[tabId]);
-          setIsSidebarExpanded(newValue[tabId]?.sidebarExpanded || false);
-        }
-      }
+    const apply = () => {
+      const expanded = readExpanded();
+      setIsSidebarExpanded(expanded);
+      const manageGroupRoot = document.getElementById("__manage-groups-root");
+      if (manageGroupRoot) manageGroupRoot.style.maxHeight = expanded ? "3.5rem" : "0rem";
     };
 
-    chrome.storage.onChanged.addListener(handleStorageChange);
-    return () => chrome.storage.onChanged.removeListener(handleStorageChange);
-  }, [tabId]);
-
-  messageLogger(constants.location.UTIL, "useSidebarState", isSidebarExpanded.toString());
+    apply();
+    // The button can be replaced when Twitch re-renders, so watch its container, not the button
+    const observer = new MutationObserver(apply);
+    observer.observe(document.querySelector(SIDE_NAV_BAR) ?? document.body, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ["aria-label"],
+    });
+    return () => observer.disconnect();
+  }, []);
 
   return isSidebarExpanded;
 };

@@ -25,8 +25,8 @@ import ExpiredContent from "./ExpiredContent";
 import ChannelRow from "./ChannelRow";
 import { useNativeRowsVersion } from "../../hooks/useNativeRows";
 
-const AccordianChannels = ({ tabId }: { tabId: string }) => {
-  const isSidebarExpanded = useSidebarState(tabId);
+const AccordianChannels = () => {
+  const isSidebarExpanded = useSidebarState();
   const globalState = useGlobalState();
   const pageAccount = usePageAccount();
   const needsReconnect = useNeedsReconnect();

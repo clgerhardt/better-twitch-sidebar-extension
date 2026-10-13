@@ -6,10 +6,10 @@ import { useNeedsReconnect } from "../../hooks/useNeedsReconnect";
 import useGlobalState from "../../hooks/useGlobalState";
 import ManageFollowedChannelsDialog from "../groups-dialog/ManageGroupsDialog";
 
-const ManageGroupsCTA = ({ tabId }: { tabId: string }) => {
+const ManageGroupsCTA = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const followedChannels = useFollowedChannels();
-  const isSidebarExpanded = useSidebarState(tabId);
+  const isSidebarExpanded = useSidebarState();
   const pageAccount = usePageAccount();
   const needsReconnect = useNeedsReconnect();
   const globalState = useGlobalState();

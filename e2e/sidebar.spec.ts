@@ -245,3 +245,41 @@ test("Manage Groups lists the channels from the snapshot, grouped, without a sto
   await expect(dialog).toContainText("Friends");
   await expect(dialog).toContainText("Ungrouped");
 });
+
+const manageButton = (page: Page) => page.locator("#__manage-groups-root").getByRole("button", { name: "Manage Groups" });
+
+test("loading a Twitch page stores no per-tab sidebar state", async ({ twitchPage, worker }) => {
+  await expect(manageButton(twitchPage)).toHaveCount(1);
+  // The background still creates an empty list on install (removed in a later phase); no tab may have an entry
+  const stored = await worker.evaluate(() => chrome.storage.local.get(null));
+  for (const [key, value] of Object.entries(stored)) {
+    if (key.includes("sideBarStateByTab")) expect(Object.keys(value as object), key).toEqual([]);
+  }
+});
+
+test("a tab in the background follows its own collapse button", async ({ twitchPage, openTwitch }) => {
+  await expect(manageButton(twitchPage)).toHaveCount(1);
+  const front = await openTwitch(); // now the active tab; twitchPage is in the background
+  await front.bringToFront();
+
+  await setSideNavLabel(twitchPage, "Expand Side Nav");
+  await expect(manageButton(twitchPage)).toHaveCount(0, { timeout: 5_000 });
+  await expect(manageButton(front)).toHaveCount(1); // the other tab is untouched
+  await setSideNavLabel(twitchPage, "Collapse Side Nav");
+  await expect(manageButton(twitchPage)).toHaveCount(1, { timeout: 5_000 });
+});
+
+test("a page that loads with the side nav collapsed starts collapsed", async ({ session, context }) => {
+  const page = await context.newPage();
+  await page.addInitScript(() => {
+    document.addEventListener("DOMContentLoaded", () => {
+      document.querySelector("[data-a-target=side-nav-arrow]")?.setAttribute("aria-label", "Expand Side Nav");
+    });
+  });
+  await page.goto("https://www.twitch.tv/");
+  await page.locator("#__root").waitFor({ state: "attached" });
+  await page.waitForTimeout(800);
+  await expect(manageButton(page)).toHaveCount(0);
+  await setSideNavLabel(page, "Collapse Side Nav");
+  await expect(manageButton(page)).toHaveCount(1, { timeout: 5_000 });
+});

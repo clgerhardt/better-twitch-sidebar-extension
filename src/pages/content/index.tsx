@@ -5,7 +5,7 @@ import { messageLogger } from "../utils/logger";
 import { constants, GLOBAL_STATE_KEY } from "../utils/constants";
 import AccordianChannels from "./components/side-navigation/AccordianChannels";
 import ManageGroups from "./components/manage-groups-cta/ManageGroupsCta";
-import { getLocalStorage, setLocalStorage } from "../background/storage";
+import { getLocalStorage } from "../background/storage";
 import { getElementBySelector, createElement, insertBefore } from './utils/domUtils';
 import { createMutationObserver } from './observer';
 import { startPageAccountReporting } from "./pageAccount";
@@ -167,19 +167,6 @@ const connectToBackground = async () => {
 const renderToUI = async (tabId: any) => {
   messageLogger(constants.location.CONTENT_SCRIPT, "Entering renderToUI function with tabId", tabId);
   try {
-    const sideNavBtn = getElementBySelector('[data-a-target="side-nav-arrow"]');
-    const ariaLabel = sideNavBtn?.getAttribute("aria-label");
-    const currentState = ariaLabel === "Expand Side Nav" ? false : true;
-
-    const data: any = await getLocalStorage(constants.storage.prefix + constants.storage.sideBarStateByTab);
-    await setLocalStorage(constants.storage.prefix + constants.storage.sideBarStateByTab, {
-      ...data,
-      [tabId]: {
-        sidebarExpanded: currentState,
-        initialDocStateIdentified: true,
-      },
-    });
-
     const recommendedFollowers = getElementBySelector(constants.htmlSearchStrings.ARIA_LABEL_RECOMMENDED_CHANNELS);
 
     const rootContainer = getElementBySelector("#__root") || createElement("__root");
@@ -188,8 +175,8 @@ const renderToUI = async (tabId: any) => {
     insertBefore(rootContainer, recommendedFollowers);
     insertBefore(manageGroupsContainer, recommendedFollowers);
 
-    getReactRoot(rootContainer).render(<AccordianChannels tabId={tabId} />);
-    getReactRoot(manageGroupsContainer).render(<ManageGroups tabId={tabId} />);
+    getReactRoot(rootContainer).render(<AccordianChannels />);
+    getReactRoot(manageGroupsContainer).render(<ManageGroups />);
 
     messageLogger(constants.location.CONTENT_SCRIPT, "Exiting renderToUI function");
   } catch (error) {
