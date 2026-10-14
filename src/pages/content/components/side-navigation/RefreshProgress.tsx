@@ -8,7 +8,7 @@ const RefreshProgress = ({ fetchedAt }: { fetchedAt: number | null }) => {
   const elapsedMs = Math.max(0, Date.now() - fetchedAt);
 
   return (
-    <div data-testid="refresh-progress" aria-hidden="true" className="h-[3px] w-full overflow-hidden rounded bg-purple-500/20">
+    <div data-testid="refresh-progress" aria-hidden="true" className="mt-4 mb-2 h-[3px] w-full overflow-hidden rounded bg-purple-500/20">
       <div
         key={fetchedAt}
         className="h-full bg-purple-500"

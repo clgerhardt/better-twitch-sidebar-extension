@@ -67,3 +67,13 @@ test("there is no bar when logged out", async ({ session, worker, openTwitch, co
   await expect(popup.getByRole("button", { name: "Connect for fixture_viewer" })).toBeVisible();
   await expect(page.getByTestId("refresh-progress")).toHaveCount(0);
 });
+
+test("the bar keeps clear of the Stories section above it", async ({ twitchPage }) => {
+  await expect(twitchPage.getByTestId("refresh-progress")).toBeVisible();
+  const gap = await twitchPage.evaluate(() => {
+    const stories = document.querySelector("[class*='storiesLeftNavSection']")!.getBoundingClientRect();
+    const bar = document.querySelector("[data-testid=refresh-progress]")!.getBoundingClientRect();
+    return bar.top - stories.bottom;
+  });
+  expect(gap).toBeGreaterThanOrEqual(8);
+});
