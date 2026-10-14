@@ -23,7 +23,7 @@ test("the extension's CSS does not restyle Twitch's own elements", async ({ twit
     imgDisplay: "inline",
     imgMaxWidth: "none",
     linkDecoration: "underline",
-    headingMargin: "18.72px",
+    headingMargin: "11.7px",
     navBoxSizing: "content-box",
     navBorderStyle: "none",
   });
@@ -53,7 +53,7 @@ test("the extension's own UI keeps its styling", async ({ twitchPage }) => {
     manageRadius: "9999px",
     manageBorderStyle: "solid",
     manageBorderWidth: "2px",
-    headerBg: "rgb(168, 85, 247)",
+    headerBg: "color(srgb 0.937255 0.937255 0.945098 / 0.08)",
     headerBoxSizing: "border-box",
   });
 

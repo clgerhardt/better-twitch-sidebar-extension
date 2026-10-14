@@ -1,6 +1,5 @@
 import { createRoot, Root } from "react-dom/client";
 import "./style.css";
-import "react-accessible-accordion/dist/fancy-example.css";
 import { messageLogger } from "../utils/logger";
 import { constants, GLOBAL_STATE_KEY } from "../utils/constants";
 import AccordianChannels from "./components/side-navigation/AccordianChannels";

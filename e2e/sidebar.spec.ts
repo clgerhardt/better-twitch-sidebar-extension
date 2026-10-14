@@ -388,3 +388,95 @@ test("the sidebar needs no background to stay put or to come back", async ({ twi
   await expect(twitchPage.locator("#__root")).toContainText("Ungrouped", { timeout: 5_000 });
   await expect(manageButton(twitchPage)).toHaveCount(1, { timeout: 5_000 });
 });
+
+test.describe("group headers", () => {
+  const header = (page: Page, name: string) => page.locator("#__root").getByRole("button", { name: new RegExp(name) }).first();
+
+  test("are compact rows, not big filled blocks", async ({ twitchPage }) => {
+    const box = (await header(twitchPage, "Ungrouped").boundingBox())!;
+    const rem = await twitchPage.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize)); // Twitch uses 10px
+    expect(box.height / rem).toBeLessThanOrEqual(3.2);
+    const background = await header(twitchPage, "Ungrouped").evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(background).not.toBe("rgb(168, 85, 247)"); // the old solid purple block
+  });
+
+  test("show how many channels in the group are live", async ({ twitchPage }) => {
+    await expect(header(twitchPage, "Ungrouped").getByTestId("group-live-count")).toHaveText("2");
+    await expect(header(twitchPage, "Ungrouped")).toHaveAttribute("title", /2 live of 3/);
+  });
+
+  test("every group, Ungrouped included, has a purple rail", async ({ twitchPage, worker }) => {
+    await worker.evaluate(() => chrome.storage.local.set({ groupNames: ["Friends"] }));
+    await expect(header(twitchPage, "Friends")).toBeVisible();
+    const rail = (name: string) => header(twitchPage, name).evaluate((el) => getComputedStyle(el).borderLeftColor);
+    expect(await rail("Friends")).toBe("rgb(168, 85, 247)");
+    expect(await rail("Ungrouped")).toBe("rgb(168, 85, 247)");
+  });
+
+  test("show the rail even though Twitch resets every div's border", async ({ twitchPage }) => {
+    const rail = await header(twitchPage, "Ungrouped").evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return { width: cs.borderLeftWidth, style: cs.borderLeftStyle };
+    });
+    expect(rail).toEqual({ width: "3px", style: "solid" });
+  });
+
+  test("run from the left edge of the sidebar to the right edge", async ({ twitchPage }) => {
+    await expect(header(twitchPage, "Ungrouped")).toBeVisible();
+    const m = await twitchPage.evaluate(() => {
+      const nav = document.querySelector("[data-a-target=side-nav-bar]")!.getBoundingClientRect();
+      const button = document.querySelector("#__root [role=button]")!.getBoundingClientRect();
+      const bar = document.querySelector("[data-testid=refresh-progress]")!.getBoundingClientRect();
+      return {
+        headerLeft: Math.round(button.left - nav.left),
+        headerRight: Math.round(nav.right - button.right),
+        barLeft: Math.round(bar.left - nav.left),
+        barRight: Math.round(nav.right - bar.right),
+      };
+    });
+    expect(m).toEqual({ headerLeft: 0, headerRight: 0, barLeft: 0, barRight: 0 });
+  });
+
+  test("are actually painted at the sidebar edges, not clipped short", async ({ twitchPage }) => {
+    await expect(header(twitchPage, "Ungrouped")).toBeVisible();
+    const hit = await twitchPage.evaluate(() => {
+      const nav = document.querySelector("[data-a-target=side-nav-bar]")!.getBoundingClientRect();
+      const button = document.querySelector("#__root [role=button]")!;
+      const y = button.getBoundingClientRect().top + button.getBoundingClientRect().height / 2;
+      const owner = (x: number) => document.elementFromPoint(x, y)?.closest("[role=button]") === button;
+      return { leftEdge: owner(nav.left + 1), rightEdge: owner(nav.right - 2) };
+    });
+    expect(hit).toEqual({ leftEdge: true, rightEdge: true });
+  });
+
+  test("have their own tinted background, different from the rows below", async ({ twitchPage }) => {
+    const background = await header(twitchPage, "Ungrouped").evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(background).not.toBe("rgba(0, 0, 0, 0)");
+    expect(background).toContain("/ 0.08"); // an 8% tint of the text color, so it works on light and dark themes
+  });
+
+  test("sit on the sidebar without a box around the accordion", async ({ twitchPage }) => {
+    await header(twitchPage, "Ungrouped").click();
+    const style = await twitchPage.evaluate(() => {
+      const accordion = document.querySelector("#__root [data-accordion-component=Accordion]")!;
+      const panel = document.querySelector("#__root [data-accordion-component=AccordionItemPanel]")!;
+      const button = document.querySelector("#__root [role=button]")!;
+      return {
+        accordionBorder: getComputedStyle(accordion).borderTopWidth,
+        panelPaddingLeft: getComputedStyle(panel).paddingLeft,
+        buttonArrow: getComputedStyle(button, "::before").content,
+      };
+    });
+    expect(style).toEqual({ accordionBorder: "0px", panelPaddingLeft: "4px", buttonArrow: "none" });
+  });
+
+  test("still open and close their channel list", async ({ twitchPage }) => {
+    const ungrouped = header(twitchPage, "Ungrouped");
+    await expect(ungrouped).toHaveAttribute("aria-expanded", "false");
+    await ungrouped.click();
+    await expect(ungrouped).toHaveAttribute("aria-expanded", "true");
+    await expect(twitchPage.locator("#__root")).toContainText("Fixture_Live");
+    await ungrouped.click();
+    await expect(ungrouped).toHaveAttribute("aria-expanded", "false");
+  });
+});
