@@ -1,4 +1,4 @@
-# Better Twitch Sidebar: overhaul design doc
+# Better Sidebar: overhaul design doc
 
 Status: draft for review. No code changes accompany this doc.
 

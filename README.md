@@ -39,7 +39,7 @@ Current Twitch Sidebar
 https://github.com/clgerhardt/better-twitch-sidebar-extension/assets/22062735/13ff32b8-be18-4114-b4c3-b7d5046a05c3
 
 
-Better Twitch Sidebar!🥳
+Better Sidebar!🥳
 
 https://github.com/clgerhardt/better-twitch-sidebar-extension/assets/22062735/ebdfef1a-7c7c-455b-b7fd-7a97a73c7480
 
@@ -56,7 +56,7 @@ https://github.com/clgerhardt/better-twitch-sidebar-extension/assets/22062735/eb
 
 ```mermaid
 timeline
-    title Better Twitch Sidebar
+    title Better Sidebar
     MVP
          : Group Manager
          : Add Group

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Better Twitch Sidebar",
-  "description": "Group the channels you follow into custom groups in Twitch's sidebar.",
+  "name": "Better Sidebar",
+  "description": "Group the channels you follow into custom groups in Twitch's sidebar. Not affiliated with Twitch.",
   "options_ui": {
     "page": "src/pages/options/index.html"
   },

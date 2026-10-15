@@ -6,9 +6,16 @@ const manifest = JSON.parse(fs.readFileSync(path.resolve("manifest.json"), "utf8
 
 test.describe("manifest.json", () => {
   test("has a real name and description", () => {
-    expect(manifest.name).toBe("Better Twitch Sidebar");
+    expect(manifest.name).toBe("Better Sidebar");
+    expect(manifest.description).toContain("Not affiliated with Twitch");
     expect(manifest.description).not.toMatch(/in manifest\.json/);
     expect(manifest.description.length).toBeGreaterThan(20);
+  });
+
+  test("the localized name and description the build ships match it", () => {
+    const messages = JSON.parse(fs.readFileSync(path.resolve("src/locales/en/messages.json"), "utf8"));
+    expect(messages.extName.message).toBe(manifest.name);
+    expect(messages.extDescription.message).toBe(manifest.description);
   });
 
   test("content scripts only run on Twitch", () => {

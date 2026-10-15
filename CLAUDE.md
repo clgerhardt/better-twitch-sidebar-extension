@@ -1,4 +1,4 @@
-# Better Twitch Sidebar
+# Better Sidebar
 
 Chrome MV3 extension (Vite, React, TypeScript, Tailwind) that adds channel groups to Twitch's sidebar. Design direction: `docs/design/extension-overhaul.md`.
 
