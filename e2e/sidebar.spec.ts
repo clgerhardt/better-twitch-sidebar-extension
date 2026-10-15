@@ -470,6 +470,54 @@ test.describe("group headers", () => {
     expect(style).toEqual({ accordionBorder: "0px", panelPaddingLeft: "4px", buttonArrow: "none" });
   });
 
+  test.describe("when the side nav is collapsed", () => {
+    test.beforeEach(async ({ twitchPage, worker }) => {
+      await worker.evaluate(() => chrome.storage.local.set({ groupNames: ["Friends"] }));
+      await expect(header(twitchPage, "Friends")).toBeVisible();
+      await setSideNavLabel(twitchPage, "Expand Side Nav");
+      await expect(manageButton(twitchPage)).toHaveCount(0, { timeout: 5_000 });
+    });
+
+    test("each header shows its group's initial", async ({ twitchPage }) => {
+      await expect(twitchPage.locator("#__root").getByRole("button", { name: "Friends" })).toContainText("F");
+      await expect(twitchPage.locator("#__root").getByRole("button", { name: "Ungrouped" })).toContainText("U");
+    });
+
+    test("hovering a header says which group it is, to the right of the sidebar", async ({ twitchPage }) => {
+      const friends = twitchPage.locator("#__root").getByRole("button", { name: "Friends" });
+      await friends.hover();
+      const tip = twitchPage.getByRole("tooltip");
+      await expect(tip).toBeVisible();
+      await expect(tip).toContainText("Friends");
+      await expect(tip).toContainText("0 live");
+      const [tipBox, headerBox] = [(await tip.boundingBox())!, (await friends.boundingBox())!];
+      expect(tipBox.x).toBeGreaterThanOrEqual(headerBox.x + headerBox.width);
+
+      await twitchPage.mouse.move(600, 600);
+      await expect(tip).toHaveCount(0);
+    });
+
+    test("keyboard focus shows the tooltip too", async ({ twitchPage }) => {
+      await twitchPage.locator("#__root").getByRole("button", { name: "Friends" }).focus();
+      await expect(twitchPage.getByRole("tooltip")).toContainText("Friends");
+    });
+
+    test("the tooltip is not clipped by the sidebar", async ({ twitchPage }) => {
+      await twitchPage.locator("#__root").getByRole("button", { name: "Friends" }).hover();
+      const tip = twitchPage.getByRole("tooltip");
+      await expect(tip).toBeVisible();
+      const box = (await tip.boundingBox())!;
+      const hit = await twitchPage.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest("[role=tooltip]") !== null, { x: box.x + box.width / 2, y: box.y + box.height / 2 });
+      expect(hit).toBe(true);
+    });
+  });
+
+  test("when expanded, hovering a header shows no tooltip", async ({ twitchPage }) => {
+    await header(twitchPage, "Ungrouped").hover();
+    await twitchPage.waitForTimeout(400);
+    await expect(twitchPage.getByRole("tooltip")).toHaveCount(0);
+  });
+
   test("still open and close their channel list", async ({ twitchPage }) => {
     const ungrouped = header(twitchPage, "Ungrouped");
     await expect(ungrouped).toHaveAttribute("aria-expanded", "false");

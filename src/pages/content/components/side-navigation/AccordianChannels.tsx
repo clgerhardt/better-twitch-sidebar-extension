@@ -7,6 +7,7 @@ import {
   AccordionItemState,
 } from "react-accessible-accordion";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
 import useSidebarState from "../../hooks/useSidebarState";
 import useGlobalState from "../../hooks/useGlobalState";
@@ -31,6 +32,15 @@ const AccordianChannels = () => {
   const [visibleGroups, setVisibleGroups] = useState(groups);
 
   const nativeVersion = useNativeRowsVersion();
+
+  // When the side nav is collapsed a header shows only an initial, so hovering or focusing it says
+  // which group it is. The tooltip lives on the page body: the sidebar clips anything sticking out.
+  const [tip, setTip] = useState<{ name: string; live: number; left: number; top: number } | null>(null);
+  const showTip = (element: HTMLElement, group: { groupName: string; numberOfLiveChannels: number }) => {
+    const rect = element.getBoundingClientRect();
+    setTip({ name: group.groupName, live: group.numberOfLiveChannels, left: rect.right + 8, top: rect.top + rect.height / 2 });
+  };
+  const hideTip = () => setTip(null);
 
   useEffect(() => {
     messageLogger(constants.location.UI_COMPONENT, "groups", groups);
@@ -70,9 +80,19 @@ const AccordianChannels = () => {
           <AccordionItem key={group.groupName}>
             <AccordionItemHeading id="expanded-side-bar-title" className="my-1">
               <AccordionItemButton
-                title={`${group.numberOfLiveChannels} live of ${group.numberOfChannels}`}
-                className={`flex w-full cursor-pointer items-center gap-3 border-l-[3px] border-solid border-purple-500 bg-[color-mix(in_srgb,var(--color-text-base,#efeff1)_8%,transparent)] py-2 text-left text-[1.4rem] font-medium text-[var(--color-text-base,#efeff1)] ${isSidebarExpanded ? "px-3" : "justify-center px-1"}`}
+                title={isSidebarExpanded ? `${group.numberOfLiveChannels} live of ${group.numberOfChannels}` : undefined}
+                aria-label={isSidebarExpanded ? undefined : group.groupName}
+                onMouseEnter={(e: React.MouseEvent<HTMLElement>) => showTip(e.currentTarget, group)}
+                onMouseLeave={hideTip}
+                onFocus={(e: React.FocusEvent<HTMLElement>) => showTip(e.currentTarget, group)}
+                onBlur={hideTip}
+                className={`flex w-full cursor-pointer items-center gap-3 border-l-[3px] border-solid border-purple-500 bg-[color-mix(in_srgb,var(--color-text-base,#efeff1)_8%,transparent)] py-2 text-left text-[1.4rem] font-medium text-[var(--color-text-base,#efeff1)] ${isSidebarExpanded ? "px-3" : "justify-center gap-1 px-1"}`}
               >
+                {!isSidebarExpanded && (
+                  <span aria-hidden="true" className="text-[1.4rem] leading-none">
+                    {Array.from(group.groupName)[0]?.toUpperCase()}
+                  </span>
+                )}
                 {isSidebarExpanded && (
                   <>
                     <span id="expanded-side-bar-heading" className="min-w-0 truncate">
@@ -117,6 +137,33 @@ const AccordianChannels = () => {
           ))}
         </Accordion>
       </div>
+      {tip &&
+        !isSidebarExpanded &&
+        createPortal(
+          <div
+            role="tooltip"
+            style={{
+              position: "fixed",
+              left: tip.left,
+              top: tip.top,
+              transform: "translateY(-50%)",
+              zIndex: 2147483000,
+              pointerEvents: "none",
+              whiteSpace: "nowrap",
+              background: "#0e0e10",
+              color: "#efeff1",
+              border: "1px solid #3a3a3d",
+              borderRadius: 4,
+              padding: "0.5rem 1rem",
+              fontSize: "1.3rem",
+              lineHeight: 1.3,
+            }}
+          >
+            <div style={{ fontWeight: 600 }}>{tip.name}</div>
+            <div style={{ color: "#adadb8" }}>{tip.live} live</div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };
