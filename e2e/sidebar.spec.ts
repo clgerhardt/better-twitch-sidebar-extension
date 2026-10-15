@@ -317,6 +317,51 @@ test("a tab in the background follows its own collapse button", async ({ twitchP
   await expect(manageButton(twitchPage)).toHaveCount(1, { timeout: 5_000 });
 });
 
+test.describe("Manage Groups button", () => {
+  test("is a compact outlined purple button, not a big pill", async ({ twitchPage }) => {
+    await expect(manageButton(twitchPage)).toBeVisible();
+    const m = await manageButton(twitchPage).evaluate((el) => {
+      const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+      const cs = getComputedStyle(el);
+      return {
+        heightRem: el.getBoundingClientRect().height / rem,
+        radiusRem: parseFloat(cs.borderTopLeftRadius) / rem,
+        border: `${cs.borderTopWidth} ${cs.borderTopStyle} ${cs.borderTopColor}`,
+        background: cs.backgroundColor,
+        hasIcon: !!el.querySelector("svg"),
+      };
+    });
+    expect(m.heightRem).toBeLessThanOrEqual(3.6);
+    expect(m.radiusRem).toBeGreaterThan(0.2);
+    expect(m.radiusRem).toBeLessThan(1);
+    expect(m.border).toBe("2px solid rgb(168, 85, 247)");
+    expect(m.background).toBe("rgba(0, 0, 0, 0)"); // outlined, not filled
+    expect(m.hasIcon).toBe(true);
+  });
+
+  test("is as wide as the channel rows and fits in its space", async ({ twitchPage }) => {
+    await expect(manageButton(twitchPage)).toBeVisible();
+    const m = await twitchPage.evaluate(() => {
+      const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+      const nav = document.querySelector("[data-a-target=side-nav-bar]")!.getBoundingClientRect();
+      const root = document.querySelector("#__manage-groups-root")!.getBoundingClientRect();
+      const button = document.querySelector("#__manage-groups-root button")!.getBoundingClientRect();
+      return { left: (button.left - nav.left) / rem, right: (nav.right - button.right) / rem, overflow: button.bottom - root.bottom };
+    });
+    expect(m.left).toBeLessThanOrEqual(0.5);
+    expect(m.right).toBeLessThanOrEqual(0.5);
+    expect(m.overflow).toBeLessThanOrEqual(1); // it does not spill out of its container into the next section
+  });
+
+  test("lights up under the mouse and still opens the dialog", async ({ twitchPage }) => {
+    const before = await manageButton(twitchPage).evaluate((el) => getComputedStyle(el).backgroundColor);
+    await manageButton(twitchPage).hover();
+    await expect.poll(() => manageButton(twitchPage).evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(before);
+    await manageButton(twitchPage).click();
+    await expect(twitchPage.getByRole("dialog")).toContainText("Ungrouped");
+  });
+});
+
 test("a page that loads with the side nav collapsed starts collapsed", async ({ session, context }) => {
   const page = await context.newPage();
   await page.addInitScript(() => {

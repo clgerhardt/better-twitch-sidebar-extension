@@ -49,8 +49,8 @@ test("the extension's own UI keeps its styling", async ({ twitchPage }) => {
     };
   });
   expect(ui).toEqual({
-    manageBg: "rgb(83, 83, 95)",
-    manageRadius: "9999px",
+    manageBg: "rgba(0, 0, 0, 0)",
+    manageRadius: "3.75px",
     manageBorderStyle: "solid",
     manageBorderWidth: "2px",
     headerBg: "color(srgb 0.937255 0.937255 0.945098 / 0.08)",
