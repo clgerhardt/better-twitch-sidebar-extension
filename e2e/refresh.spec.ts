@@ -18,7 +18,7 @@ const memoryStorage = (initial: Record<string, any> = {}) => {
   return { storage, data };
 };
 
-const connected = { twitchToken: "tok", twitchUserId: "999" };
+const connected = { twitchToken: "tok", twitchUserId: "999", twitchUserImage: "https://img/me.png" };
 
 // A fake client that records calls; each method can be overridden per test
 const fakeClient = (overrides: Record<string, (...args: any[]) => any> = {}) => {
@@ -233,6 +233,58 @@ test.describe("refresh", () => {
     expect(await second).toMatchObject({ ok: true });
     expect(usedTokens).toEqual(["tok", "tok2"]);
     expect(t.data.channelSnapshot.user).toEqual({ id: "888" });
+  });
+
+  test.describe("the account's profile picture", () => {
+    const withoutPicture = { twitchToken: "tok", twitchUserId: "999" };
+
+    test("is fetched and saved once when it is missing", async () => {
+      const t = setup(withoutPicture);
+      await t.refresher.refresh();
+      expect(t.data.twitchUserImage).toBe("https://img/999.png");
+      expect(t.calls).toContain("users:999");
+
+      t.calls.length = 0;
+      await t.refresher.refresh(true);
+      expect(t.calls.filter((c) => c === "users:999")).toEqual([]);
+    });
+
+    test("is left alone when it is already saved", async () => {
+      const t = setup(connected);
+      await t.refresher.refresh();
+      expect(t.data.twitchUserImage).toBe("https://img/me.png");
+      expect(t.calls).not.toContain("users:999");
+    });
+
+    test("failing to get it does not fail the refresh", async () => {
+      const t = setup(withoutPicture, {
+        getUsers: async (_token: string, ids: string[]) => {
+          if (ids.includes("999")) throw new HelixError("network", "x");
+          return ids.map((id) => ({ id, login: `l${id}`, displayName: `L${id}`, image: `https://img/${id}.png` }));
+        },
+      });
+      expect(await t.refresher.refresh()).toMatchObject({ ok: true });
+      expect(t.data.twitchUserImage).toBeUndefined();
+      expect(t.data.snapshotError).toBeUndefined();
+    });
+
+    test("an empty picture is not saved, and a session that ended meanwhile gets nothing", async () => {
+      const empty = setup(withoutPicture, { getUsers: async (_t: string, ids: string[]) => ids.map((id) => ({ id, login: "x", displayName: "x", image: "" })) });
+      await empty.refresher.refresh();
+      expect(empty.data.twitchUserImage).toBeUndefined();
+
+      const t = setup(withoutPicture, {
+        getUsers: async (_token: string, ids: string[]) => {
+          if (ids.includes("999")) {
+            delete t.data.twitchToken;
+            delete t.data.twitchUserId;
+          }
+          return ids.map((id) => ({ id, login: `l${id}`, displayName: `L${id}`, image: `https://img/${id}.png` }));
+        },
+      });
+      await t.refresher.refresh();
+      expect(t.data.twitchUserImage).toBeUndefined();
+    });
   });
 
   test.describe("a rejected token", () => {

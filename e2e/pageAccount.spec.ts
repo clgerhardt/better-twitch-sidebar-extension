@@ -6,13 +6,18 @@ const user = { authToken: "secret-auth-token", displayName: "Fixture_Viewer", id
 
 test.describe("readPageAccount", () => {
   test("reads the signed-in account's id and login", () => {
-    expect(readPageAccount(`unique_id=abc; ${twilight(user)}; login=fixture_viewer`)).toEqual({ status: "signed_in", id: "999", login: "fixture_viewer" });
+    expect(readPageAccount(`unique_id=abc; ${twilight(user)}; login=fixture_viewer`)).toEqual({ status: "signed_in", id: "999", login: "fixture_viewer", displayName: "Fixture_Viewer" });
   });
 
   test("never returns the token or anything else from the cookie", () => {
     const account = readPageAccount(twilight(user));
-    expect(Object.keys(account).sort()).toEqual(["id", "login", "status"]);
+    expect(Object.keys(account).sort()).toEqual(["displayName", "id", "login", "status"]);
     expect(JSON.stringify(account)).not.toContain("secret-auth-token");
+  });
+
+  test("the display name falls back to the login when the cookie has none", () => {
+    const { displayName: _omit, ...withoutName } = user;
+    expect(readPageAccount(twilight(withoutName))).toMatchObject({ status: "signed_in", login: "fixture_viewer", displayName: "fixture_viewer" });
   });
 
   test("a numeric id is returned as a string", () => {

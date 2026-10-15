@@ -46,7 +46,8 @@ async function stubTwitch(context: BrowserContext) {
         if (ids.length === 0) {
           return route.fulfill(json({ data: [{ id: "999", login: "fixture_viewer", display_name: "Fixture_Viewer", profile_image_url: "" }] }));
         }
-        return route.fulfill(json({ data: CHANNELS.filter((c) => ids.includes(c.id)).map((c) => ({ id: c.id, login: c.login, display_name: c.display_name, profile_image_url: AVATAR })) }));
+        const people = [...CHANNELS.map((c) => ({ id: c.id, login: c.login, display_name: c.display_name })), { id: "999", login: "fixture_viewer", display_name: "Fixture_Viewer" }];
+        return route.fulfill(json({ data: people.filter((p) => ids.includes(p.id)).map((p) => ({ ...p, profile_image_url: AVATAR })) }));
       }
       case "/helix/streams/followed":
         return route.fulfill(
@@ -124,6 +125,7 @@ export const test = base.extend<Fixtures & Options>({
         twitchToken: "fixture-token",
         tokenExpiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
         twitchUserId: "999",
+        twitchUserImage: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
         globalState: { ...globalState, loggedIn: true },
       });
     });

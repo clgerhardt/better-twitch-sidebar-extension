@@ -43,6 +43,19 @@ export const createRefresher = (deps: Deps) => {
     return { token: stored.twitchToken as string | undefined, userId: stored.twitchUserId as string | undefined };
   };
 
+  // The account's own profile picture is saved when it connects, but older sessions never saved one. Fetch
+  // it once if it is missing so the popup can show it; this must never fail or delay a refresh.
+  const ensureProfileImage = async (token: string, userId: string, sameSession: () => Promise<boolean>) => {
+    try {
+      const { twitchUserImage } = await storage.get(["twitchUserImage"]);
+      if (twitchUserImage) return;
+      const [me] = await client.getUsers(token, [userId]);
+      if (me?.image && (await sameSession())) await storage.set({ twitchUserImage: me.image });
+    } catch (error) {
+      log?.("could not load the profile picture", error);
+    }
+  };
+
   const run = async (force: boolean, renewed = false): Promise<RefreshResult> => {
     const stored = await storage.get(["twitchToken", "twitchUserId", CHANNEL_SNAPSHOT_KEY]);
     const token: string | undefined = stored.twitchToken;
@@ -79,6 +92,7 @@ export const createRefresher = (deps: Deps) => {
       if (!(await sameSession())) return { ok: false, reason: "discarded" };
       await storage.set({ [CHANNEL_SNAPSHOT_KEY]: snapshot });
       await storage.remove([SNAPSHOT_ERROR_KEY]);
+      await ensureProfileImage(token, userId, sameSession);
       return { ok: true };
     } catch (error) {
       if (!(await sameSession())) return { ok: false, reason: "discarded" };

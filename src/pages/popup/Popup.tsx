@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import UserGreeting from "./UserGreeting/UserGreeting";
+import Banner from "./Banner/Banner";
 import GuestGreeting from "./GuestGreeting/GuestGreeting";
 import SignedOutGreeting from "./SignedOutGreeting/SignedOutGreeting";
 import ExpiredGreeting from "./ExpiredGreeting/ExpiredGreeting";
@@ -8,17 +9,10 @@ import { usePageAccount } from "../content/hooks/usePageAccount";
 import { messageLogger } from "../utils/logger";
 import { constants } from "../utils/constants";
 import { useTwitchToken } from "../content/hooks/userTwitchToken";
+import { useStoredUserImage } from "../content/hooks/useStoredUserImage";
 import { logoutTwitch } from "../content/utils/getValidTwitchToken";
 
-const CLIENT_ID = import.meta.env.VITE_TWITCH_CLIENT_ID;
-
-type UserSession = {
-  user: string;
-  userImage: string;
-};
-
 const Popup = () => {
-  const [userSession, setUserSession] = useState<UserSession | null>(null);
   const [isIncognito, setIsIncognito] = useState<boolean | null>(
     chrome.extension.inIncognitoContext
   );
@@ -26,68 +20,32 @@ const Popup = () => {
   const twitchToken = useTwitchToken();
   const pageAccount = usePageAccount();
   const needsReconnect = useNeedsReconnect();
+  const userImage = useStoredUserImage();
 
   const logout = async () => {
     await logoutTwitch();
-    setUserSession(null);
     messageLogger(constants.location.POPUP, "User logged out");
-  };
-
-  const fetchTwitchUser = async (accessToken: string) => {
-    messageLogger(constants.location.POPUP, "Fetching Twitch user data");
-    try {
-      const res = await fetch("https://api.twitch.tv/helix/users", {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Client-Id": CLIENT_ID,
-        },
-      });
-
-      if (!res.ok) throw new Error(`API call failed with status ${res.status}`);
-
-      const data = await res.json();
-      const userData = data.data?.[0];
-
-      if (userData?.display_name) {
-        const user = userData.display_name;
-        const userImage = userData.profile_image_url;
-        setUserSession({ user, userImage });
-        messageLogger(constants.location.POPUP, "Fetched Twitch user", user);
-        chrome.storage.local.set({ twitchUserId: userData.id });
-      }
-    } catch (error) {
-      // This lookup only fills in the name and picture. Offline, rate limited, or a rejected token
-      // (the background notices that and the popup shows the reconnect view): never log out here.
-      messageLogger(constants.location.POPUP, "Could not fetch Twitch user", error);
-    }
   };
 
   useEffect(() => {
     messageLogger(constants.location.POPUP, "Popup loaded");
-    messageLogger(
-      constants.location.POPUP,
-      "Checking if in incognito mode",
-      isIncognito
-    );
-    messageLogger(constants.location.POPUP, "Twitch token:", twitchToken);
-    if (twitchToken) {
-      fetchTwitchUser(twitchToken);
-    } else {
-      setUserSession(null);
-    }
-  }, [twitchToken]);
+    messageLogger(constants.location.POPUP, "Checking if in incognito mode", isIncognito);
+  }, []);
 
   if (isIncognito) {
     return (
-      <div id="main-container" className="p-4 text-sm text-gray-200">
-        This extension does not work in Incognito Mode. Please disable it in
-        your browser settings or use a normal window.
+      <div id="main-container" className="p-3 text-sm text-[#efeff1]">
+        <Banner />
+        <p className="mb-0 mt-3">
+          This extension does not work in Incognito Mode. Please disable it in your browser settings or use a normal window.
+        </p>
       </div>
     );
   }
 
   return (
-    <div id="main-container" className="p-4 text-sm text-gray-200">
+    <div id="main-container" className="p-3 text-sm text-[#efeff1]">
+      <Banner />
       {twitchToken ? (
         <>
           {pageAccount?.status === "signed_out" ? (
@@ -96,21 +54,19 @@ const Popup = () => {
             <ExpiredGreeting />
           ) : (
             <UserGreeting
-              userName={userSession?.user}
-              userImage={userSession?.userImage}
+              userName={pageAccount?.status === "signed_in" ? pageAccount.displayName : undefined}
+              userImage={userImage}
             />
           )}
           <button
             onClick={logout}
-            className="bg-red-500 text-white px-3 py-1 rounded mt-4"
+            className="mt-3 w-full cursor-pointer rounded-md border-2 border-solid border-purple-500 bg-transparent px-3 py-1.5 text-sm font-medium text-purple-300 transition-colors hover:bg-purple-500/20"
           >
             Logout
           </button>
         </>
       ) : (
-        <>
-          <GuestGreeting />
-        </>
+        <GuestGreeting />
       )}
     </div>
   );

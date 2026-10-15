@@ -1,9 +1,9 @@
 // Which Twitch account is signed in on twitch.tv, read from the page's own cookies. Twitch's
-// `twilight-user` cookie holds the account's id and login (and a token, which this never reads out).
+// `twilight-user` cookie holds the account's id, login and display name (and a token, which this never reads out).
 // A cookie that cannot be understood is "unknown", never "signed out": Twitch may change the format,
 // and a wrong "signed out" must not be able to lead to anything destructive.
 export type PageAccount =
-  | { status: "signed_in"; id: string; login: string }
+  | { status: "signed_in"; id: string; login: string; displayName: string }
   | { status: "signed_out" }
   | { status: "unknown" };
 
@@ -21,7 +21,9 @@ export const readPageAccount = (cookieString: string): PageAccount => {
     const user = JSON.parse(decodeURIComponent(value));
     const id = user?.id !== undefined && user?.id !== null ? String(user.id) : "";
     const login = typeof user?.login === "string" ? user.login : "";
-    return id && login ? { status: "signed_in", id, login } : { status: "unknown" };
+    // The display name only changes capitalisation; the login is the safe fallback
+    const displayName = typeof user?.displayName === "string" && user.displayName ? user.displayName : login;
+    return id && login ? { status: "signed_in", id, login, displayName } : { status: "unknown" };
   } catch {
     return { status: "unknown" };
   }
