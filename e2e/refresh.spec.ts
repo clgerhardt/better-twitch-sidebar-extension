@@ -208,6 +208,33 @@ test.describe("refresh", () => {
     expect(await t.refresher.refresh(true)).toMatchObject({ ok: true });
   });
 
+  test("a refresh asked for while another account's refresh is running is run again for the new account", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const usedTokens: string[] = [];
+    const t = setup(connected, {
+      getFollowedChannels: async (token: string) => {
+        usedTokens.push(token);
+        if (token === "tok") await gate; // the first account's refresh is slow
+        return { total: 2, channels: follows };
+      },
+      getLiveFollowed: async () => [],
+    });
+
+    const first = t.refresher.refresh();
+    await new Promise((r) => setTimeout(r, 0));
+    // The user connects another account while the first refresh is still running, then asks for a refresh
+    t.data.twitchToken = "tok2";
+    t.data.twitchUserId = "888";
+    const second = t.refresher.refresh(true);
+    release();
+
+    expect(await first).toEqual({ ok: false, reason: "discarded" });
+    expect(await second).toMatchObject({ ok: true });
+    expect(usedTokens).toEqual(["tok", "tok2"]);
+    expect(t.data.channelSnapshot.user).toEqual({ id: "888" });
+  });
+
   test.describe("a rejected token", () => {
     const rejectOldToken = (renewedFails = false) => ({
       getFollowedChannels: async (token: string) => {

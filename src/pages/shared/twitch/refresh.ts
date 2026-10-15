@@ -97,14 +97,21 @@ export const createRefresher = (deps: Deps) => {
   };
 
   return {
-    // Callers that arrive while a refresh is running share its result
-    refresh: (force = false): Promise<RefreshResult> => {
-      if (!inFlight) {
-        inFlight = run(force).finally(() => {
-          inFlight = null;
-        });
+    // Callers that arrive while a refresh is running share its result, unless that refresh was for a
+    // session that has since ended (logout, another account): its result is thrown away, so a caller
+    // that only joined it starts a fresh refresh for the session that is connected now
+    refresh: async (force = false): Promise<RefreshResult> => {
+      for (let attempt = 0; ; attempt++) {
+        const joined = inFlight !== null;
+        if (!inFlight) {
+          inFlight = run(force).finally(() => {
+            inFlight = null;
+          });
+        }
+        const result = await inFlight;
+        const discarded = !result.ok && result.reason === "discarded";
+        if (!discarded || !joined || attempt >= 2) return result;
       }
-      return inFlight;
     },
   };
 };
