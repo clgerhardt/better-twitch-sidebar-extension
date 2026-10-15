@@ -1,67 +1,72 @@
-import { Fragment, useRef } from "react";
+import { Fragment, useState } from "react";
 import { Dialog, Transition } from "@headlessui/react";
-import { AddGroup } from "./add-group-form/AddGroup";
-import { ManageGroupsDialogProps } from "./GroupsDialogModels";
-import GroupsDataTable from "./data-tables/Groups";
+import { XMarkIcon } from "@heroicons/react/24/outline";
+import type { SidebarGroup } from "@src/pages/utils/layoutGroups";
+import GroupList from "./GroupList";
+import GroupDetail from "./GroupDetail";
 
-export default function ManageFollowedChannelsDialog({
-  open,
-  setOpen,
-  followedChannels
-}: ManageGroupsDialogProps) {
-  const cancelButtonRef = useRef(null);
+export type ManageGroupsDialogProps = {
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  followedChannels: SidebarGroup[];
+};
+
+// A dark panel in Twitch's colors: the groups on the left, and on the right the selected group with
+// every channel to tick in or out of it.
+export default function ManageFollowedChannelsDialog({ open, setOpen, followedChannels: groups }: ManageGroupsDialogProps) {
+  const [selectedName, setSelectedName] = useState("Ungrouped");
+  // A group that is gone (deleted) or not stored yet (just added) falls back to the first group
+  const selected = groups.find((g) => g.groupName === selectedName) ?? groups[0];
 
   return (
     <Transition.Root show={open} as={Fragment}>
-      <Dialog
-        as="div"
-        className="relative z-[9999]"
-        initialFocus={cancelButtonRef}
-        onClose={setOpen}
-      >
+      <Dialog as="div" className="relative z-[9999]" onClose={setOpen}>
         <Transition.Child
           as={Fragment}
-          enter="ease-out duration-300"
+          enter="ease-out duration-200"
           enterFrom="opacity-0"
           enterTo="opacity-100"
-          leave="ease-in duration-200"
+          leave="ease-in duration-150"
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
+          <div className="fixed inset-0 bg-black/60" />
         </Transition.Child>
 
-        <div className="fixed inset-0 z-10 w-screen overflow-y-auto">
-          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-            <Transition.Child
-              as={Fragment}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-              enterTo="opacity-100 translate-y-0 sm:scale-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100 translate-y-0 sm:scale-100"
-              leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+        <div className="fixed inset-0 z-10 flex items-center justify-center p-4">
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-200"
+            enterFrom="opacity-0 scale-95"
+            enterTo="opacity-100 scale-100"
+            leave="ease-in duration-150"
+            leaveFrom="opacity-100 scale-100"
+            leaveTo="opacity-0 scale-95"
+          >
+            <Dialog.Panel
+              data-testid="dialog-panel"
+              className="flex h-[56rem] max-h-[85vh] w-[84rem] max-w-[95vw] flex-col overflow-hidden rounded-lg border border-solid border-[#2f2f35] bg-[#18181b] text-left text-[1.4rem] text-[#efeff1] shadow-xl"
             >
-              <Dialog.Panel className="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-7xl max-h-[80vh] overflow-y-auto">
-                <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
-                  <div className="grid grid-flow-row auto-rows-max">
-                    <div className="mt-3 text-center h-12">
-                      <Dialog.Title
-                        as="h3"
-                        className="text-xl font-semibold leading-6 text-gray-900"
-                      >
-                        Manage your groups
-                      </Dialog.Title>
-                    </div>
-                    <AddGroup
-                      groups={followedChannels}
-                    />
-                    <GroupsDataTable followedChannels={followedChannels} />
-                  </div>
-                </div>
-              </Dialog.Panel>
-            </Transition.Child>
-          </div>
+              <div className="flex items-center border-b border-solid border-[#2f2f35] px-6 py-4">
+                <Dialog.Title as="h2" className="m-0 text-[1.8rem] font-semibold text-[#efeff1]">
+                  Manage groups
+                </Dialog.Title>
+                <button
+                  type="button"
+                  aria-label="Close"
+                  onClick={() => setOpen(false)}
+                  className="ml-auto cursor-pointer rounded p-1 text-[#adadb8] hover:bg-white/10 hover:text-[#efeff1]"
+                >
+                  <XMarkIcon className="h-7 w-7" />
+                </button>
+              </div>
+
+              <div className="grid min-h-0 flex-1 grid-cols-[24rem_1fr]">
+                <GroupList groups={groups} selectedName={selected?.groupName ?? ""} onSelect={setSelectedName} />
+                {selected && <GroupDetail key={selected.groupName} group={selected} groups={groups} onSelect={setSelectedName} />}
+              </div>
+            </Dialog.Panel>
+          </Transition.Child>
         </div>
       </Dialog>
     </Transition.Root>

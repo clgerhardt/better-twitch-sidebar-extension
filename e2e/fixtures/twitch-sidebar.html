@@ -5,6 +5,8 @@
 /* Twitch's reset: every div and span starts with border: 0, which also means border-style: none */
 html, body, div, span, p, h1, h2, h3, ul, li { border: 0px; }
 /* Twitch's sidebar: 10px root font size, and 0.4rem of padding either side of the section list */
+/* Twitch gives buttons a border width of their own, which a plain border-style then turns into a visible box */
+button { border: 2px solid transparent; }
 html { font-size: 10px; }
 .side-bar-contents { padding-left: 0.4rem; padding-right: 0.4rem; }</style></head>
 <body class="tw-root--theme-dark">
