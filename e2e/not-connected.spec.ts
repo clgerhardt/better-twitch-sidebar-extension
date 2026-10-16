@@ -71,3 +71,16 @@ test("not connected and signed out of Twitch: the sidebar asks to sign in to Twi
   await expect(page.locator("#__root")).toContainText("Sign in to Twitch to see your groups");
   await expect(page.getByTestId("not-connected-view")).toHaveCount(0);
 });
+
+test("after logging out and refreshing the page, the sidebar still shows the connect view", async ({ twitchPage, context, extensionId }) => {
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
+  await popup.getByRole("button", { name: "Logout" }).click();
+  await expect(popup.getByRole("button", { name: /^Connect for/ })).toBeVisible();
+
+  await twitchPage.reload();
+  const view = twitchPage.getByTestId("not-connected-view");
+  await expect(view).toBeVisible({ timeout: 8_000 });
+  await expect(view.getByRole("button", { name: "Connect for fixture_viewer" })).toBeVisible();
+  await expect(twitchPage.locator("#__root")).toHaveCount(1);
+});
