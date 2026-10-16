@@ -14,6 +14,7 @@
     "dev": "nodemon --config nodemon.chrome.json",
     "dev:chrome": "nodemon --config nodemon.chrome.json",
     "dev:firefox": "nodemon --config nodemon.firefox.json",
+    "typecheck": "tsc --noEmit",
     "test:e2e": "yarn build:chrome && playwright test",
     "css:scope-preflight": "node scripts/scope-preflight.cjs"
   },
