@@ -20,7 +20,7 @@ export function useTwitchToken() {
       areaName: string
     ) => {
       if (areaName === "local" && changes.twitchToken) {
-        console.log("[HOOK] twitchToken changed in storage");
+        messageLogger(constants.location.HOOK, "[HOOK] twitchToken changed in storage");
         updateToken();
       }
     };

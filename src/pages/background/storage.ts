@@ -51,7 +51,6 @@ export const clearAllStorage = (): Promise<boolean> => {
         console.error("Error clearing storage:", chrome.runtime.lastError);
         resolve(false);
       } else {
-        console.log("Local storage has been cleared.");
         resolve(true);
       }
     });
