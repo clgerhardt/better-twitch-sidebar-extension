@@ -13,24 +13,9 @@ export const createElement = (id: any, styles = {}) => {
 };
 
 export const insertBefore = (newElement: any, referenceElement: any) => {
-  const parent = referenceElement.parentNode;
+  messageLogger(constants.location.UTIL, "Entering insertBefore function");
+  const parent = referenceElement?.parentNode;
   if (parent) {
     parent.insertBefore(newElement, referenceElement);
   }
-};
-
-export const waitUntilNoMoreShowMoreButton = async () => {
-  messageLogger(constants.location.UTIL, "Entering waitUntilNoMoreShowMoreButton function");
-  return new Promise((resolve) => {
-    const interval = setInterval(() => {
-      const showMoreBtn = getElementBySelector('[data-a-target="side-nav-show-more-button"]');
-      if (showMoreBtn) {
-        showMoreBtn.click();
-      } else {
-        messageLogger(constants.location.UTIL, "Show more button not found, resolving waitUntilNoMoreShowMoreButton");
-        resolve(true);
-        clearInterval(interval);
-      }
-    }, 10);
-  });
 };

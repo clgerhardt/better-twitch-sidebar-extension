@@ -1,39 +1,47 @@
 import { useState, useEffect } from 'react';
-import { getLocalStorage } from "@src/pages/background/storage";
-import { constants } from "@src/pages/utils/constants";
-import { messageLogger } from "@src/pages/utils/logger";
+import {
+  CHANNEL_GROUPS_KEY,
+  CHANNEL_SNAPSHOT_KEY,
+  GROUP_NAMES_KEY,
+} from "@src/pages/utils/constants";
+import { SidebarGroup, layoutGroups } from "@src/pages/utils/layoutGroups";
+import { isSnapshotFor, snapshotToFetched } from "@src/pages/shared/twitch/snapshot";
 
+// The groups the Manage Groups dialog shows: the stored channel snapshot laid out with the user's
+// groups, exactly as the sidebar does. Read-only; the sidebar owns refreshing the snapshot.
 const useFollowedChannels = () => {
-  const [followedChannels, setFollowedChannels] = useState<any[]>([]);
+  const [groups, setGroups] = useState<SidebarGroup[]>([]);
 
   useEffect(() => {
-    const fetchFollowedChannels = async () => {
-      try {
-        const channels: any = await getLocalStorage(constants.storage.localStorageKey) || [];
-        setFollowedChannels(channels);
-        messageLogger(constants.location.UI_COMPONENT, "followedChannels", channels);
-      } catch (e) {
-        console.error("Error fetching followed channels", e);
-      }
-    };
+    const read = () =>
+      chrome.storage.local
+        .get(["twitchToken", "twitchUserId", CHANNEL_SNAPSHOT_KEY, GROUP_NAMES_KEY, CHANNEL_GROUPS_KEY])
+        .then((stored) => {
+          const snapshot = stored[CHANNEL_SNAPSHOT_KEY];
+          if (!stored.twitchToken || !isSnapshotFor(snapshot, stored.twitchUserId)) {
+            setGroups([]);
+            return;
+          }
+          setGroups(
+            layoutGroups({
+              fetched: snapshotToFetched(snapshot),
+              groupNames: stored[GROUP_NAMES_KEY] || [],
+              channelGroups: stored[CHANNEL_GROUPS_KEY] || {},
+            }).groups
+          );
+        })
+        .catch((e) => console.error("Error reading groups", e));
 
-    fetchFollowedChannels();
+    read();
+    const listener = (changes: { [key: string]: chrome.storage.StorageChange }, area: string) => {
+      if (area !== "local") return;
+      if (changes.twitchToken || changes.twitchUserId || changes[CHANNEL_SNAPSHOT_KEY] || changes[GROUP_NAMES_KEY] || changes[CHANNEL_GROUPS_KEY]) read();
+    };
+    chrome.storage.onChanged.addListener(listener);
+    return () => chrome.storage.onChanged.removeListener(listener);
   }, []);
 
-  useEffect(() => {
-    const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }) => {
-      for (const [key, { newValue }] of Object.entries(changes)) {
-        if (key === constants.storage.localStorageKey) {
-          setFollowedChannels(newValue);
-        }
-      }
-    };
-
-    chrome.storage.onChanged.addListener(handleStorageChange);
-    return () => chrome.storage.onChanged.removeListener(handleStorageChange);
-  }, []);
-
-  return followedChannels;
+  return groups;
 };
 
 export default useFollowedChannels;

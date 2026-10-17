@@ -1,145 +1,157 @@
-import { createRoot } from "react-dom/client";
+import { createRoot, Root } from "react-dom/client";
 import "./style.css";
-import "react-accessible-accordion/dist/fancy-example.css";
 import { messageLogger } from "../utils/logger";
-import { CHANNEL_GROUP_MAP, constants, GLOBAL_STATE_KEY } from "../utils/constants";
+import { constants, GLOBAL_STATE_KEY } from "../utils/constants";
 import AccordianChannels from "./components/side-navigation/AccordianChannels";
 import ManageGroups from "./components/manage-groups-cta/ManageGroupsCta";
-import { followersListParser } from "../utils/parser";
-import { getLocalStorage, setLocalStorage } from "../background/storage";
-import { getElementBySelector, createElement, insertBefore, waitUntilNoMoreShowMoreButton } from './utils/domUtils';
-import { createMutationObserver } from './observer';
-import { initFollowersData } from "../utils/transformer";
+import { getLocalStorage } from "../background/storage";
+import { getElementBySelector, createElement, insertBefore } from './utils/domUtils';
+import { startPageAccountReporting } from "./pageAccount";
 
-// Global variables
-let port: chrome.runtime.Port;
-let followersDOMNode: HTMLElement | null = null;
-let observer: MutationObserver;
+// One React root per container: creating a second root on the same container duplicates the UI
+const reactRoots = new WeakMap<Element, Root>();
 
-const setFollowersDOMNode = (node: HTMLElement) => {
-  messageLogger(constants.location.CONTENT_SCRIPT, "Setting followersDOMNode", node);
-  followersDOMNode = node;
+const getReactRoot = (container: Element) => {
+  let root = reactRoots.get(container);
+  if (!root) {
+    root = createRoot(container);
+    reactRoots.set(container, root);
+  }
+  return root;
 };
 
-const connectToBackground = () => {
-    messageLogger(constants.location.CONTENT_SCRIPT, "Connecting to long-lived port");
-    port = chrome.runtime.connect({ name: "content-script" });
+const applySidebarVisibilityFromState = (globalState: any) => {
+  if (!globalState) return;
 
-    port.onDisconnect.addListener(() => {
-      messageLogger(constants.location.CONTENT_SCRIPT, "Disconnected from background. Attempting to reconnect...");
-      setTimeout(connectToBackground, 1000);
-    });
+  const configs = [
+    {
+      selector: "[aria-label='Followed Channels']",
+      hidden: globalState.hideOriginalFollowersList,
+      logMessage: "Applying initial visibility: Followed Channels",
+      overrideStyle: false,
+    },
+    {
+      selector: "[aria-label='Live Channels']",
+      hidden: globalState.hideLiveChannels,
+      logMessage: "Applying initial visibility: Live Channels",
+      overrideStyle: false,
+    },
+    {
+      selector: "[class*='storiesLeftNavSection']",
+      hidden: globalState.hideStories,
+      logMessage: "Applying initial visibility: Stories",
+      overrideStyle: true,
+    }
+  ];
 
-    port.onMessage.addListener(async (response: any) => {
-      messageLogger(constants.location.CONTENT_SCRIPT, "Received message from port", response);
-      try {
-        switch (response.message) {
-          case "SYS:Followers:PARSE_FOLLOWED_CHANNELS_HTML":
-            await parseFollowersHTML();
-            break;
-          case "SYS:Followers:RenderFollowersInSideBar":
-            await renderToUI(response.tabId);
-            break;
-          default:
-            messageLogger(constants.location.CONTENT_SCRIPT, "No action found for message", response);
-        }
-      } catch (error) {
-        messageLogger(constants.location.CONTENT_SCRIPT, "Error handling port message", error);
-      }
-    });
-    observer = createMutationObserver(port, setFollowersDOMNode);
-    observer.observe(document.body, {
-      attributes: true,
-      childList: true,
-      characterData: true,
-      subtree: true,
-    });
-};
+  for (const { selector, hidden, logMessage, overrideStyle } of configs) {
+    const element = getElementBySelector(selector);
+    if (!element) continue;
 
-const parseFollowersHTML = async () => {
-  messageLogger(constants.location.CONTENT_SCRIPT, "Entering parseFollowersHTML function");
-  try {
-    const expandBtn = getElementBySelector('[data-a-target="side-nav-arrow"]');
-    let hadToExpandSideBar = false;
-    if (expandBtn?.ariaLabel === "Expand Side Nav") {
-      expandBtn.click();
-      hadToExpandSideBar = true;
+    if (hidden && element.classList.contains("iGMbNn")) {
+      element.classList.remove("iGMbNn");
+      messageLogger(constants.location.CONTENT_SCRIPT, `Removed class iGMbNn from ${selector}`);
     }
 
-    await waitUntilNoMoreShowMoreButton();
+    messageLogger(constants.location.CONTENT_SCRIPT, logMessage);
 
-    const followerCards = followersDOMNode?.querySelectorAll("[data-a-id]");
-    const followerData = followerCards ? followersListParser(followerCards) : [];
-
-    if (hadToExpandSideBar) {
-      expandBtn.click();
+    if (overrideStyle) {
+      element.style.setProperty("display", hidden ? "none" : "block", "important");
+    } else if (hidden) {
+      element.style.setProperty("display", "none", "important");
+    } else {
+      element.style.removeProperty("display");
     }
-
-    messageLogger(constants.location.CONTENT_SCRIPT, "Exiting parseFollowersHTML function");
-    return followerData;
-
-  } catch (error) {
-    messageLogger(constants.location.CONTENT_SCRIPT, "Error in parseFollowersHTML function", error);
   }
 };
 
-const renderToUI = async (tabId: any) => {
-  messageLogger(constants.location.CONTENT_SCRIPT, "Entering renderToUI function with tabId", tabId);
-  try {
-    const sideNavBtn = getElementBySelector('[data-a-target="side-nav-arrow"]');
-    const ariaLabel = sideNavBtn?.getAttribute("aria-label");
-    const currentState = ariaLabel === "Expand Side Nav" ? false : true;
+const waitForSidebarElements = async (selectors: string[], timeoutMs = 5000): Promise<boolean> => {
+  const start = performance.now();
+  return new Promise(resolve => {
+    const check = () => {
+      const allFound = selectors.every(sel => !!getElementBySelector(sel));
+      if (allFound) return resolve(true);
+      if (performance.now() - start > timeoutMs) return resolve(false);
+      requestAnimationFrame(check);
+    };
+    check();
+  });
+};
 
-    const data: any = await getLocalStorage(constants.storage.prefix + constants.storage.sideBarStateByTab);
-    await setLocalStorage(constants.storage.prefix + constants.storage.sideBarStateByTab, {
-      ...data,
-      [tabId]: {
-        sidebarExpanded: currentState,
-        initialDocStateIdentified: true,
-      },
-    });
 
-    const recommendedFollowers = getElementBySelector(constants.htmlSearchStrings.ARIA_LABEL_RECOMMENDED_CHANNELS);
-    const parentDiv = recommendedFollowers.parentNode;
+// The two containers the extension owns. They are created once and kept, so when Twitch drops them
+// from the page the same elements go back in and React keeps its state.
+let rootContainer: HTMLElement | null = null;
+let manageGroupsContainer: HTMLElement | null = null;
 
-    const rootContainer = getElementBySelector("#__root") || createElement("__root");
-    const manageGroupsContainer = getElementBySelector("#__manage-groups-root") || createElement("__manage-groups-root", { maxheight: "3.5rem" });
+// Puts the sidebar groups and the Manage Groups button in front of Twitch's "Live Channels" section.
+// Safe to call at any time: it does nothing when they are already in place.
+const mountSidebar = () => {
+  const followed = getElementBySelector("[aria-label='Followed Channels']");
+  const anchor = getElementBySelector(constants.htmlSearchStrings.ARIA_LABEL_RECOMMENDED_CHANNELS);
+  if (!followed || !anchor) return;
 
-    insertBefore(rootContainer, recommendedFollowers);
-    insertBefore(manageGroupsContainer, recommendedFollowers);
+  const firstMount = !rootContainer || !manageGroupsContainer;
+  rootContainer ??= createElement("__root");
+  manageGroupsContainer ??= createElement("__manage-groups-root", { maxheight: "3.5rem" });
 
-    const root = createRoot(rootContainer);
-    const manageGroupsRoot = createRoot(manageGroupsContainer);
+  const inPlace = rootContainer.isConnected && manageGroupsContainer.isConnected && manageGroupsContainer.nextElementSibling === anchor && rootContainer.nextElementSibling === manageGroupsContainer;
+  if (!inPlace) {
+    insertBefore(rootContainer, anchor);
+    insertBefore(manageGroupsContainer, anchor);
+  }
 
-    root.render(<AccordianChannels tabId={tabId} />);
-    manageGroupsRoot.render(<ManageGroups tabId={tabId} />);
-
-    messageLogger(constants.location.CONTENT_SCRIPT, "Exiting renderToUI function");
-  } catch (error) {
-    messageLogger(constants.location.CONTENT_SCRIPT, "Error in renderToUI function", error);
+  if (firstMount) {
+    getReactRoot(rootContainer).render(<AccordianChannels />);
+    getReactRoot(manageGroupsContainer).render(<ManageGroups />);
+    messageLogger(constants.location.CONTENT_SCRIPT, "Sidebar mounted");
   }
 };
 
-const addFollowersInitializeListener = () => {
-  chrome.runtime.onMessage.addListener(async (request) => {
-    if (request.message === "SYS:Followers:INITALIZE_FOLLOWED_CHANNELS_FROM_HTML") {
-      messageLogger(constants.location.CONTENT_SCRIPT, "Initializing followed channels from HTML");
-      const followedData = await parseFollowersHTML();
-      const { groupsList, channelGroupMap } = initFollowersData(followedData);
-      messageLogger(constants.location.CONTENT_SCRIPT, "Followed channels initialized", groupsList);
-      messageLogger(constants.location.CONTENT_SCRIPT, "Channel group map initialized", channelGroupMap);
-      await setLocalStorage(
-        constants.storage.localStorageKey,
-        groupsList
-      );
-      await setLocalStorage(
-        CHANNEL_GROUP_MAP,
-        channelGroupMap
-      );
-      const globalS: any = await getLocalStorage(GLOBAL_STATE_KEY)
-      await setLocalStorage(GLOBAL_STATE_KEY, { ...globalS, followersListInitialized: true, initializationDate: new Date().toISOString() });
+// Twitch re-renders its sidebar from time to time and can drop what we added; check again after the
+// page changes (batched, since the page changes constantly)
+const keepSidebarMounted = () => {
+  let scheduled = false;
+  const observer = new MutationObserver(() => {
+    if (!chrome.runtime?.id) {
+      // After the extension is reloaded or updated this script is orphaned and must stop
+      observer.disconnect();
+      return;
     }
-    return true;
+    if (scheduled) return;
+    scheduled = true;
+    setTimeout(() => {
+      scheduled = false;
+      mountSidebar();
+    }, 50);
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+};
+
+const setUpPage = async () => {
+    const globalS: any = await getLocalStorage(GLOBAL_STATE_KEY);
+    const success = await waitForSidebarElements([
+      "[aria-label='Followed Channels']",
+      "[aria-label='Live Channels']"
+    ]);
+    // Stories is optional (not every page or account has it): only give it a short grace period
+    await waitForSidebarElements(["[class*='storiesLeftNavSection']"], 1000);
+
+    if (success) {
+      applySidebarVisibilityFromState(globalS);
+    } else {
+      messageLogger(constants.location.CONTENT_SCRIPT, "Sidebar elements not found in time");
+    }
+    mountSidebar();
+    keepSidebarMounted();
+};
+
+// The popup only writes the settings; every open Twitch tab applies them from storage
+const watchSettings = () => {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && changes[GLOBAL_STATE_KEY]) {
+      applySidebarVisibilityFromState(changes[GLOBAL_STATE_KEY].newValue);
+    }
   });
 };
 
@@ -150,8 +162,9 @@ try {
     messageLogger(constants.location.CONTENT_SCRIPT, "Dark mode detected");
     isDark.classList.add("dark");
   }
-  connectToBackground();
-  addFollowersInitializeListener();
+  startPageAccountReporting();
+  setUpPage();
+  watchSettings();
 } catch (e) {
   messageLogger(constants.location.CONTENT_SCRIPT, "Error in content script initialization", e);
 }

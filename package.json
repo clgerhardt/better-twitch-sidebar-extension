@@ -1,7 +1,7 @@
 {
-  "name": "better-twitch-sidebar-extension",
+  "name": "better-sidebar",
   "version": "1.0.0",
-  "description": "A extension to replace twitch's follower sidebar with a custom grouping sidebar built with Vite, React, TypeScript and Tailwind CSS.",
+  "description": "Group the channels you follow into custom groups in Twitch's sidebar. Not affiliated with Twitch.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -13,7 +13,10 @@
     "build:firefox": "vite build --config vite.config.firefox.ts",
     "dev": "nodemon --config nodemon.chrome.json",
     "dev:chrome": "nodemon --config nodemon.chrome.json",
-    "dev:firefox": "nodemon --config nodemon.firefox.json"
+    "dev:firefox": "nodemon --config nodemon.firefox.json",
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "yarn build:chrome && playwright test",
+    "css:scope-preflight": "node scripts/scope-preflight.cjs"
   },
   "type": "module",
   "dependencies": {
@@ -21,13 +24,12 @@
     "@heroicons/react": "^2.2.0",
     "react": "^19.0.0",
     "react-accessible-accordion": "^5.0.0",
-    "react-data-table-component": "^7.6.2",
     "react-dom": "^19.0.0",
-    "styled-components": "^6.1.14",
     "webextension-polyfill": "^0.12.0"
   },
   "devDependencies": {
     "@crxjs/vite-plugin": "^2.0.0-beta.28",
+    "@playwright/test": "^1.63.0",
     "@types/chrome": "^0.0.287",
     "@types/node": "^22.10.5",
     "@types/react": "^19.0.2",

@@ -6,7 +6,9 @@ export const constants = {
     POPUP: 'popup',
     STORAGE: 'storage',
     UTIL: 'util',
-    NOT_SET: 'not_set'
+    OBSERVER: 'observer',
+    NOT_SET: 'not_set',
+    HOOK: 'hook'
   },
   loggerLevel: {
     DEBUG: 'debug',
@@ -17,23 +19,35 @@ export const constants = {
   storage: {
     generalKey: 'bttvSidebar',
     prefix: 'bttvSidebar_',
-    localStorageKey: 'betterTwitchSidebar',
-    sideBarStateByTab: 'sideBarStateByTab',
     globalState: 'globalState',
     followedChannels: 'followedChannels',
-    channelGroupMap: 'channelGroupMap'
+    channelGroups: 'channelGroups',
+    groupNames: 'groupNames'
   },
   htmlSearchStrings: {
-    ARIA_LABEL_RECOMMENDED_CHANNELS: '[aria-label="Recommended Channels"]'
-  },
-  portMessages: {
-    FOLLOWED_CHANNELS_LOADED: 'SYS:Followers:FOLLOWED_CHANNELS_LOADED'
+    ARIA_LABEL_RECOMMENDED_CHANNELS: '[aria-label="Live Channels"]'
   }
 };
 
 // constants.js
 export const STORAGE_PREFIX = constants.storage.prefix;
 export const GLOBAL_STATE_KEY = constants.storage.globalState;
-export const SIDEBAR_STATE_KEY = STORAGE_PREFIX + constants.storage.sideBarStateByTab;
-export const CHANNEL_GROUP_MAP = STORAGE_PREFIX + constants.storage.channelGroupMap;
-export const LOCAL_STORAGE_KEY = constants.storage.localStorageKey;
+// Older versions stored a derived group list here; it is only ever removed now (on logout and update)
+export const FOLLOWED_CHANNELS_KEY = constants.storage.followedChannels;
+// Everything older versions stored that nothing uses now; removed whenever the background starts
+export const LEGACY_STORAGE_KEYS = [FOLLOWED_CHANNELS_KEY, 'sideBarStateByTab', STORAGE_PREFIX + 'sideBarStateByTab'];
+export const CHANNEL_GROUPS_KEY = constants.storage.channelGroups;
+export const GROUP_NAMES_KEY = constants.storage.groupNames;
+// When the stored Twitch token stops working (ms since epoch), from Twitch's own validate call
+export const TOKEN_EXPIRES_AT_KEY = 'tokenExpiresAt';
+// The Twitch account signed in on twitch.tv, as seen by the content script: { status, id?, login?, seenAt }
+export const PAGE_ACCOUNT_KEY = 'pageAccount';
+// True after an explicit logout: stops silent re-login until the user connects again
+export const TWITCH_LOGGED_OUT_KEY = 'twitchLoggedOut';
+// The channels fetched from Twitch for the connected user (written only by the background)
+export const CHANNEL_SNAPSHOT_KEY = 'channelSnapshot';
+// Why the last refresh failed ('unauthorized' | 'rate_limited' | 'failed'); absent when it succeeded
+export const SNAPSHOT_ERROR_KEY = 'snapshotError';
+// The last Twitch channel row captured from the page, blanked of any account data, used to build
+// rows when the page has none of its own
+export const ROW_TEMPLATE_KEY = 'rowTemplate';
