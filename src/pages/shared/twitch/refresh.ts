@@ -34,14 +34,18 @@ type Deps = {
   log?: (message: string, detail?: unknown) => void;
 };
 
+type Flight = { promise: Promise<RefreshResult>; session?: string };
+
 export const createRefresher = (deps: Deps) => {
   const { client, storage, now, log } = deps;
-  let inFlight: Promise<RefreshResult> | null = null;
+  // The refresh that is running, and the session (token and account) it read when it started
+  let inFlight: Flight | null = null;
 
   const readSession = async () => {
     const stored = await storage.get(["twitchToken", "twitchUserId"]);
     return { token: stored.twitchToken as string | undefined, userId: stored.twitchUserId as string | undefined };
   };
+  const sessionKey = (session: { token?: string; userId?: string }) => `${session.token ?? ""}|${session.userId ?? ""}`;
 
   // The account's own profile picture is saved when it connects, but older sessions never saved one. Fetch
   // it once if it is missing so the popup can show it; this must never fail or delay a refresh.
@@ -56,10 +60,11 @@ export const createRefresher = (deps: Deps) => {
     }
   };
 
-  const run = async (force: boolean, renewed = false): Promise<RefreshResult> => {
+  const run = async (flight: Flight, force: boolean, renewed = false): Promise<RefreshResult> => {
     const stored = await storage.get(["twitchToken", "twitchUserId", CHANNEL_SNAPSHOT_KEY]);
     const token: string | undefined = stored.twitchToken;
     const userId: string | undefined = stored.twitchUserId;
+    flight.session = sessionKey({ token, userId });
     if (!token || !userId) return { ok: false, reason: "not_connected" };
     if (await deps.isPaused?.()) return { ok: false, reason: "paused" };
 
@@ -99,7 +104,7 @@ export const createRefresher = (deps: Deps) => {
       // A rejected token gets one quiet renewal and one retry, never a loop
       if (error instanceof HelixError && error.kind === "unauthorized" && deps.renewToken && !renewed) {
         log?.("token rejected, renewing");
-        if (await deps.renewToken()) return run(true, true);
+        if (await deps.renewToken()) return run(flight, true, true);
         if (!(await sameSession())) return { ok: false, reason: "discarded" };
       }
       const reason: RefreshFailure =
@@ -111,20 +116,25 @@ export const createRefresher = (deps: Deps) => {
   };
 
   return {
-    // Callers that arrive while a refresh is running share its result, unless that refresh was for a
-    // session that has since ended (logout, another account): its result is thrown away, so a caller
-    // that only joined it starts a fresh refresh for the session that is connected now
+    // Callers that arrive while a refresh is running share its result, unless that refresh ran for a
+    // session that is not the connected one now (logout, another account, or it started before anyone
+    // was connected): its result says nothing about the session this caller is asking for, so the
+    // caller that only joined it starts a fresh refresh
     refresh: async (force = false): Promise<RefreshResult> => {
       for (let attempt = 0; ; attempt++) {
         const joined = inFlight !== null;
-        if (!inFlight) {
-          inFlight = run(force).finally(() => {
-            inFlight = null;
+        let flight = inFlight;
+        if (!flight) {
+          const started: Flight = { promise: undefined as unknown as Promise<RefreshResult> };
+          started.promise = run(started, force).finally(() => {
+            if (inFlight === started) inFlight = null;
           });
+          flight = inFlight = started;
         }
-        const result = await inFlight;
+        const result = await flight.promise;
+        if (!joined || attempt >= 2) return result;
         const discarded = !result.ok && result.reason === "discarded";
-        if (!discarded || !joined || attempt >= 2) return result;
+        if (!discarded && flight.session === sessionKey(await readSession())) return result;
       }
     },
   };
