@@ -1,7 +1,7 @@
 {
-  "name": "better-twitch-sidebar-extension",
+  "name": "better-sidebar",
   "version": "1.0.0",
-  "description": "A extension to replace twitch's follower sidebar with a custom grouping sidebar built with Vite, React, TypeScript and Tailwind CSS.",
+  "description": "Group the channels you follow into custom groups in Twitch's sidebar. Not affiliated with Twitch.",
   "license": "MIT",
   "repository": {
     "type": "git",
