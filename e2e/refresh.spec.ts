@@ -235,6 +235,36 @@ test.describe("refresh", () => {
     expect(t.data.channelSnapshot.user).toEqual({ id: "888" });
   });
 
+  test("a refresh asked for while a refresh for no account is still reading is run again for the connected account", async () => {
+    // The first refresh read storage while nobody was connected, and has not finished yet
+    const data: Record<string, any> = {};
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    let reads = 0;
+    const storage: RefreshStorage = {
+      get: async (keys) => {
+        const seen = Object.fromEntries(keys.filter((k) => k in data).map((k) => [k, data[k]]));
+        if (reads++ === 0) await gate;
+        return seen;
+      },
+      set: async (items) => void Object.assign(data, items),
+      remove: async (keys) => void keys.forEach((k) => delete data[k]),
+    };
+    const { client, calls } = fakeClient();
+    const refresher = createRefresher({ client, storage, now: () => 1_000_000 });
+
+    const first = refresher.refresh();
+    await new Promise((r) => setTimeout(r, 0));
+    Object.assign(data, connected);
+    const second = refresher.refresh(true);
+    release();
+
+    expect(await first).toEqual({ ok: false, reason: "not_connected" });
+    expect(await second).toMatchObject({ ok: true });
+    expect(calls).toEqual(["followed", "users:1,2", "live"]);
+    expect(data.channelSnapshot.user).toEqual({ id: "999" });
+  });
+
   test.describe("the account's profile picture", () => {
     const withoutPicture = { twitchToken: "tok", twitchUserId: "999" };
 
