@@ -152,7 +152,11 @@ export const getValidTwitchToken = async (): Promise<string | null> => {
 
   if (loggedOut) return null;
 
-  if (!twitchToken || isTokenExpired(expiresAt)) {
+  // Only the Connect button creates a connection. A silent sign-in here would connect any browser
+  // that is signed in to Twitch the moment a popup opens, without its account being recorded.
+  if (!twitchToken) return null;
+
+  if (isTokenExpired(expiresAt)) {
     return await trySilentReauth();
   }
 

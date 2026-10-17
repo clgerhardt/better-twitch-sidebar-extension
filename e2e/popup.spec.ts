@@ -143,3 +143,25 @@ test.describe("the popup's look", () => {
     await expect(popup.locator("img[src*='cover']")).toHaveCount(0);
   });
 });
+
+test.describe("the popup when the extension is not connected", () => {
+  test("shows the connect view and never connects on its own, even if Twitch would approve silently", async ({ session, context, worker, extensionId, openTwitch }) => {
+    await worker.evaluate(async () => {
+      await chrome.storage.local.remove(["twitchToken", "twitchUserId", "twitchUserImage", "tokenExpiresAt", "channelSnapshot"]);
+    });
+    await openTwitch();
+    await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get("pageAccount")).pageAccount?.status)).toBe("signed_in");
+
+    const popup = await context.newPage();
+    // Twitch would hand a token to a silent sign-in, as it does for a browser already signed in
+    await popup.addInitScript(() => {
+      (chrome.identity as any).launchWebAuthFlow = (_o: unknown, cb: (url?: string) => void) =>
+        cb("https://fixture.chromiumapp.org/#access_token=silent-token&scope=user%3Aread%3Afollows&token_type=bearer");
+    });
+    await openPopup(popup, extensionId);
+    await expect(popup.getByRole("button", { name: "Connect for fixture_viewer" })).toBeVisible();
+    await expect(popup.getByText("Connected", { exact: true })).toHaveCount(0);
+    await popup.waitForTimeout(500);
+    expect((await worker.evaluate(() => chrome.storage.local.get("twitchToken"))).twitchToken).toBeUndefined();
+  });
+});
