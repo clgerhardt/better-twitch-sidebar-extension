@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { startLiveRefresh } from "../src/pages/shared/liveRefresh";
 
 // A fake document, clock and timers: the test decides what time it is and when the poll fires
-const setup = (options: { visibility?: "visible" | "hidden"; fetchedAt?: number | null } = {}) => {
+const setup = (options: { visibility?: "visible" | "hidden"; fetchedAt?: number | null; waitingForFirst?: boolean } = {}) => {
   const listeners = new Set<() => void>();
   const doc = {
     visibilityState: options.visibility ?? "visible",
@@ -25,12 +25,14 @@ const setup = (options: { visibility?: "visible" | "hidden"; fetchedAt?: number 
   };
   let time = 1_000_000;
   let fetchedAt: number | null = options.fetchedAt === undefined ? time : options.fetchedAt;
+  let waitingForFirst = options.waitingForFirst ?? false;
   let requests = 0;
   const stop = startLiveRefresh({
     intervalMs: 60_000,
     retryMs: 15_000,
     request: () => requests++,
     getFetchedAt: () => fetchedAt,
+    isWaitingForFirst: () => waitingForFirst,
     now: () => time,
     doc,
     timers,
@@ -45,6 +47,7 @@ const setup = (options: { visibility?: "visible" | "hidden"; fetchedAt?: number 
     },
     // Fresh data landed
     refreshLanded: () => (fetchedAt = time),
+    setWaitingForFirst: (waiting: boolean) => (waitingForFirst = waiting),
     switchBackToTab: () => listeners.forEach((l) => l()),
     setVisibility: (v: "visible" | "hidden") => (doc.visibilityState = v),
     listenerCount: () => listeners.size,
@@ -109,6 +112,30 @@ test.describe("startLiveRefresh", () => {
     const t = setup({ fetchedAt: null });
     t.advance(300_000);
     expect(t.requests()).toBe(0);
+  });
+
+  test("while the first snapshot is awaited, asks again every retry interval, but not while the tab is hidden", () => {
+    const t = setup({ fetchedAt: null, waitingForFirst: true });
+    t.advance(10_000);
+    expect(t.requests()).toBe(0); // the caller's own request was just made
+    t.advance(5_000);
+    expect(t.requests()).toBe(1);
+    t.advance(10_000);
+    expect(t.requests()).toBe(1);
+    t.advance(5_000);
+    expect(t.requests()).toBe(2);
+    t.setVisibility("hidden");
+    t.advance(60_000);
+    expect(t.requests()).toBe(2);
+  });
+
+  test("stops asking once the wait is over", () => {
+    const t = setup({ fetchedAt: null, waitingForFirst: true });
+    t.advance(15_000);
+    expect(t.requests()).toBe(1);
+    t.setWaitingForFirst(false);
+    t.advance(60_000);
+    expect(t.requests()).toBe(1);
   });
 
   test("stopping removes the timer and the listener", () => {
