@@ -30,6 +30,8 @@ export const useSidebarGroups = (): {
   const [fetchedAt, setFetchedAt] = useState<number | null>(null);
   // The live refresh timer reads this, so it is always the latest value
   const fetchedAtRef = useRef<number | null>(null);
+  // True while the account is connected but its first snapshot has not arrived
+  const waitingForFirstRef = useRef(false);
   const updateFetchedAt = (value: number | null) => {
     fetchedAtRef.current = value;
     setFetchedAt(value);
@@ -60,6 +62,7 @@ export const useSidebarGroups = (): {
   const showStoredSnapshot = () => {
     chrome.storage.local.get(["twitchToken", "twitchUserId", CHANNEL_SNAPSHOT_KEY, SNAPSHOT_ERROR_KEY], (stored) => {
       const { twitchToken, twitchUserId } = stored;
+      waitingForFirstRef.current = false;
       if (!twitchToken || !twitchUserId) {
         // Logged out: drop the previous account's channels and groups from memory too
         fetchedRef.current = null;
@@ -90,6 +93,7 @@ export const useSidebarGroups = (): {
       } else {
         setError(null);
         setLoading(true);
+        waitingForFirstRef.current = true;
       }
     });
   };
@@ -123,6 +127,7 @@ export const useSidebarGroups = (): {
       retryMs: LIVE_RETRY_MS,
       request: requestRefresh,
       getFetchedAt: () => fetchedAtRef.current,
+      isWaitingForFirst: () => waitingForFirstRef.current,
     });
 
     return () => {
