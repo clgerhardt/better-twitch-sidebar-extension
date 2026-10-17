@@ -21,6 +21,10 @@ type LiveRefreshOptions = {
   request: () => void;
   // When the stored data was last refreshed (null while there is none yet)
   getFetchedAt: () => number | null;
+  // True while a connected account is waiting for its first snapshot. The request that should have
+  // produced it can be lost (the background asleep, a refresh that wrote nothing), so ask again every
+  // retryMs rather than leave the sidebar loading forever.
+  isWaitingForFirst?: () => boolean;
   now?: () => number;
   pollMs?: number;
   doc?: Pick<Document, "visibilityState" | "addEventListener" | "removeEventListener">;
@@ -39,12 +43,14 @@ export const startLiveRefresh = ({
   retryMs,
   request,
   getFetchedAt,
+  isWaitingForFirst = () => false,
   now = () => Date.now(),
   pollMs = 1_000,
   doc = document,
   timers = browserTimers,
 }: LiveRefreshOptions) => {
-  let lastAskedAt = -Infinity;
+  // The caller makes the first request itself when it starts
+  let lastAskedAt = now();
 
   const ask = () => {
     lastAskedAt = now();
@@ -54,7 +60,11 @@ export const startLiveRefresh = ({
   const poll = () => {
     if (doc.visibilityState !== "visible") return;
     const fetchedAt = getFetchedAt();
-    if (fetchedAt === null) return; // nothing to age yet; the first request is the caller's
+    if (fetchedAt === null) {
+      // Nothing to age yet: the first request is the caller's, and is only repeated if it never produced a snapshot
+      if (isWaitingForFirst() && now() - lastAskedAt >= retryMs) ask();
+      return;
+    }
     if (now() - fetchedAt >= intervalMs && now() - lastAskedAt >= retryMs) ask();
   };
 
