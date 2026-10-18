@@ -80,6 +80,7 @@ jobs:
           name="better-sidebar-${version}.zip"
           (cd dist_chrome && zip -r -q "../${name}" . -x ".vite/*")
           echo "name=${name}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
 
       - name: Upload the zip
         uses: actions/upload-artifact@v4
@@ -87,9 +88,23 @@ jobs:
           name: ${{ steps.zip.outputs.name }}
           path: ${{ steps.zip.outputs.name }}
 
+      # A push to main releases when package.json holds a version that has no tag yet, so bumping the
+      # version in a merged PR is what publishes. Pushing a v* tag by hand still releases that tag.
+      - name: Check whether this version is already released
+        id: released
+        if: github.ref == 'refs/heads/main'
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/v${{ steps.zip.outputs.version }}" > /dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Attach the zip to a GitHub release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || steps.released.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ steps.zip.outputs.version }}
+          target_commitish: ${{ github.sha }}
           files: ${{ steps.zip.outputs.name }}
           generate_release_notes: true
