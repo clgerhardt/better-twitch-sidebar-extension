@@ -1,4 +1,4 @@
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import type { SidebarGroup } from "@src/pages/utils/layoutGroups";
@@ -17,6 +17,17 @@ export default function ManageFollowedChannelsDialog({ open, setOpen, followedCh
   const [selectedName, setSelectedName] = useState("Ungrouped");
   // A group that is gone (deleted) or not stored yet (just added) falls back to the first group
   const selected = groups.find((g) => g.groupName === selectedName) ?? groups[0];
+
+  // Twitch's own key handlers preventDefault() Esc before it reaches Headless UI, which then ignores it.
+  // Listening in the capture phase gets there first.
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [open, setOpen]);
 
   return (
     <Transition.Root show={open} as={Fragment}>
