@@ -16,10 +16,6 @@ Twitch's native sidebar items have a hover effect; our channel items don't yet. 
 
 Add the ability to set the order of channel groups.
 
-## Esc closes the manage groups modal
-
-Pressing Esc should close the manage groups modal.
-
 ## Group accent color picker
 
 Add a color picker so each group can change its vertical purple bar to a different color.
