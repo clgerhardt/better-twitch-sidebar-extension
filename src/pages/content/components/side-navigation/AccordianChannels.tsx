@@ -125,7 +125,7 @@ const AccordianChannels = () => {
                 <ul role="list" className="m-0 list-none p-0">
                   {group.followedChannels.map((channel) => (
                     <li key={channel.login}>
-                      <ChannelRow channel={channel} nativeVersion={nativeVersion} />
+                      <ChannelRow channel={channel} nativeVersion={nativeVersion} collapsed={!isSidebarExpanded} />
                     </li>
                   ))}
                 </ul>
