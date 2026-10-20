@@ -377,6 +377,15 @@ test.describe("group headers", () => {
       await expect(twitchPage.locator("#__root").getByRole("button", { name: "Ungrouped" })).toContainText("U");
     });
 
+    test("channel rows show only the avatar, and get their text back when expanded", async ({ twitchPage }) => {
+      const row = twitchPage.locator("#__root a.side-nav-card__link").first();
+      await expect(row.locator("img")).toHaveCount(1);
+      await expect(row.locator("[data-a-target=side-nav-title]")).toHaveCount(0);
+      await expect(row).toHaveAttribute("title", /\S/);
+      await setSideNavLabel(twitchPage, "Collapse Side Nav");
+      await expect(twitchPage.locator("#__root a.side-nav-card__link [data-a-target=side-nav-title]").first()).toBeVisible();
+    });
+
     test("an empty group shows a short mark that fits, not the full sentence", async ({ twitchPage }) => {
       const friends = twitchPage.locator("#__root").getByRole("button", { name: "Friends" });
       await friends.click();
