@@ -75,9 +75,10 @@ const AccordianChannels = () => {
     <div>
       <RefreshProgress fetchedAt={fetchedAt} />
       <div className="-mx-[0.4rem] overflow-y-auto" style={{ maxHeight: "50vh" }}>
-        <Accordion allowZeroExpanded>
+        {/* preExpanded is only read on mount, and groups arrive after loading ends, so remount once they exist */}
+        <Accordion key={groups.length > 0 ? "populated" : "empty"} allowZeroExpanded preExpanded={groups.length > 0 ? [groups[0].groupName] : []}>
           {visibleGroups.map((group) => (
-          <AccordionItem key={group.groupName}>
+          <AccordionItem key={group.groupName} uuid={group.groupName}>
             <AccordionItemHeading id="expanded-side-bar-title" className="my-1">
               <AccordionItemButton
                 title={isSidebarExpanded ? `${group.numberOfLiveChannels} live of ${group.numberOfChannels}` : undefined}

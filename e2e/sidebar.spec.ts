@@ -350,7 +350,7 @@ test.describe("group headers", () => {
   });
 
   test("sit on the sidebar without a box around the accordion", async ({ twitchPage }) => {
-    await header(twitchPage, "Ungrouped").click();
+    await expect(header(twitchPage, "Ungrouped")).toHaveAttribute("aria-expanded", "true");
     const style = await twitchPage.evaluate(() => {
       const accordion = document.querySelector("#__root [data-accordion-component=Accordion]")!;
       const panel = document.querySelector("#__root [data-accordion-component=AccordionItemPanel]")!;
@@ -414,11 +414,15 @@ test.describe("group headers", () => {
 
   test("still open and close their channel list", async ({ twitchPage }) => {
     const ungrouped = header(twitchPage, "Ungrouped");
-    await expect(ungrouped).toHaveAttribute("aria-expanded", "false");
-    await ungrouped.click();
     await expect(ungrouped).toHaveAttribute("aria-expanded", "true");
     await expect(twitchPage.locator("#__root")).toContainText("Fixture_Live");
     await ungrouped.click();
     await expect(ungrouped).toHaveAttribute("aria-expanded", "false");
+    await ungrouped.click();
+    await expect(ungrouped).toHaveAttribute("aria-expanded", "true");
+  });
+
+  test("open the first group on load", async ({ twitchPage }) => {
+    await expect(header(twitchPage, "Ungrouped")).toHaveAttribute("aria-expanded", "true");
   });
 });

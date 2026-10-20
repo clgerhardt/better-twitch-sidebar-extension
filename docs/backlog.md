@@ -23,7 +23,3 @@ Add a color picker so each group can change its vertical purple bar to a differe
 ## Empty group text in collapsed sidebar
 
 When the sidebar is collapsed and a group has no channels, the empty-state text does not fit. Needs shorter text or another treatment.
-
-## Auto-expand first group on load
-
-On load, the first group should be expanded automatically.
