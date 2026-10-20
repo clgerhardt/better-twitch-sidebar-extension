@@ -4,4 +4,7 @@ export type GlobalState = {
   hideOriginalFollowersList: boolean;
   hideStories?: boolean;
   hideLiveChannels?: boolean;
+  hideStreaks?: boolean;
+  hideRecommendedCategories?: boolean;
+  hideViewersAlsoWatch?: boolean;
 };

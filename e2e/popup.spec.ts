@@ -98,7 +98,7 @@ test.describe("the popup's look", () => {
   test("lists the toggles as dark rows with switches, not white cards", async ({ twitchPage, context, extensionId }) => {
     const popup = await context.newPage();
     await goto(popup, extensionId);
-    await expect(popup.getByRole("switch")).toHaveCount(3);
+    await expect(popup.getByRole("switch")).toHaveCount(6);
     await expect(popup.getByText("Hide original followers list")).toBeVisible();
     const whites = await popup.evaluate(() => [...document.querySelectorAll("#main-container *")].filter((el) => getComputedStyle(el).backgroundColor === "rgb(255, 255, 255)" && el.getBoundingClientRect().width > 40).length);
     expect(whites).toBe(0);
@@ -107,7 +107,7 @@ test.describe("the popup's look", () => {
   test("Logout sits right under the toggles, with no empty gap", async ({ twitchPage, context, extensionId }) => {
     const popup = await context.newPage();
     await goto(popup, extensionId);
-    await expect(popup.getByRole("switch")).toHaveCount(3);
+    await expect(popup.getByRole("switch")).toHaveCount(6);
     const gap = await popup.evaluate(() => {
       const last = [...document.querySelectorAll("[role=switch]")].pop()!.closest("div")!.getBoundingClientRect();
       const logout = [...document.querySelectorAll("button")].find((b) => b.innerText === "Logout")!.getBoundingClientRect();
