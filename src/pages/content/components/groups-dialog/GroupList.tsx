@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { PlusIcon } from "@heroicons/react/24/outline";
+import { ChevronDownIcon, ChevronUpIcon, PlusIcon } from "@heroicons/react/24/outline";
 import type { SidebarGroup } from "@src/pages/utils/layoutGroups";
 import { validateGroupName } from "@src/pages/utils/groupName";
-import { addGroup } from "./groupsStorage";
+import { addGroup, moveGroup } from "./groupsStorage";
 
 // The left pane: a field to add a group, and the groups to pick from
 export default function GroupList({
@@ -17,6 +17,9 @@ export default function GroupList({
   const [name, setName] = useState("");
   const error = name === "" ? null : validateGroupName(name, groups.map((g) => g.groupName.toLowerCase()));
   const canAdd = name !== "" && error === null;
+
+  // Ungrouped always comes first and cannot be moved
+  const movable = groups.filter((g) => !g.default).map((g) => g.groupName);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -55,19 +58,42 @@ export default function GroupList({
       <ul aria-label="Groups" className="m-0 min-h-0 flex-1 list-none overflow-y-auto p-0">
         {groups.map((group) => {
           const isSelected = group.groupName === selectedName;
+          const position = movable.indexOf(group.groupName);
           return (
-            <li key={group.groupName} className="my-1">
+            <li key={group.groupName} className="my-1 flex items-stretch gap-1">
               <button
                 type="button"
                 aria-pressed={isSelected}
                 onClick={() => onSelect(group.groupName)}
-                className={`flex w-full cursor-pointer items-center gap-3 rounded-r border-0 border-l-[3px] border-solid border-purple-500 px-3 py-2 text-left text-[1.4rem] font-medium text-[#efeff1] ${
+                className={`flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-r border-0 border-l-[3px] border-solid border-purple-500 px-3 py-2 text-left text-[1.4rem] font-medium text-[#efeff1] ${
                   isSelected ? "bg-purple-500/25" : "bg-white/[0.07] hover:bg-white/[0.12]"
                 }`}
               >
                 <span className="min-w-0 flex-1 truncate">{group.groupName}</span>
                 <span className="rounded-full bg-[#3a3a3d] px-2 text-[1.1rem] leading-[1.7rem]">{group.numberOfChannels}</span>
               </button>
+              {position !== -1 && (
+                <div className="flex flex-col justify-center">
+                  {([-1, 1] as const).map((step) => {
+                    const Icon = step === -1 ? ChevronUpIcon : ChevronDownIcon;
+                    const edge = step === -1 ? position === 0 : position === movable.length - 1;
+                    const label = `Move ${group.groupName} ${step === -1 ? "up" : "down"}`;
+                    return (
+                      <button
+                        key={step}
+                        type="button"
+                        aria-label={label}
+                        title={label}
+                        disabled={edge}
+                        onClick={() => moveGroup(group.groupName, step, movable)}
+                        className="flex cursor-pointer items-center justify-center rounded border-0 bg-transparent px-1 py-0.5 text-[#adadb8] enabled:hover:bg-white/10 enabled:hover:text-[#efeff1] disabled:cursor-default disabled:opacity-30"
+                      >
+                        <Icon aria-hidden="true" className="h-5 w-5" />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </li>
           );
         })}
