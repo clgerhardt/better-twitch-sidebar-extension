@@ -6,7 +6,8 @@ import type { BrowserContext, Page } from "@playwright/test";
 // fixture_offline is not.
 
 const openGroup = async (page: Page) => {
-  await page.locator("#__root").getByRole("button", { name: /Ungrouped/ }).click();
+  const header = page.locator("#__root").getByRole("button", { name: /Ungrouped/ });
+  if ((await header.getAttribute("aria-expanded")) !== "true") await header.click();
   await expect(page.locator("#__root a.side-nav-card__link").first()).toBeVisible();
 };
 const rowFor = (page: Page, login: string) => page.locator(`#__root a.side-nav-card__link[href="/${login}"]`);
