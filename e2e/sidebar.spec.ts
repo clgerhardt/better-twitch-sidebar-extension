@@ -364,6 +364,27 @@ test.describe("group headers", () => {
     expect(style).toEqual({ accordionBorder: "0px", panelPaddingLeft: "4px", buttonArrow: "none" });
   });
 
+  test.describe("hovering a channel row", () => {
+    const rowFor = (page: Page, login: string) => page.locator(`#__root a.side-nav-card__link[href="/${login}"]`);
+
+    test("shows the stream title beside a live row, as Twitch does", async ({ twitchPage }) => {
+      const row = rowFor(twitchPage, "fixture_live");
+      await row.hover();
+      const tip = twitchPage.getByRole("tooltip");
+      await expect(tip).toHaveText("Fixture live stream title");
+      const [tipBox, rowBox] = [(await tip.boundingBox())!, (await row.boundingBox())!];
+      expect(tipBox.x).toBeGreaterThanOrEqual(rowBox.x + rowBox.width);
+      await twitchPage.mouse.move(600, 600);
+      await expect(tip).toHaveCount(0);
+    });
+
+    test("shows nothing for an offline row", async ({ twitchPage }) => {
+      await rowFor(twitchPage, "fixture_offline").hover();
+      await twitchPage.waitForTimeout(400);
+      await expect(twitchPage.getByRole("tooltip")).toHaveCount(0);
+    });
+  });
+
   test.describe("when the side nav is collapsed", () => {
     test.beforeEach(async ({ twitchPage, worker }) => {
       await worker.evaluate(() => chrome.storage.local.set({ groupNames: ["Friends"] }));
@@ -381,9 +402,16 @@ test.describe("group headers", () => {
       const row = twitchPage.locator("#__root a.side-nav-card__link").first();
       await expect(row.locator("img")).toHaveCount(1);
       await expect(row.locator("[data-a-target=side-nav-title]")).toHaveCount(0);
-      await expect(row).toHaveAttribute("title", /\S/);
+      await expect(row).toHaveAttribute("aria-label", /\S/);
       await setSideNavLabel(twitchPage, "Collapse Side Nav");
       await expect(twitchPage.locator("#__root a.side-nav-card__link [data-a-target=side-nav-title]").first()).toBeVisible();
+    });
+
+    test("hovering a channel avatar shows its name and stream title", async ({ twitchPage }) => {
+      await twitchPage.locator("#__root a.side-nav-card__link[href='/fixture_live']").hover();
+      const tip = twitchPage.getByRole("tooltip");
+      await expect(tip).toContainText("Fixture_Live");
+      await expect(tip).toContainText("Fixture live stream title");
     });
 
     test("an empty group shows a short mark that fits, not the full sentence", async ({ twitchPage }) => {

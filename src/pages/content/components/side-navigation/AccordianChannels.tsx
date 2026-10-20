@@ -6,7 +6,7 @@ import {
   AccordionItemPanel,
   AccordionItemState,
 } from "react-accessible-accordion";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
 import useSidebarState from "../../hooks/useSidebarState";
@@ -22,6 +22,9 @@ import { useNeedsReconnect } from "../../hooks/useNeedsReconnect";
 import ExpiredContent from "./ExpiredContent";
 import ChannelRow from "./ChannelRow";
 import { useNativeRowsVersion } from "../../hooks/useNativeRows";
+import type { SidebarChannel } from "@src/pages/utils/layoutGroups";
+import { isSharedRow, nativeRowsByLogin } from "../../rows/nativeRows";
+import { readNativeTooltip } from "../../rows/nativeTooltip";
 
 const AccordianChannels = () => {
   const isSidebarExpanded = useSidebarState();
@@ -35,12 +38,34 @@ const AccordianChannels = () => {
 
   // When the side nav is collapsed a header shows only an initial, so hovering or focusing it says
   // which group it is. The tooltip lives on the page body: the sidebar clips anything sticking out.
-  const [tip, setTip] = useState<{ name: string; live?: number; left: number; top: number } | null>(null);
+  const [tip, setTip] = useState<{ name: string; live?: number; detail?: string; content?: HTMLElement; kind: "group" | "channel"; left: number; top: number } | null>(null);
   const showTip = (element: HTMLElement, name: string, live?: number) => {
     const rect = element.getBoundingClientRect();
-    setTip({ name, live, left: rect.right + 8, top: rect.top + rect.height / 2 });
+    setTip({ name, live, kind: "group", left: rect.right + 8, top: rect.top + rect.height / 2 });
   };
-  const hideTip = () => setTip(null);
+  const hoveredLogin = useRef<string | null>(null);
+  const hideTip = () => {
+    hoveredLogin.current = null;
+    setTip(null);
+  };
+
+  // Twitch shows a live channel's stream title beside its row. Our rows are copies without Twitch's
+  // handlers, so show it ourselves. In the collapsed rail a row is only an avatar, so the name goes with it.
+  const showChannelTip = (element: HTMLElement | null, channel: SidebarChannel) => {
+    const title = channel.isLive ? channel.streamTitle : undefined;
+    if (!element || (isSidebarExpanded && !title)) return hideTip();
+    hoveredLogin.current = channel.login;
+    const rect = element.getBoundingClientRect();
+    setTip({ name: isSidebarExpanded ? "" : channel.channelName, detail: title, kind: "channel", left: rect.right + 8, top: rect.top });
+
+    // A shared stream has more to show than its title: take Twitch's own tooltip for it
+    const native = channel.isLive ? nativeRowsByLogin().get(channel.login.toLowerCase()) : undefined;
+    if (native && isSharedRow(native)) {
+      readNativeTooltip(native).then((content) => {
+        if (content && hoveredLogin.current === channel.login) setTip((current) => current && { ...current, name: "", detail: undefined, content });
+      });
+    }
+  };
 
   useEffect(() => {
     messageLogger(constants.location.UI_COMPONENT, "groups", groups);
@@ -125,7 +150,7 @@ const AccordianChannels = () => {
                 <ul role="list" className="m-0 list-none p-0">
                   {group.followedChannels.map((channel) => (
                     <li key={channel.login}>
-                      <ChannelRow channel={channel} nativeVersion={nativeVersion} collapsed={!isSidebarExpanded} />
+                      <ChannelRow channel={channel} nativeVersion={nativeVersion} collapsed={!isSidebarExpanded} onHover={showChannelTip} />
                     </li>
                   ))}
                 </ul>
@@ -152,7 +177,7 @@ const AccordianChannels = () => {
         </Accordion>
       </div>
       {tip &&
-        !isSidebarExpanded &&
+        (tip.kind === "channel" || !isSidebarExpanded) &&
         createPortal(
           <div
             role="tooltip"
@@ -160,20 +185,23 @@ const AccordianChannels = () => {
               position: "fixed",
               left: tip.left,
               top: tip.top,
-              transform: "translateY(-50%)",
+              transform: tip.kind === "group" ? "translateY(-50%)" : undefined,
               zIndex: 2147483000,
               pointerEvents: "none",
               whiteSpace: "nowrap",
-              background: "#0e0e10",
+              ...(tip.kind === "channel"
+                ? { width: "20.8rem", boxSizing: "border-box", background: "#323239", borderRadius: 6, boxShadow: "0 4px 8px rgba(0,0,0,0.6), 0 0 4px rgba(0,0,0,0.4)", padding: tip.content ? 0 : "0.6rem 0.8rem", fontSize: "1.4rem", lineHeight: 1.4 }
+                : { background: "#0e0e10", border: "1px solid #3a3a3d", borderRadius: 4, padding: "0.5rem 1rem", fontSize: "1.3rem", lineHeight: 1.3 }),
               color: "#efeff1",
-              border: "1px solid #3a3a3d",
-              borderRadius: 4,
-              padding: "0.5rem 1rem",
-              fontSize: "1.3rem",
-              lineHeight: 1.3,
             }}
           >
-            <div style={{ fontWeight: 600 }}>{tip.name}</div>
+            {tip.content && <div ref={(el) => el?.replaceChildren(tip.content!)} />}
+            {tip.name && <div style={{ fontWeight: 600 }}>{tip.name}</div>}
+            {tip.detail && (
+              <div style={{ color: tip.name ? "#adadb8" : undefined, whiteSpace: "normal", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                {tip.detail}
+              </div>
+            )}
             {tip.live !== undefined && <div style={{ color: "#adadb8" }}>{tip.live} live</div>}
           </div>,
           document.body

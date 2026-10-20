@@ -149,6 +149,29 @@ test("a shared-stream row keeps its '+1' name and gets the game on the game line
   await expect(rowFor(page, "fixturesharedstreak")).toContainText("Watch Streak");
 });
 
+test("hovering a shared-stream row shows Twitch's own tooltip, with who else is live", async ({ context, session, worker, openTwitch }) => {
+  await seedChannels(worker, [
+    channel("fixtureshared", "FixtureShared", { isLive: true, game: "Another Game", viewers: 2500, title: "Our stored title" }),
+    channel("fixture_live", "Fixture_Live", { isLive: true, game: "Lootbound", viewers: 7, title: "Plain stream title" }),
+  ]);
+  await twitchDown(context);
+  const page = await openTwitch();
+  await openGroup(page);
+
+  await rowFor(page, "fixtureshared").hover();
+  const tip = page.getByRole("tooltip");
+  await expect(tip).toContainText("Fixture shared stream title");
+  await expect(tip).toContainText("Live with:");
+  await expect(tip).toContainText("FixtureGuest");
+  // Twitch's own tooltip was only borrowed: it is closed again
+  await expect(page.locator(".ReactModal__Overlay")).toHaveCount(0);
+
+  // A stream that is not shared keeps the plain title
+  await page.mouse.move(600, 600);
+  await rowFor(page, "fixture_live").hover();
+  await expect(tip).toHaveText("Plain stream title");
+});
+
 test("live channels are listed by viewer count, highest first, with offline channels after", async ({ twitchPage }) => {
   await openGroup(twitchPage);
   // Twitch's follow order is fixture_live, fixturestreak, fixture_offline; viewers are 1,100 and 4,900
