@@ -19,7 +19,3 @@ Let the user choose which group is the default (where new channels land) and ren
 ## Localization
 
 Add support for other languages. All UI text (popup, dialog, sidebar, tooltips) is currently hard-coded English.
-
-## Profanity check on group names
-
-Add a profanity check to group name validation (`src/pages/utils/groupName.ts`), alongside the existing length and uniqueness rules.
