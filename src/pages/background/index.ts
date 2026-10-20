@@ -38,6 +38,9 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       hideOriginalFollowersList: true,
       hideStories: false,
       hideLiveChannels: false,
+      hideStreaks: false,
+      hideRecommendedCategories: false,
+      hideViewersAlsoWatch: false,
       lastUpdated: isoNow,
     };
     await setLocalStorage(

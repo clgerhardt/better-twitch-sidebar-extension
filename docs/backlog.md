@@ -1,12 +1,8 @@
 # Backlog
 
-## More hide toggles
+## Verify the Streaks hide toggle
 
-Add toggles alongside the existing "Stories" section hide:
-
-- Hide the "Streaks" section (same treatment as Stories)
-- Hide recommended categories
-- Hide the "<streamer> viewers also watch" sections
+"Hide streaks" is wired (`#side-nav .side-nav-section[aria-label*='streak' i]` in `src/pages/content/index.tsx`) but the selector is a guess: no Streaks section was on the test account. Check it on an account that has one and fix the selector if needed.
 
 ## Reorder groups
 

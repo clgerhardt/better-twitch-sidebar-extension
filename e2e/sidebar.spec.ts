@@ -50,6 +50,42 @@ test("the popup's toggles work without being tied to the active tab", async ({ t
   await expect(live).toBeVisible({ timeout: 5_000 });
 });
 
+for (const [label, section] of [
+  ["Hide streaks", "[aria-label='Streaks']"],
+  ["Hide recommended categories", "[aria-label='Recommended Categories']"],
+  ["Hide \"viewers also watch\"", "[aria-label$='Viewers Also Watch']"],
+] as const) {
+  test(`the "${label}" toggle hides its section and shows it again`, async ({ twitchPage, context, extensionId }) => {
+    const popup = await context.newPage();
+    await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
+    const target = twitchPage.locator(section);
+    await expect(target).toBeVisible();
+
+    await popup.getByRole("switch", { name: label }).click();
+    await expect(target).toBeHidden({ timeout: 5_000 });
+    await popup.getByRole("switch", { name: label }).click();
+    await expect(target).toBeVisible({ timeout: 5_000 });
+  });
+}
+
+test("a Viewers Also Watch section that Twitch adds later is hidden too", async ({ twitchPage, context, extensionId }) => {
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
+  await popup.getByRole("switch", { name: "Hide \"viewers also watch\"" }).click();
+  await expect(twitchPage.locator("[aria-label$='Viewers Also Watch']")).toBeHidden({ timeout: 5_000 });
+
+  // Navigating to another channel page: Twitch renders a new section
+  await twitchPage.evaluate(() => {
+    document.querySelector("[aria-label$='Viewers Also Watch']")!.remove();
+    const section = document.createElement("div");
+    section.className = "side-nav-section";
+    section.setAttribute("aria-label", "OtherChannel Viewers Also Watch");
+    section.textContent = "OtherChannel Viewers Also Watch";
+    document.querySelector("[aria-label='Recommended Categories']")!.after(section);
+  });
+  await expect(twitchPage.locator("[aria-label='OtherChannel Viewers Also Watch']")).toBeHidden({ timeout: 5_000 });
+});
+
 test.describe("page without a Stories section", () => {
   test.use({ removeStories: true });
 

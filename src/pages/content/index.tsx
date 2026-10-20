@@ -20,8 +20,13 @@ const getReactRoot = (container: Element) => {
   return root;
 };
 
+// The latest saved settings, so sections Twitch renders later (e.g. "Viewers Also Watch" after a
+// page change) are hidden too
+let currentGlobalState: any;
+
 const applySidebarVisibilityFromState = (globalState: any) => {
   if (!globalState) return;
+  currentGlobalState = globalState;
 
   const configs = [
     {
@@ -41,7 +46,26 @@ const applySidebarVisibilityFromState = (globalState: any) => {
       hidden: globalState.hideStories,
       logMessage: "Applying initial visibility: Stories",
       overrideStyle: true,
-    }
+    },
+    {
+      selector: "#side-nav .side-nav-section[aria-label*='streak' i]",
+      hidden: globalState.hideStreaks,
+      logMessage: "Applying initial visibility: Streaks",
+      overrideStyle: false,
+    },
+    {
+      selector: "[aria-label='Recommended Categories']",
+      hidden: globalState.hideRecommendedCategories,
+      logMessage: "Applying initial visibility: Recommended Categories",
+      overrideStyle: false,
+    },
+    {
+      // "<channel> Viewers Also Watch": only on channel pages, so it can appear after the page loads
+      selector: "[aria-label$='Viewers Also Watch' i]",
+      hidden: globalState.hideViewersAlsoWatch,
+      logMessage: "Applying initial visibility: Viewers Also Watch",
+      overrideStyle: false,
+    },
   ];
 
   for (const { selector, hidden, logMessage, overrideStyle } of configs) {
@@ -123,6 +147,7 @@ const keepSidebarMounted = () => {
     setTimeout(() => {
       scheduled = false;
       mountSidebar();
+      applySidebarVisibilityFromState(currentGlobalState);
     }, 50);
   });
   observer.observe(document.body, { childList: true, subtree: true });
