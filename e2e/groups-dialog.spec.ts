@@ -113,7 +113,7 @@ test.describe("Manage Groups dialog", () => {
     const listOrder = (dialog: Locator) => dialog.getByRole("list", { name: "Groups" }).getByRole("listitem").evaluateAll((items) => items.map((li) => li.querySelector("button span")!.textContent));
     const sidebarOrder = (page: Page) => page.locator("#__root [data-accordion-component=AccordionItemButton]").evaluateAll((buttons) => buttons.map((b) => (b.querySelector("#expanded-side-bar-heading") as HTMLElement).innerText));
 
-    test("moves a group up and down, in the dialog and the sidebar, with Ungrouped staying first", async ({ twitchPage }) => {
+    test("moves a group up and down, in the dialog and the sidebar", async ({ twitchPage }) => {
       const dialog = await open(twitchPage);
       for (const name of ["Alpha", "Beta", "Gamma"]) await addGroup(dialog, name);
       expect(await listOrder(dialog)).toEqual(["Ungrouped", "Alpha", "Beta", "Gamma"]);
@@ -125,14 +125,21 @@ test.describe("Manage Groups dialog", () => {
       await expect.poll(() => sidebarOrder(twitchPage)).toEqual(["Ungrouped", "Gamma", "Alpha", "Beta"]);
     });
 
-    test("the first and last groups cannot move past the ends, and Ungrouped cannot move", async ({ twitchPage }) => {
+    test("the default group can be moved like any other", async ({ twitchPage }) => {
       const dialog = await open(twitchPage);
       for (const name of ["Alpha", "Beta"]) await addGroup(dialog, name);
-      await expect(dialog.getByRole("button", { name: "Move Alpha up" })).toBeDisabled();
+      await dialog.getByRole("button", { name: "Move Ungrouped down" }).click();
+      await expect.poll(() => listOrder(dialog)).toEqual(["Alpha", "Ungrouped", "Beta"]);
+      await expect.poll(() => sidebarOrder(twitchPage)).toEqual(["Alpha", "Ungrouped", "Beta"]);
+    });
+
+    test("the first and last groups cannot move past the ends", async ({ twitchPage }) => {
+      const dialog = await open(twitchPage);
+      for (const name of ["Alpha", "Beta"]) await addGroup(dialog, name);
+      await expect(dialog.getByRole("button", { name: "Move Ungrouped up" })).toBeDisabled();
       await expect(dialog.getByRole("button", { name: "Move Beta down" })).toBeDisabled();
       await expect(dialog.getByRole("button", { name: "Move Alpha down" })).toBeEnabled();
       await expect(dialog.getByRole("button", { name: "Move Alpha down" })).toHaveAttribute("title", "Move Alpha down");
-      await expect(dialog.getByRole("button", { name: /Move Ungrouped/ })).toHaveCount(0);
     });
   });
 
@@ -301,11 +308,44 @@ test.describe("Manage Groups dialog", () => {
       await expect(groupButton(dialog, "Zebra Squad")).toBeVisible();
     });
 
-    test("the default group cannot be renamed or deleted", async ({ twitchPage }) => {
+    test("the default group can be renamed but not deleted", async ({ twitchPage }) => {
       const dialog = await open(twitchPage);
       await expect(dialog).toContainText("default group");
-      await expect(dialog.getByRole("button", { name: "edit-group-name" })).toHaveCount(0);
+      await expect(dialog.getByRole("button", { name: "edit-group-name" })).toHaveCount(1);
       await expect(dialog.getByRole("button", { name: "delete-group" })).toHaveCount(0);
+      await expect(dialog.getByRole("button", { name: "Make default" })).toHaveCount(0);
+    });
+
+    test("renaming the default group keeps its channels and it stays the default", async ({ twitchPage }) => {
+      const dialog = await open(twitchPage);
+      await dialog.getByRole("button", { name: "edit-group-name" }).click();
+      await dialog.getByLabel("New group name").fill("Inbox");
+      await dialog.getByRole("button", { name: "save-group-name" }).click();
+      await expect(groupButton(dialog, "Inbox")).toContainText("Default");
+      await expect(groupButton(dialog, "Inbox")).toHaveAttribute("aria-pressed", "true");
+      await expect(dialog.getByRole("list", { name: "Groups" })).not.toContainText("Ungrouped");
+      await expect(dialog.getByTestId("channel-name")).not.toHaveCount(0);
+      await twitchPage.keyboard.press("Escape");
+      await expect(twitchPage.locator("#__root")).toContainText("Inbox", { timeout: 5_000 });
+    });
+
+    test("another group can be made the default, and the old default then becomes an ordinary group", async ({ twitchPage }) => {
+      const dialog = await open(twitchPage);
+      await addGroup(dialog, "Alpha");
+      await dialog.getByRole("button", { name: "Make default" }).click();
+      await expect(groupButton(dialog, "Alpha")).toContainText("Default");
+      await expect(groupButton(dialog, "Ungrouped")).not.toContainText("Default");
+      // The old default keeps its channels and can now be deleted: they move to the new default
+      await groupButton(dialog, "Ungrouped").click();
+      await expect(dialog.getByRole("button", { name: "delete-group" })).toBeVisible();
+      const members = dialog.locator("input[type=checkbox]:checked");
+      await expect(members).not.toHaveCount(0);
+      const channels = await members.count();
+      await dialog.getByRole("button", { name: "delete-group" }).click();
+      await dialog.getByRole("button", { name: "Are you sure?" }).click();
+      await expect(dialog.getByRole("list", { name: "Groups" })).not.toContainText("Ungrouped");
+      await expect(groupButton(dialog, "Alpha")).toHaveAttribute("aria-pressed", "true");
+      await expect(groupButton(dialog, "Alpha")).toContainText(String(channels));
     });
   });
 });

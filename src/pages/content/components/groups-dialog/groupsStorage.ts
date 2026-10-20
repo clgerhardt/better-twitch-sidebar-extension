@@ -1,14 +1,17 @@
-import { CHANNEL_GROUPS_KEY, GROUP_NAMES_KEY } from "@src/pages/utils/constants";
+import { CHANNEL_GROUPS_KEY, DEFAULT_GROUP_KEY, GROUP_NAMES_KEY } from "@src/pages/utils/constants";
 
 // What the Manage Groups dialog changes in storage. The sidebar and the dialog both read from storage,
-// so a write here updates both. "Ungrouped" is the default group and is never stored in the name list.
+// so a write here updates both. The default group ("Ungrouped" until the user picks another) is where
+// channels without a group land. It is an ordinary group in the name list, except that older data
+// leaves it out and shows it first.
 const UNGROUPED = "Ungrouped";
 
 const read = async () => {
-  const stored = await chrome.storage.local.get([GROUP_NAMES_KEY, CHANNEL_GROUPS_KEY]);
+  const stored = await chrome.storage.local.get([GROUP_NAMES_KEY, CHANNEL_GROUPS_KEY, DEFAULT_GROUP_KEY]);
   return {
     groupNames: (stored[GROUP_NAMES_KEY] as string[] | undefined) ?? [],
     channelGroups: (stored[CHANNEL_GROUPS_KEY] as Record<string, string> | undefined) ?? {},
+    defaultGroup: (stored[DEFAULT_GROUP_KEY] as string | undefined) ?? UNGROUPED,
   };
 };
 
@@ -17,8 +20,8 @@ export const addGroup = async (name: string) => {
   await chrome.storage.local.set({ [GROUP_NAMES_KEY]: [...groupNames, name] });
 };
 
-// Moves a group one place up (-1) or down (1). order is the groups as shown, without Ungrouped (which
-// stays first): saving it whole also keeps groups that were only shown because a channel uses them.
+// Moves a group one place up (-1) or down (1). order is every group as shown, default group included:
+// saving it whole also keeps groups that were only shown because a channel uses them.
 export const moveGroup = async (name: string, step: -1 | 1, order: string[]) => {
   const from = order.indexOf(name);
   const to = from + step;
@@ -28,20 +31,28 @@ export const moveGroup = async (name: string, step: -1 | 1, order: string[]) => 
   await chrome.storage.local.set({ [GROUP_NAMES_KEY]: moved });
 };
 
+// Makes another group the default. order is every group as shown, so the old default stays in the list
+// (it was only implied to be first) as a group like any other.
+export const setDefaultGroup = async (name: string, order: string[]) => {
+  await chrome.storage.local.set({ [DEFAULT_GROUP_KEY]: name, [GROUP_NAMES_KEY]: order });
+};
+
 export const renameGroup = async (from: string, to: string) => {
-  const { groupNames, channelGroups } = await read();
+  const { groupNames, channelGroups, defaultGroup } = await read();
   await chrome.storage.local.set({
     [GROUP_NAMES_KEY]: groupNames.map((n) => (n === from ? to : n)),
     [CHANNEL_GROUPS_KEY]: Object.fromEntries(Object.entries(channelGroups).map(([login, name]) => [login, name === from ? to : name])),
+    [DEFAULT_GROUP_KEY]: defaultGroup === from ? to : defaultGroup,
   });
 };
 
-// A deleted group's channels go back to Ungrouped
+// A deleted group's channels go to the default group. The default group itself cannot be deleted.
 export const deleteGroup = async (name: string) => {
-  const { groupNames, channelGroups } = await read();
+  const { groupNames, channelGroups, defaultGroup } = await read();
+  if (name === defaultGroup) return;
   await chrome.storage.local.set({
     [GROUP_NAMES_KEY]: groupNames.filter((n) => n !== name),
-    [CHANNEL_GROUPS_KEY]: Object.fromEntries(Object.entries(channelGroups).map(([login, group]) => [login, group === name ? UNGROUPED : group])),
+    [CHANNEL_GROUPS_KEY]: Object.fromEntries(Object.entries(channelGroups).map(([login, group]) => [login, group === name ? defaultGroup : group])),
   });
 };
 

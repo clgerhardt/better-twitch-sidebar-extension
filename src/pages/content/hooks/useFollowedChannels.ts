@@ -3,6 +3,7 @@ import {
   CHANNEL_GROUPS_KEY,
   CHANNEL_SNAPSHOT_KEY,
   GROUP_NAMES_KEY,
+  DEFAULT_GROUP_KEY,
 } from "@src/pages/utils/constants";
 import { SidebarGroup, layoutGroups } from "@src/pages/utils/layoutGroups";
 import { isSnapshotFor, snapshotToFetched } from "@src/pages/shared/twitch/snapshot";
@@ -15,7 +16,7 @@ const useFollowedChannels = () => {
   useEffect(() => {
     const read = () =>
       chrome.storage.local
-        .get(["twitchToken", "twitchUserId", CHANNEL_SNAPSHOT_KEY, GROUP_NAMES_KEY, CHANNEL_GROUPS_KEY])
+        .get(["twitchToken", "twitchUserId", CHANNEL_SNAPSHOT_KEY, GROUP_NAMES_KEY, CHANNEL_GROUPS_KEY, DEFAULT_GROUP_KEY])
         .then((stored) => {
           const snapshot = stored[CHANNEL_SNAPSHOT_KEY];
           if (!stored.twitchToken || !isSnapshotFor(snapshot, stored.twitchUserId)) {
@@ -26,6 +27,7 @@ const useFollowedChannels = () => {
             layoutGroups({
               fetched: snapshotToFetched(snapshot),
               groupNames: stored[GROUP_NAMES_KEY] || [],
+              defaultGroup: stored[DEFAULT_GROUP_KEY],
               channelGroups: stored[CHANNEL_GROUPS_KEY] || {},
             }).groups
           );
@@ -35,7 +37,7 @@ const useFollowedChannels = () => {
     read();
     const listener = (changes: { [key: string]: chrome.storage.StorageChange }, area: string) => {
       if (area !== "local") return;
-      if (changes.twitchToken || changes.twitchUserId || changes[CHANNEL_SNAPSHOT_KEY] || changes[GROUP_NAMES_KEY] || changes[CHANNEL_GROUPS_KEY]) read();
+      if (changes.twitchToken || changes.twitchUserId || changes[CHANNEL_SNAPSHOT_KEY] || changes[GROUP_NAMES_KEY] || changes[CHANNEL_GROUPS_KEY] || changes[DEFAULT_GROUP_KEY]) read();
     };
     chrome.storage.onChanged.addListener(listener);
     return () => chrome.storage.onChanged.removeListener(listener);

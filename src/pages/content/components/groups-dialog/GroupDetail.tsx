@@ -2,9 +2,7 @@ import { useEffect, useState } from "react";
 import { CheckIcon, PencilIcon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import type { SidebarGroup } from "@src/pages/utils/layoutGroups";
 import { validateGroupName } from "@src/pages/utils/groupName";
-import { deleteGroup, renameGroup, setChannelGroup } from "./groupsStorage";
-
-const UNGROUPED = "Ungrouped";
+import { deleteGroup, renameGroup, setChannelGroup, setDefaultGroup } from "./groupsStorage";
 
 // The right pane: the selected group (rename, delete) and the channels to tick in or out of it
 export default function GroupDetail({
@@ -16,6 +14,8 @@ export default function GroupDetail({
   groups: SidebarGroup[];
   onSelect: (name: string) => void;
 }) {
+  // Where a channel goes when it is taken out of a group
+  const defaultName = groups.find((g) => g.default)?.groupName ?? group.groupName;
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState(group.groupName);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -62,7 +62,7 @@ export default function GroupDetail({
 
   const confirmedDelete = async () => {
     await deleteGroup(group.groupName);
-    onSelect(UNGROUPED);
+    onSelect(defaultName);
   };
 
   return (
@@ -98,21 +98,32 @@ export default function GroupDetail({
         ) : (
           <>
             <h3 className="m-0 min-w-0 truncate text-[1.6rem] font-semibold text-[#efeff1]">{group.groupName}</h3>
-            {!group.default && (
-              <div className="ml-auto flex items-center gap-1">
-                <button type="button" aria-label="edit-group-name" onClick={() => setRenaming(true)} className="cursor-pointer rounded p-1 text-[#adadb8] hover:bg-white/10 hover:text-[#efeff1]">
-                  <PencilIcon className="h-6 w-6" />
+            <div className="ml-auto flex items-center gap-1">
+              {!group.default && (
+                <button
+                  type="button"
+                  onClick={() => setDefaultGroup(group.groupName, groups.map((g) => g.groupName))}
+                  className="mr-1 cursor-pointer rounded border border-solid border-[#3a3a3d] bg-transparent px-3 py-1 text-[1.3rem] text-[#efeff1] hover:bg-white/10"
+                >
+                  Make default
                 </button>
-                <button type="button" aria-label="delete-group" onClick={() => setConfirmDelete((open) => !open)} className="cursor-pointer rounded p-1 text-[#adadb8] hover:bg-white/10 hover:text-[#efeff1]">
-                  <TrashIcon className="h-6 w-6" />
-                </button>
-                {confirmDelete && (
-                  <button type="button" onClick={confirmedDelete} className="ml-1 cursor-pointer rounded bg-red-600 px-3 py-1 text-[1.3rem] font-medium text-white hover:bg-red-500">
-                    Are you sure?
+              )}
+              <button type="button" aria-label="edit-group-name" onClick={() => setRenaming(true)} className="cursor-pointer rounded p-1 text-[#adadb8] hover:bg-white/10 hover:text-[#efeff1]">
+                <PencilIcon className="h-6 w-6" />
+              </button>
+              {!group.default && (
+                <>
+                  <button type="button" aria-label="delete-group" onClick={() => setConfirmDelete((open) => !open)} className="cursor-pointer rounded p-1 text-[#adadb8] hover:bg-white/10 hover:text-[#efeff1]">
+                    <TrashIcon className="h-6 w-6" />
                   </button>
-                )}
-              </div>
-            )}
+                  {confirmDelete && (
+                    <button type="button" onClick={confirmedDelete} className="ml-1 cursor-pointer rounded bg-red-600 px-3 py-1 text-[1.3rem] font-medium text-white hover:bg-red-500">
+                      Are you sure?
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           </>
         )}
       </div>
@@ -120,7 +131,7 @@ export default function GroupDetail({
 
       {group.default ? (
         <p className="m-0 mb-3 text-[1.3rem] text-[#adadb8]">
-          Ungrouped is the default group: it can't be renamed or deleted. Select another group to move channels into it.
+          {group.groupName} is the default group: channels without a group land here, and it can't be deleted. Select another group to move channels into it, or make another group the default.
         </p>
       ) : (
         <p className="m-0 mb-3 text-[1.3rem] text-[#adadb8]">Tick the channels that belong in {group.groupName}.</p>
@@ -148,7 +159,7 @@ export default function GroupDetail({
                 <input
                   type="checkbox"
                   checked={(optimistic[channel.login] ?? groupName) === group.groupName}
-                  onChange={(event) => tick(channel.login, event.target.checked ? group.groupName : UNGROUPED)}
+                  onChange={(event) => tick(channel.login, event.target.checked ? group.groupName : defaultName)}
                   className="h-5 w-5 shrink-0 cursor-pointer accent-purple-500"
                 />
                 <img src={channel.channelImage} alt="" className="h-9 w-9 rounded-full bg-[#3a3a3d]" />

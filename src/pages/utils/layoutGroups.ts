@@ -31,15 +31,18 @@ export const UNGROUPED = "Ungrouped";
 
 type LayoutInput = {
   fetched: FetchedChannel[];
-  // User-created groups in their saved order (Ungrouped is implicit)
+  // The groups in their saved order. The default group may be left out (older data, or never
+  // reordered): it is then shown first.
   groupNames: string[];
+  // The group that channels without one land in; "Ungrouped" until the user picks another
+  defaultGroup?: string;
   // Channel login -> group name
   channelGroups: Record<string, string>;
 };
 
 type LayoutResult = {
   groups: SidebarGroup[];
-  // channelGroups plus a mapping to Ungrouped for every channel that had none
+  // channelGroups plus a mapping to the default group for every channel that had none
   channelGroups: Record<string, string>;
   // True when channelGroups gained entries and should be saved
   addedMappings: boolean;
@@ -52,16 +55,16 @@ const byLiveThenViewers = (a: SidebarChannel, b: SidebarChannel) => {
   return a.isLive ? b.viewers - a.viewers : 0;
 };
 
-export const layoutGroups = ({ fetched, groupNames, channelGroups }: LayoutInput): LayoutResult => {
+export const layoutGroups = ({ fetched, groupNames, channelGroups, defaultGroup = UNGROUPED }: LayoutInput): LayoutResult => {
   const updatedChannelGroups: Record<string, string> = { ...channelGroups };
   const groupMap: Record<string, SidebarChannel[]> = {};
   let addedMappings = false;
 
   fetched.forEach(({ login, channel }) => {
-    const groupName = updatedChannelGroups[login] || UNGROUPED;
+    const groupName = updatedChannelGroups[login] || defaultGroup;
 
     if (!updatedChannelGroups[login]) {
-      updatedChannelGroups[login] = UNGROUPED;
+      updatedChannelGroups[login] = defaultGroup;
       addedMappings = true;
     }
 
@@ -69,19 +72,19 @@ export const layoutGroups = ({ fetched, groupNames, channelGroups }: LayoutInput
     groupMap[groupName].push(channel);
   });
 
-  // Ungrouped first, then user-created groups in order (including empty ones),
-  // then any group that only exists in the channel map
-  const savedNames = groupNames.filter((n, i) => n !== UNGROUPED && groupNames.indexOf(n) === i);
+  // The saved order (the default group first when it is not in it), then any group that only
+  // exists in the channel map
+  const savedNames = groupNames.filter((n, i) => groupNames.indexOf(n) === i);
   const orderedNames = [
-    UNGROUPED,
+    ...(savedNames.includes(defaultGroup) ? [] : [defaultGroup]),
     ...savedNames,
-    ...Object.keys(groupMap).filter((n) => n !== UNGROUPED && !savedNames.includes(n)),
+    ...Object.keys(groupMap).filter((n) => n !== defaultGroup && !savedNames.includes(n)),
   ];
 
   const groups = orderedNames.map((groupName, index): SidebarGroup => {
     const channels = [...(groupMap[groupName] ?? [])];
     return {
-      default: groupName === UNGROUPED,
+      default: groupName === defaultGroup,
       dialogOpen: false,
       dropdownVisible: false,
       followedChannels: channels.sort(byLiveThenViewers),

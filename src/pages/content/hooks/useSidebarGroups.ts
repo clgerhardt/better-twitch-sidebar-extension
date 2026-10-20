@@ -3,6 +3,7 @@ import {
   CHANNEL_GROUPS_KEY,
   CHANNEL_SNAPSHOT_KEY,
   GROUP_NAMES_KEY,
+  DEFAULT_GROUP_KEY,
   SNAPSHOT_ERROR_KEY,
 } from "@src/pages/utils/constants";
 import { useEffect, useRef, useState } from "react";
@@ -41,10 +42,11 @@ export const useSidebarGroups = (): {
   const fetchedRef = useRef<FetchedChannel[] | null>(null);
 
   const applyLayout = () => {
-    chrome.storage.local.get([CHANNEL_GROUPS_KEY, GROUP_NAMES_KEY], (stored) => {
+    chrome.storage.local.get([CHANNEL_GROUPS_KEY, GROUP_NAMES_KEY, DEFAULT_GROUP_KEY], (stored) => {
       const result = layoutGroups({
         fetched: fetchedRef.current ?? [],
         groupNames: stored[GROUP_NAMES_KEY] || [],
+        defaultGroup: stored[DEFAULT_GROUP_KEY],
         channelGroups: stored[CHANNEL_GROUPS_KEY] || {},
       });
 
@@ -115,7 +117,7 @@ export const useSidebarGroups = (): {
         requestRefresh();
       } else if (changes[CHANNEL_SNAPSHOT_KEY] || changes[SNAPSHOT_ERROR_KEY]) {
         showStoredSnapshot();
-      } else if (changes[CHANNEL_GROUPS_KEY] || changes[GROUP_NAMES_KEY]) {
+      } else if (changes[CHANNEL_GROUPS_KEY] || changes[GROUP_NAMES_KEY] || changes[DEFAULT_GROUP_KEY]) {
         if (fetchedRef.current) applyLayout();
       }
     };
