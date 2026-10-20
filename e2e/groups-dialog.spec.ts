@@ -109,6 +109,33 @@ test.describe("Manage Groups dialog", () => {
     });
   });
 
+  test.describe("reordering groups", () => {
+    const listOrder = (dialog: Locator) => dialog.getByRole("list", { name: "Groups" }).getByRole("listitem").evaluateAll((items) => items.map((li) => li.querySelector("button span")!.textContent));
+    const sidebarOrder = (page: Page) => page.locator("#__root [data-accordion-component=AccordionItemButton]").evaluateAll((buttons) => buttons.map((b) => (b.querySelector("#expanded-side-bar-heading") as HTMLElement).innerText));
+
+    test("moves a group up and down, in the dialog and the sidebar, with Ungrouped staying first", async ({ twitchPage }) => {
+      const dialog = await open(twitchPage);
+      for (const name of ["Alpha", "Beta", "Gamma"]) await addGroup(dialog, name);
+      expect(await listOrder(dialog)).toEqual(["Ungrouped", "Alpha", "Beta", "Gamma"]);
+
+      await dialog.getByRole("button", { name: "Move Gamma up" }).click();
+      await expect.poll(() => listOrder(dialog)).toEqual(["Ungrouped", "Alpha", "Gamma", "Beta"]);
+      await dialog.getByRole("button", { name: "Move Alpha down" }).click();
+      await expect.poll(() => listOrder(dialog)).toEqual(["Ungrouped", "Gamma", "Alpha", "Beta"]);
+      await expect.poll(() => sidebarOrder(twitchPage)).toEqual(["Ungrouped", "Gamma", "Alpha", "Beta"]);
+    });
+
+    test("the first and last groups cannot move past the ends, and Ungrouped cannot move", async ({ twitchPage }) => {
+      const dialog = await open(twitchPage);
+      for (const name of ["Alpha", "Beta"]) await addGroup(dialog, name);
+      await expect(dialog.getByRole("button", { name: "Move Alpha up" })).toBeDisabled();
+      await expect(dialog.getByRole("button", { name: "Move Beta down" })).toBeDisabled();
+      await expect(dialog.getByRole("button", { name: "Move Alpha down" })).toBeEnabled();
+      await expect(dialog.getByRole("button", { name: "Move Alpha down" })).toHaveAttribute("title", "Move Alpha down");
+      await expect(dialog.getByRole("button", { name: /Move Ungrouped/ })).toHaveCount(0);
+    });
+  });
+
   test.describe("putting channels in a group", () => {
     test("ticking a channel moves it into the selected group, in the dialog and the sidebar", async ({ twitchPage }) => {
       const dialog = await open(twitchPage);
