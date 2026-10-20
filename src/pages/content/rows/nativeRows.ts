@@ -29,6 +29,10 @@ export const isPlainLiveRow = (row: Element): boolean =>
   !/Watch Streak|Hype Train/i.test(row.textContent || "") &&
   !/\+\d+\s*$/.test(row.querySelector(TITLE)?.textContent || "");
 
+// A shared stream: the row's name block has a paragraph with "+N" for the guests
+export const isSharedRow = (row: Element): boolean =>
+  Array.from(row.querySelectorAll("[data-a-target=side-nav-card-metadata] p")).some((p) => /^\+\d+$/.test(p.textContent?.trim() ?? ""));
+
 export const nativeRowsByLogin = (): Map<string, HTMLAnchorElement> => {
   const rows = new Map<string, HTMLAnchorElement>();
   for (const row of nativeRows()) rows.set(loginOfRow(row), row);

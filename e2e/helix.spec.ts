@@ -79,15 +79,15 @@ test.describe("Helix client", () => {
   });
 
   test("getLiveFollowed maps live streams and pages through them", async () => {
-    const stream = (n: number) => ({ user_id: String(n), user_login: `l${n}`, user_name: `L${n}`, game_name: "Game", viewer_count: n * 10, type: "live" });
+    const stream = (n: number) => ({ user_id: String(n), user_login: `l${n}`, user_name: `L${n}`, game_name: "Game", title: `Title ${n}`, viewer_count: n * 10, type: "live" });
     const { client, calls } = setup((url) =>
       url.searchParams.get("after") ? { body: { data: [stream(3)], pagination: {} } } : { body: { data: [stream(1), stream(2)], pagination: { cursor: "c" } } }
     );
     const live = await client.getLiveFollowed("tok", "999");
     expect(live).toEqual([
-      { id: "1", login: "l1", displayName: "L1", game: "Game", viewers: 10 },
-      { id: "2", login: "l2", displayName: "L2", game: "Game", viewers: 20 },
-      { id: "3", login: "l3", displayName: "L3", game: "Game", viewers: 30 },
+      { id: "1", login: "l1", displayName: "L1", game: "Game", title: "Title 1", viewers: 10 },
+      { id: "2", login: "l2", displayName: "L2", game: "Game", title: "Title 2", viewers: 20 },
+      { id: "3", login: "l3", displayName: "L3", game: "Game", title: "Title 3", viewers: 30 },
     ]);
     expect(calls[0].path).toBe("streams/followed");
   });

@@ -62,7 +62,7 @@ const collapseRow = (row: HTMLAnchorElement, channel: SidebarChannel) => {
   // holds an empty tooltip element with a -5px margin, which sits the avatar 3px right of dead center
   row.style.cssText = "display:flex;justify-content:center;align-items:center;padding:4px 8px";
   row.querySelector<HTMLElement>(".side-nav-card__avatar")?.style.setProperty("margin-right", "-5px");
-  row.setAttribute("title", channel.channelName);
+  row.removeAttribute("title");
   row.setAttribute("aria-label", channel.channelName);
 };
 

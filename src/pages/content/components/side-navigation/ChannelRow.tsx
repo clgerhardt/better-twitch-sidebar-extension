@@ -5,7 +5,7 @@ import { nativeRowsByLogin } from "../../rows/nativeRows";
 
 // One channel, shown as a row that looks like Twitch's own. The row is plain DOM built from Twitch's
 // markup (see rows/buildRow.ts); React only hosts it and handles the click.
-const ChannelRow = ({ channel, nativeVersion, collapsed }: { channel: SidebarChannel; nativeVersion: number; collapsed: boolean }) => {
+const ChannelRow = ({ channel, nativeVersion, collapsed, onHover }: { channel: SidebarChannel; nativeVersion: number; collapsed: boolean; onHover: (element: HTMLElement | null, channel: SidebarChannel) => void }) => {
   const host = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
@@ -22,7 +22,16 @@ const ChannelRow = ({ channel, nativeVersion, collapsed }: { channel: SidebarCha
     else window.location.href = channel.channelLink;
   };
 
-  return <div ref={host} onClick={open} />;
+  return (
+    <div
+      ref={host}
+      onClick={open}
+      onMouseEnter={(e) => onHover(e.currentTarget, channel)}
+      onMouseLeave={() => onHover(null, channel)}
+      onFocus={(e) => onHover(e.currentTarget, channel)}
+      onBlur={() => onHover(null, channel)}
+    />
+  );
 };
 
 export default ChannelRow;

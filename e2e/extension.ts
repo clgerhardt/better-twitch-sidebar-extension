@@ -8,9 +8,9 @@ const SIDEBAR_FIXTURE = fs.readFileSync(path.resolve("e2e/fixtures/twitch-sideba
 
 // Fake Twitch accounts served by the stubbed Helix API. Logins match the row fixtures.
 const CHANNELS = [
-  { id: "1", login: "fixture_live", display_name: "Fixture_Live", game: "Lootbound", viewers: 1100 },
-  { id: "2", login: "fixturestreak", display_name: "FixtureStreak", game: "Escape from Tarkov", viewers: 4900 },
-  { id: "3", login: "fixture_offline", display_name: "fixture_offline", game: null, viewers: 0 },
+  { id: "1", login: "fixture_live", display_name: "Fixture_Live", game: "Lootbound", title: "Fixture live stream title", viewers: 1100 },
+  { id: "2", login: "fixturestreak", display_name: "FixtureStreak", game: "Escape from Tarkov", title: "Fixture streak stream title", viewers: 4900 },
+  { id: "3", login: "fixture_offline", display_name: "fixture_offline", game: null, title: "", viewers: 0 },
 ];
 
 // A 1x1 image as a data URI, so avatars need no network
@@ -52,7 +52,7 @@ async function stubTwitch(context: BrowserContext) {
       case "/helix/streams/followed":
         return route.fulfill(
           json({
-            data: CHANNELS.filter((c) => c.viewers > 0).map((c) => ({ user_id: c.id, user_login: c.login, user_name: c.display_name, game_name: c.game, viewer_count: c.viewers, type: "live" })),
+            data: CHANNELS.filter((c) => c.viewers > 0).map((c) => ({ user_id: c.id, user_login: c.login, user_name: c.display_name, game_name: c.game, title: c.title, viewer_count: c.viewers, type: "live" })),
             pagination: {},
           })
         );
