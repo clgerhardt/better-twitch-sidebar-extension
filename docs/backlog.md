@@ -20,6 +20,6 @@ Add the ability to set the order of channel groups.
 
 Add a color picker so each group can change its vertical purple bar to a different color.
 
-## Empty group text in collapsed sidebar
+## Collapsed sidebar renders expanded content after a refresh
 
-When the sidebar is collapsed and a group has no channels, the empty-state text does not fit. Needs shorter text or another treatment.
+When the sidebar is collapsed and the page is refreshed, our group content renders in its expanded layout inside the narrow collapsed rail (clipped names and wrapped text) until the collapsed state is picked up. Make it render collapsed from the first paint.
