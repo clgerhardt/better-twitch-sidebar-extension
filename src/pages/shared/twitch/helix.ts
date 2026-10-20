@@ -37,7 +37,7 @@ export type HelixDeps = {
 
 export type FollowedChannel = { id: string; login: string; displayName: string };
 export type TwitchUser = { id: string; login: string; displayName: string; image: string };
-export type LiveStream = { id: string; login: string; displayName: string; game: string; viewers: number };
+export type LiveStream = { id: string; login: string; displayName: string; game: string; title: string; viewers: number };
 
 export const createHelixClient = (deps: HelixDeps) => {
   const spacingMs = deps.spacingMs ?? 100;
@@ -142,6 +142,7 @@ export const createHelixClient = (deps: HelixDeps) => {
         login: s.user_login,
         displayName: s.user_name,
         game: s.game_name ?? "",
+        title: s.title ?? "",
         viewers: s.viewer_count ?? 0,
       }));
     },

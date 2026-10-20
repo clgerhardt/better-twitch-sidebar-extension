@@ -10,6 +10,7 @@ export type SidebarChannel = {
   // The number behind viewerCount, for sorting (0 when offline)
   viewers: number;
   streamingContent?: string;
+  streamTitle?: string;
   viewerCount?: string;
 };
 

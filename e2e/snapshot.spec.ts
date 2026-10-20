@@ -14,7 +14,7 @@ const follows = [
   { id: "2", login: "b", displayName: "Beta" },
   { id: "3", login: "c", displayName: "Gamma" },
 ];
-const live = [{ id: "2", login: "b", displayName: "Beta", game: "Tarkov", viewers: 1500 }];
+const live = [{ id: "2", login: "b", displayName: "Beta", game: "Tarkov", title: "Raid night", viewers: 1500 }];
 
 const snapshot = (): ChannelSnapshot =>
   buildSnapshot({ userId: "999", follows, avatars: { "1": "https://img/1.png", "2": "https://img/2.png" }, live, fetchedAt: 5_000, staticAt: 4_000 });
@@ -27,16 +27,16 @@ test.describe("buildSnapshot", () => {
     expect(s.fetchedAt).toBe(5_000);
     expect(s.staticAt).toBe(4_000);
     expect(s.channels).toEqual([
-      { id: "1", login: "a", displayName: "Alpha", image: "https://img/1.png", isLive: false, game: "", viewers: 0 },
-      { id: "2", login: "b", displayName: "Beta", image: "https://img/2.png", isLive: true, game: "Tarkov", viewers: 1500 },
-      { id: "3", login: "c", displayName: "Gamma", image: "", isLive: false, game: "", viewers: 0 },
+      { id: "1", login: "a", displayName: "Alpha", image: "https://img/1.png", isLive: false, game: "", title: "", viewers: 0 },
+      { id: "2", login: "b", displayName: "Beta", image: "https://img/2.png", isLive: true, game: "Tarkov", title: "Raid night", viewers: 1500 },
+      { id: "3", login: "c", displayName: "Gamma", image: "", isLive: false, game: "", title: "", viewers: 0 },
     ]);
   });
 });
 
 test.describe("applyLive", () => {
   test("updates live status, game and viewers, keeping avatars and the static timestamp", () => {
-    const updated = applyLive(snapshot(), [{ id: "1", login: "a", displayName: "Alpha", game: "Zomboid", viewers: 20 }], 9_000);
+    const updated = applyLive(snapshot(), [{ id: "1", login: "a", displayName: "Alpha", game: "Zomboid", title: "t", viewers: 20 }], 9_000);
     expect(updated.fetchedAt).toBe(9_000);
     expect(updated.staticAt).toBe(4_000);
     expect(updated.channels.map((c) => [c.login, c.isLive, c.game, c.viewers])).toEqual([
@@ -48,7 +48,7 @@ test.describe("applyLive", () => {
   });
 
   test("ignores live streams for channels that are not in the snapshot", () => {
-    const updated = applyLive(snapshot(), [{ id: "42", login: "x", displayName: "X", game: "G", viewers: 1 }], 9_000);
+    const updated = applyLive(snapshot(), [{ id: "42", login: "x", displayName: "X", game: "G", title: "t", viewers: 1 }], 9_000);
     expect(updated.channels).toHaveLength(3);
     expect(updated.channels.some((c) => c.login === "x")).toBe(false);
   });
@@ -96,7 +96,7 @@ test.describe("snapshotToFetched", () => {
       login: "a",
       channel: { login: "a", channelName: "Alpha", channelLink: "https://twitch.tv/Alpha", channelImage: "https://img/1.png", isLive: false, viewers: 0, streamingContent: undefined, viewerCount: undefined },
     });
-    expect(online.channel).toMatchObject({ isLive: true, streamingContent: "Tarkov", viewerCount: "1.5K viewers", viewers: 1500 });
+    expect(online.channel).toMatchObject({ isLive: true, streamingContent: "Tarkov", streamTitle: "Raid night", viewerCount: "1.5K viewers", viewers: 1500 });
     expect(noAvatar.channel.channelImage).toBe("");
   });
 

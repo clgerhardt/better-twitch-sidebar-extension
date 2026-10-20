@@ -12,6 +12,8 @@ export type SnapshotChannel = {
   image: string;
   isLive: boolean;
   game: string;
+  // Absent in snapshots stored before titles were fetched; the next live refresh fills it
+  title?: string;
   viewers: number;
 };
 
@@ -27,7 +29,7 @@ export type ChannelSnapshot = {
 };
 
 const liveFields = (live: LiveStream | undefined) =>
-  live ? { isLive: true, game: live.game, viewers: live.viewers } : { isLive: false, game: "", viewers: 0 };
+  live ? { isLive: true, game: live.game, title: live.title, viewers: live.viewers } : { isLive: false, game: "", title: "", viewers: 0 };
 
 export const buildSnapshot = (input: {
   userId: string;
@@ -94,6 +96,7 @@ export const snapshotToFetched = (snapshot: ChannelSnapshot): FetchedChannel[] =
       isLive: c.isLive,
       viewers: c.isLive ? c.viewers : 0,
       streamingContent: c.isLive ? c.game : undefined,
+      streamTitle: c.isLive && c.title ? c.title : undefined,
       viewerCount: c.isLive ? `${compact.format(c.viewers)} viewers` : undefined,
     },
   }));
