@@ -68,6 +68,19 @@ test.describe("layoutGroups", () => {
     expect(names(result)).toEqual(["Ungrouped", "Saved", "Orphan2", "Orphan1"]);
   });
 
+  test("channels without a group land in the chosen default group, which keeps its saved place", () => {
+    const result = layoutGroups({ fetched: [ch("a"), ch("b")], groupNames: ["A", "Inbox", "B"], channelGroups: { a: "A" }, defaultGroup: "Inbox" });
+    expect(names(result)).toEqual(["A", "Inbox", "B"]);
+    expect(result.groups.filter((g) => g.default).map((g) => g.groupName)).toEqual(["Inbox"]);
+    expect(result.channelGroups).toEqual({ a: "A", b: "Inbox" });
+    expect(result.addedMappings).toBe(true);
+  });
+
+  test("a default group missing from the saved order is shown first", () => {
+    const result = layoutGroups({ fetched: [], groupNames: ["A"], channelGroups: {}, defaultGroup: "Inbox" });
+    expect(names(result)).toEqual(["Inbox", "A"]);
+  });
+
   test("only Ungrouped is the default group", () => {
     const result = layoutGroups({ fetched: [], groupNames: ["A", "B"], channelGroups: {} });
     expect(result.groups.filter((g) => g.default).map((g) => g.groupName)).toEqual(["Ungrouped"]);
@@ -107,9 +120,9 @@ test.describe("layoutGroups", () => {
     expect(result.groups[0]).toMatchObject({ numberOfChannels: 3, numberOfLiveChannels: 2 });
   });
 
-  test("a duplicated saved name, or a saved 'Ungrouped', does not create duplicate groups", () => {
+  test("a duplicated saved name does not create duplicate groups, and a saved 'Ungrouped' keeps its place", () => {
     const result = layoutGroups({ fetched: [], groupNames: ["A", "Ungrouped", "A", "B"], channelGroups: {} });
-    expect(names(result)).toEqual(["Ungrouped", "A", "B"]);
+    expect(names(result)).toEqual(["A", "Ungrouped", "B"]);
   });
 
   test("does not modify its inputs", () => {

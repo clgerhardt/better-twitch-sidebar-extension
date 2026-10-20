@@ -18,8 +18,7 @@ export default function GroupList({
   const error = name === "" ? null : validateGroupName(name, groups.map((g) => g.groupName.toLowerCase()));
   const canAdd = name !== "" && error === null;
 
-  // Ungrouped always comes first and cannot be moved
-  const movable = groups.filter((g) => !g.default).map((g) => g.groupName);
+  const order = groups.map((g) => g.groupName);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -58,7 +57,7 @@ export default function GroupList({
       <ul aria-label="Groups" className="m-0 min-h-0 flex-1 list-none overflow-y-auto p-0">
         {groups.map((group) => {
           const isSelected = group.groupName === selectedName;
-          const position = movable.indexOf(group.groupName);
+          const position = order.indexOf(group.groupName);
           return (
             <li key={group.groupName} className="my-1 flex items-stretch gap-1">
               <button
@@ -70,30 +69,29 @@ export default function GroupList({
                 }`}
               >
                 <span className="min-w-0 flex-1 truncate">{group.groupName}</span>
+                {group.default && <span className="text-[1.1rem] font-normal text-[#adadb8]">Default</span>}
                 <span className="rounded-full bg-[#3a3a3d] px-2 text-[1.1rem] leading-[1.7rem]">{group.numberOfChannels}</span>
               </button>
-              {position !== -1 && (
-                <div className="flex flex-col justify-center">
-                  {([-1, 1] as const).map((step) => {
-                    const Icon = step === -1 ? ChevronUpIcon : ChevronDownIcon;
-                    const edge = step === -1 ? position === 0 : position === movable.length - 1;
-                    const label = `Move ${group.groupName} ${step === -1 ? "up" : "down"}`;
-                    return (
-                      <button
-                        key={step}
-                        type="button"
-                        aria-label={label}
-                        title={label}
-                        disabled={edge}
-                        onClick={() => moveGroup(group.groupName, step, movable)}
-                        className="flex cursor-pointer items-center justify-center rounded border-0 bg-transparent px-1 py-0.5 text-[#adadb8] enabled:hover:bg-white/10 enabled:hover:text-[#efeff1] disabled:cursor-default disabled:opacity-30"
-                      >
-                        <Icon aria-hidden="true" className="h-5 w-5" />
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              <div className="flex flex-col justify-center">
+                {([-1, 1] as const).map((step) => {
+                  const Icon = step === -1 ? ChevronUpIcon : ChevronDownIcon;
+                  const edge = step === -1 ? position === 0 : position === order.length - 1;
+                  const label = `Move ${group.groupName} ${step === -1 ? "up" : "down"}`;
+                  return (
+                    <button
+                      key={step}
+                      type="button"
+                      aria-label={label}
+                      title={label}
+                      disabled={edge}
+                      onClick={() => moveGroup(group.groupName, step, order)}
+                      className="flex cursor-pointer items-center justify-center rounded border-0 bg-transparent px-1 py-0.5 text-[#adadb8] enabled:hover:bg-white/10 enabled:hover:text-[#efeff1] disabled:cursor-default disabled:opacity-30"
+                    >
+                      <Icon aria-hidden="true" className="h-5 w-5" />
+                    </button>
+                  );
+                })}
+              </div>
             </li>
           );
         })}
