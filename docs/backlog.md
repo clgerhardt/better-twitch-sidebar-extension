@@ -19,3 +19,7 @@ Add support for other languages. All UI text (popup, dialog, sidebar, tooltips) 
 ## Newly followed channels are slow to show up
 
 After following a channel, Twitch's followed-channels API lags before it includes the new channel, so it takes a while to appear in the sidebar. Look for ways to shorten or hide that delay (for example: pick up the follow from the page as it happens, retry the follow list a few times after a follow is detected, or add the channel optimistically).
+
+## Sync groups and channel assignments across the Chrome profile
+
+Keep the groups, their order, the default group and which channel is in which group in sync across the user's devices, through their Chrome profile (`chrome.storage.sync`) instead of the local-only `chrome.storage.local`. Things to work out: `chrome.storage.sync` has small quotas (about 100 KB in total, 8 KB per item), and the channel-to-group map grows with the follow list, so it needs a compact format or splitting across items; what happens when two devices change groups at once; and the sign-in, the stored follows snapshot and other per-device data must stay local.
