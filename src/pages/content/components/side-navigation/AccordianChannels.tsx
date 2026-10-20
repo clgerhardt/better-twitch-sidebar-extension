@@ -35,10 +35,10 @@ const AccordianChannels = () => {
 
   // When the side nav is collapsed a header shows only an initial, so hovering or focusing it says
   // which group it is. The tooltip lives on the page body: the sidebar clips anything sticking out.
-  const [tip, setTip] = useState<{ name: string; live: number; left: number; top: number } | null>(null);
-  const showTip = (element: HTMLElement, group: { groupName: string; numberOfLiveChannels: number }) => {
+  const [tip, setTip] = useState<{ name: string; live?: number; left: number; top: number } | null>(null);
+  const showTip = (element: HTMLElement, name: string, live?: number) => {
     const rect = element.getBoundingClientRect();
-    setTip({ name: group.groupName, live: group.numberOfLiveChannels, left: rect.right + 8, top: rect.top + rect.height / 2 });
+    setTip({ name, live, left: rect.right + 8, top: rect.top + rect.height / 2 });
   };
   const hideTip = () => setTip(null);
 
@@ -83,9 +83,9 @@ const AccordianChannels = () => {
               <AccordionItemButton
                 title={isSidebarExpanded ? `${group.numberOfLiveChannels} live of ${group.numberOfChannels}` : undefined}
                 aria-label={isSidebarExpanded ? undefined : group.groupName}
-                onMouseEnter={(e: React.MouseEvent<HTMLElement>) => showTip(e.currentTarget, group)}
+                onMouseEnter={(e: React.MouseEvent<HTMLElement>) => showTip(e.currentTarget, group.groupName, group.numberOfLiveChannels)}
                 onMouseLeave={hideTip}
-                onFocus={(e: React.FocusEvent<HTMLElement>) => showTip(e.currentTarget, group)}
+                onFocus={(e: React.FocusEvent<HTMLElement>) => showTip(e.currentTarget, group.groupName, group.numberOfLiveChannels)}
                 onBlur={hideTip}
                 className={`flex w-full cursor-pointer items-center gap-3 border-l-[3px] border-solid border-purple-500 bg-[color-mix(in_srgb,var(--color-text-base,#efeff1)_8%,transparent)] py-2 text-left text-[1.4rem] font-medium text-[var(--color-text-base,#efeff1)] ${isSidebarExpanded ? "px-3" : "justify-center gap-1 px-1"}`}
               >
@@ -130,7 +130,20 @@ const AccordianChannels = () => {
                   ))}
                 </ul>
                 {group.followedChannels.length === 0 && (
-                  <div className="text-center">No channels to show</div>
+                  <div
+                    className="text-center"
+                    onMouseEnter={isSidebarExpanded ? undefined : (e: React.MouseEvent<HTMLElement>) => showTip(e.currentTarget, "No channels")}
+                    onMouseLeave={hideTip}
+                  >
+                    {isSidebarExpanded ? (
+                      "No channels to show"
+                    ) : (
+                      <>
+                        <span aria-hidden="true">—</span>
+                        <span className="sr-only">No channels to show</span>
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
             </AccordionItemPanel>
@@ -161,7 +174,7 @@ const AccordianChannels = () => {
             }}
           >
             <div style={{ fontWeight: 600 }}>{tip.name}</div>
-            <div style={{ color: "#adadb8" }}>{tip.live} live</div>
+            {tip.live !== undefined && <div style={{ color: "#adadb8" }}>{tip.live} live</div>}
           </div>,
           document.body
         )}

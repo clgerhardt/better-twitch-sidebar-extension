@@ -377,6 +377,20 @@ test.describe("group headers", () => {
       await expect(twitchPage.locator("#__root").getByRole("button", { name: "Ungrouped" })).toContainText("U");
     });
 
+    test("an empty group shows a short mark that fits, not the full sentence", async ({ twitchPage }) => {
+      const friends = twitchPage.locator("#__root").getByRole("button", { name: "Friends" });
+      await friends.click();
+      const container = twitchPage.locator("#__root [data-accordion-component=AccordionItemPanel]:visible [data-testid=group-container]").last();
+      const mark = container.locator("span[aria-hidden=true]");
+      await expect(mark).toHaveText("—");
+      const [markBox, sidebarBox] = [(await mark.boundingBox())!, (await twitchPage.locator("#__root").boundingBox())!];
+      expect(markBox.x + markBox.width).toBeLessThanOrEqual(sidebarBox.x + sidebarBox.width);
+      await container.hover();
+      await expect(twitchPage.getByRole("tooltip")).toHaveText("No channels");
+      await twitchPage.mouse.move(600, 600);
+      await expect(twitchPage.getByRole("tooltip")).toHaveCount(0);
+    });
+
     test("hovering a header says which group it is, to the right of the sidebar", async ({ twitchPage }) => {
       const friends = twitchPage.locator("#__root").getByRole("button", { name: "Friends" });
       await friends.hover();
