@@ -17,6 +17,17 @@ export const addGroup = async (name: string) => {
   await chrome.storage.local.set({ [GROUP_NAMES_KEY]: [...groupNames, name] });
 };
 
+// Moves a group one place up (-1) or down (1). order is the groups as shown, without Ungrouped (which
+// stays first): saving it whole also keeps groups that were only shown because a channel uses them.
+export const moveGroup = async (name: string, step: -1 | 1, order: string[]) => {
+  const from = order.indexOf(name);
+  const to = from + step;
+  if (from === -1 || to < 0 || to >= order.length) return;
+  const moved = [...order];
+  [moved[from], moved[to]] = [moved[to], moved[from]];
+  await chrome.storage.local.set({ [GROUP_NAMES_KEY]: moved });
+};
+
 export const renameGroup = async (from: string, to: string) => {
   const { groupNames, channelGroups } = await read();
   await chrome.storage.local.set({
