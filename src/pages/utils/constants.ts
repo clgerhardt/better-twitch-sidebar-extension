@@ -51,6 +51,10 @@ export const TWITCH_LOGGED_OUT_KEY = 'twitchLoggedOut';
 // The channels fetched from Twitch for the connected user (written only by the background)
 export const CHANNEL_SNAPSHOT_KEY = 'channelSnapshot';
 
+// What this device last synced of the groups (the common starting point for merging), and its id in the sync data
+export const GROUPS_SYNC_STATE_KEY = 'groupsSyncState';
+export const SYNC_DEVICE_ID_KEY = 'syncDeviceId';
+
 // Channels the user just followed that Twitch's followed list does not include yet
 export const PENDING_FOLLOWS_KEY = 'pendingFollows';
 // Why the last refresh failed ('unauthorized' | 'rate_limited' | 'failed'); absent when it succeeded

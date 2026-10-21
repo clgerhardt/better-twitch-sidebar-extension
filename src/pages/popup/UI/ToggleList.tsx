@@ -20,6 +20,7 @@ export default function ToggleList() {
         { id: 4, label: 'Hide streaks', enabled: globalState?.hideStreaks ?? false },
         { id: 5, label: 'Hide recommended categories', enabled: globalState?.hideRecommendedCategories ?? false },
         { id: 6, label: 'Hide "viewers also watch"', enabled: globalState?.hideViewersAlsoWatch ?? false },
+        { id: 7, label: 'Sync groups across devices', enabled: globalState?.syncGroups ?? true },
       ];
       setItems(initialItems);
     });
@@ -39,6 +40,7 @@ export default function ToggleList() {
       case 4: updated.hideStreaks = value; break;
       case 5: updated.hideRecommendedCategories = value; break;
       case 6: updated.hideViewersAlsoWatch = value; break;
+      case 7: updated.syncGroups = value; break;
     }
 
     await setLocalStorage(GLOBAL_STATE_KEY, updated);
@@ -60,7 +62,7 @@ export default function ToggleList() {
 
   // The rows' space is held until the saved settings are read, so the buttons below do not jump
   return (
-    <div className="min-h-[14.75rem] space-y-1">
+    <div className="min-h-[17.25rem] space-y-1">
       {items.map(item => (
         <div key={item.id} className="flex items-center justify-between gap-3 rounded-md bg-white/[0.07] px-3 py-2">
           <span className="text-sm text-[#efeff1]">{item.label}</span>
