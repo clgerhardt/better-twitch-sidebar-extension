@@ -143,6 +143,81 @@ test.describe("Manage Groups dialog", () => {
     });
   });
 
+  test.describe("group colors", () => {
+    const rail = (locator: Locator) => locator.evaluate((el) => getComputedStyle(el).borderLeftColor);
+    const header = (page: Page, name: string) => page.locator("#__root [data-accordion-component=AccordionItemButton]").filter({ hasText: name });
+    const PURPLE = "rgb(168, 85, 247)";
+
+    test("a group's bar can be given another color, in the dialog and the sidebar, and put back", async ({ twitchPage }) => {
+      const dialog = await open(twitchPage);
+      await addGroup(dialog, "Alpha");
+      expect(await rail(groupButton(dialog, "Alpha"))).toBe(PURPLE);
+
+      await dialog.getByRole("button", { name: "Red color" }).click();
+      await expect.poll(() => rail(groupButton(dialog, "Alpha"))).toBe("rgb(239, 68, 68)");
+      await expect(dialog.getByRole("button", { name: "Red color" })).toHaveAttribute("aria-pressed", "true");
+      await expect.poll(() => rail(header(twitchPage, "Alpha"))).toBe("rgb(239, 68, 68)");
+      // Other groups keep their color
+      expect(await rail(groupButton(dialog, "Ungrouped"))).toBe(PURPLE);
+
+      await dialog.getByRole("button", { name: "Purple color" }).click();
+      await expect.poll(() => rail(groupButton(dialog, "Alpha"))).toBe(PURPLE);
+      await expect.poll(() => rail(header(twitchPage, "Alpha"))).toBe(PURPLE);
+    });
+
+    test("the default group can be colored too", async ({ twitchPage }) => {
+      const dialog = await open(twitchPage);
+      await dialog.getByRole("button", { name: "Green color" }).click();
+      await expect.poll(() => rail(header(twitchPage, "Ungrouped"))).toBe("rgb(34, 197, 94)");
+    });
+
+    test("the live count wears the group's color, with text that can be read on it", async ({ twitchPage }) => {
+      const dialog = await open(twitchPage);
+      const badge = header(twitchPage, "Ungrouped").getByTestId("group-live-count");
+      const look = () => badge.evaluate((el) => ({ background: getComputedStyle(el).backgroundColor, color: getComputedStyle(el).color }));
+      expect(await look()).toEqual({ background: PURPLE, color: "rgb(255, 255, 255)" });
+
+      await dialog.getByRole("button", { name: "Blue color" }).click();
+      await expect.poll(look).toEqual({ background: "rgb(59, 130, 246)", color: "rgb(255, 255, 255)" });
+      await dialog.getByRole("button", { name: "Yellow color" }).click();
+      await expect.poll(look).toEqual({ background: "rgb(234, 179, 8)", color: "rgb(14, 14, 16)" });
+    });
+
+    test("a group with no live channels keeps the quiet grey count whatever its color", async ({ twitchPage }) => {
+      const dialog = await open(twitchPage);
+      await addGroup(dialog, "Alpha");
+      await dialog.getByRole("button", { name: "Red color" }).click();
+      await expect.poll(() => rail(header(twitchPage, "Alpha"))).toBe("rgb(239, 68, 68)");
+      const background = await header(twitchPage, "Alpha").getByTestId("group-live-count").evaluate((el) => getComputedStyle(el).backgroundColor);
+      expect(background).not.toBe("rgb(239, 68, 68)");
+    });
+
+    test("any color can be chosen with the color input, saved when it is let go", async ({ twitchPage }) => {
+      const dialog = await open(twitchPage);
+      await addGroup(dialog, "Alpha");
+      const input = dialog.getByLabel("Custom color");
+      await input.fill("#123456");
+      await input.blur();
+      await expect.poll(() => rail(groupButton(dialog, "Alpha"))).toBe("rgb(18, 52, 86)");
+      await expect.poll(() => rail(header(twitchPage, "Alpha"))).toBe("rgb(18, 52, 86)");
+    });
+
+    test("renaming a group keeps its color, and deleting it forgets the color", async ({ twitchPage }) => {
+      const dialog = await open(twitchPage);
+      await addGroup(dialog, "Alpha");
+      await dialog.getByRole("button", { name: "Blue color" }).click();
+      await dialog.getByRole("button", { name: "edit-group-name" }).click();
+      await dialog.getByLabel("New group name").fill("Bravo");
+      await dialog.getByRole("button", { name: "save-group-name" }).click();
+      await expect.poll(() => rail(groupButton(dialog, "Bravo"))).toBe("rgb(59, 130, 246)");
+
+      await dialog.getByRole("button", { name: "delete-group" }).click();
+      await dialog.getByRole("button", { name: "Are you sure?" }).click();
+      await addGroup(dialog, "Bravo");
+      expect(await rail(groupButton(dialog, "Bravo"))).toBe(PURPLE);
+    });
+  });
+
   test.describe("putting channels in a group", () => {
     test("ticking a channel moves it into the selected group, in the dialog and the sidebar", async ({ twitchPage }) => {
       const dialog = await open(twitchPage);
@@ -224,10 +299,25 @@ test.describe("Manage Groups dialog", () => {
       await expect(dialog).toContainText("No channels match");
     });
 
-    test("the default group lists its channels without checkboxes and points to the other groups", async ({ twitchPage }) => {
+    test("the default group lists every channel: its own are ticked and locked, the others can be ticked in", async ({ twitchPage }) => {
       const dialog = await open(twitchPage);
-      await expect(dialog.locator("input[type=checkbox]")).toHaveCount(0);
-      await expect(dialog).toContainText("Select another group to move channels into it");
+      await addGroup(dialog, "Zebra Squad");
+      await dialog.getByLabel("FixtureStreak").check();
+      await expect(dialog.getByTestId("channel-group").filter({ hasText: "Zebra Squad" })).toHaveCount(1);
+
+      // Back in the default group: all channels are listed
+      await groupButton(dialog, "Ungrouped").click();
+      await expect(dialog).toContainText("Tick a channel to move it into Ungrouped");
+      await expect(dialog.getByTestId("channel-name")).toHaveCount(3);
+      // A channel already in it is ticked and cannot be unticked (it leaves by being ticked into another group)
+      await expect(dialog.getByLabel("Fixture_Live")).toBeChecked();
+      await expect(dialog.getByLabel("Fixture_Live")).toBeDisabled();
+      // One that is elsewhere can be ticked in, which moves it back
+      await expect(dialog.getByLabel("FixtureStreak")).not.toBeChecked();
+      await dialog.getByLabel("FixtureStreak").check();
+      await expect(dialog.getByLabel("FixtureStreak")).toBeChecked();
+      await expect(dialog.getByTestId("channel-group").filter({ hasText: "Zebra Squad" })).toHaveCount(0);
+      await expect(groupButton(dialog, "Zebra Squad")).toContainText("0");
     });
   });
 

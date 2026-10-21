@@ -63,6 +63,7 @@ export default function GroupList({
               <button
                 type="button"
                 aria-pressed={isSelected}
+                style={group.color ? { borderLeftColor: group.color } : undefined}
                 onClick={() => onSelect(group.groupName)}
                 className={`flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-r border-0 border-l-[3px] border-solid border-purple-500 px-3 py-2 text-left text-[1.4rem] font-medium text-[#efeff1] ${
                   isSelected ? "bg-purple-500/25" : "bg-white/[0.07] hover:bg-white/[0.12]"
