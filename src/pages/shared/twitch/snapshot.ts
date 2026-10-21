@@ -1,7 +1,7 @@
 // The channel snapshot: what the background fetched from Twitch for one user, stored so every tab,
 // the popup and the dialog read the same data. Pure functions only (no chrome.* or Vite imports).
 import type { FetchedChannel } from "../../utils/layoutGroups";
-import type { FollowedChannel, LiveStream } from "./helix";
+import type { FollowedChannel, LiveStream, TwitchUser } from "./helix";
 
 export const SNAPSHOT_VERSION = 1;
 
@@ -100,3 +100,62 @@ export const snapshotToFetched = (snapshot: ChannelSnapshot): FetchedChannel[] =
       viewerCount: c.isLive ? `${compact.format(c.viewers)} viewers` : undefined,
     },
   }));
+
+// Twitch's followed list can lag behind a follow or an unfollow. A channel the user just followed is kept
+// here, with what Twitch's public lookups said about it, and shown with the snapshot until the list
+// includes it. A channel the user just unfollowed is kept in `removed`, and hidden until the list drops it.
+export const PENDING_FOLLOW_MAX_AGE_MS = 15 * 60_000;
+// An unfollow that Twitch's list still disagrees with this long afterwards is not believed (it may have failed)
+export const PENDING_UNFOLLOW_MAX_AGE_MS = 3 * 60_000;
+
+export type PendingFollows = {
+  // The Twitch account these belong to, like the snapshot
+  user: { id: string };
+  items: { addedAt: number; channel: SnapshotChannel }[];
+  removed?: { addedAt: number; login: string }[];
+};
+
+export const isPendingFor = (value: unknown, userId: string): value is PendingFollows => {
+  const p = value as Partial<PendingFollows> | null | undefined;
+  return !!p && typeof p === "object" && p.user?.id === userId && Array.isArray(p.items);
+};
+
+const stillPending = (item: PendingFollows["items"][number], followedIds: Set<string>, now: number) =>
+  !followedIds.has(item.channel.id) && now - item.addedAt < PENDING_FOLLOW_MAX_AGE_MS;
+
+const stillRemoved = (entry: { addedAt: number; login: string }, followedLogins: Set<string>, now: number) =>
+  followedLogins.has(entry.login) && now - entry.addedAt < PENDING_UNFOLLOW_MAX_AGE_MS;
+
+// The snapshot with the pending channels in front (most recent follow first), except those it already has,
+// and without the channels that were just unfollowed
+export const withPendingFollows = (snapshot: ChannelSnapshot, pending: unknown, now: number): ChannelSnapshot => {
+  if (!isPendingFor(pending, snapshot.user.id)) return snapshot;
+  const have = new Set(snapshot.channels.map((c) => c.id));
+  const extra = pending.items
+    .filter((item) => stillPending(item, have, now))
+    .sort((a, b) => b.addedAt - a.addedAt)
+    .map((item) => item.channel);
+  const hidden = new Set((pending.removed ?? []).filter((r) => now - r.addedAt < PENDING_UNFOLLOW_MAX_AGE_MS).map((r) => r.login));
+  const channels = [...extra, ...snapshot.channels].filter((c) => !hidden.has(c.login.toLowerCase()));
+  return extra.length === 0 && channels.length === snapshot.channels.length ? snapshot : { ...snapshot, channels };
+};
+
+// What stays pending once the follow list is known: follows it does not have yet, and unfollows it still
+// shows, each only while believable. null when nothing is left.
+export const prunePending = (pending: unknown, userId: string, follows: FollowedChannel[], now: number): PendingFollows | null => {
+  if (!isPendingFor(pending, userId)) return null;
+  const followedIds = new Set(follows.map((f) => f.id));
+  const followedLogins = new Set(follows.map((f) => f.login.toLowerCase()));
+  const items = pending.items.filter((item) => stillPending(item, followedIds, now));
+  const removed = (pending.removed ?? []).filter((entry) => stillRemoved(entry, followedLogins, now));
+  return items.length === 0 && removed.length === 0 ? null : { user: pending.user, items, ...(removed.length > 0 ? { removed } : {}) };
+};
+
+// A channel as the snapshot stores it, from a profile and (when live) its stream
+export const channelFromLookup = (user: TwitchUser, stream: LiveStream | undefined): SnapshotChannel => ({
+  id: user.id,
+  login: user.login,
+  displayName: user.displayName,
+  image: user.image,
+  ...liveFields(stream),
+});
