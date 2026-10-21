@@ -1,5 +1,6 @@
 // Pure grouping logic, shared by anything that shows groups. No chrome.* or Vite imports, so it can
 // be tested in plain node.
+import { normalizeGroupColor } from "./groupColor";
 
 export type SidebarChannel = {
   login: string;
@@ -20,6 +21,8 @@ export type SidebarGroup = {
   dropdownVisible: boolean;
   followedChannels: SidebarChannel[];
   groupName: string;
+  // The accent color the user picked ('#rrggbb'); absent for the default purple
+  color?: string;
   numberOfChannels: number;
   numberOfLiveChannels: number;
   order: number;
@@ -36,6 +39,8 @@ type LayoutInput = {
   groupNames: string[];
   // The group that channels without one land in; "Ungrouped" until the user picks another
   defaultGroup?: string;
+  // Group name -> accent color
+  groupColors?: Record<string, string>;
   // Channel login -> group name
   channelGroups: Record<string, string>;
 };
@@ -55,7 +60,7 @@ const byLiveThenViewers = (a: SidebarChannel, b: SidebarChannel) => {
   return a.isLive ? b.viewers - a.viewers : 0;
 };
 
-export const layoutGroups = ({ fetched, groupNames, channelGroups, defaultGroup = UNGROUPED }: LayoutInput): LayoutResult => {
+export const layoutGroups = ({ fetched, groupNames, channelGroups, defaultGroup = UNGROUPED, groupColors = {} }: LayoutInput): LayoutResult => {
   const updatedChannelGroups: Record<string, string> = { ...channelGroups };
   const groupMap: Record<string, SidebarChannel[]> = {};
   let addedMappings = false;
@@ -89,6 +94,7 @@ export const layoutGroups = ({ fetched, groupNames, channelGroups, defaultGroup 
       dropdownVisible: false,
       followedChannels: channels.sort(byLiveThenViewers),
       groupName,
+      color: normalizeGroupColor(groupColors[groupName]),
       numberOfChannels: channels.length,
       numberOfLiveChannels: channels.filter((c) => c.isLive).length,
       order: index,

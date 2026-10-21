@@ -81,6 +81,11 @@ test.describe("layoutGroups", () => {
     expect(names(result)).toEqual(["Inbox", "A"]);
   });
 
+  test("a group's accent color comes through, and a bad stored color is ignored", () => {
+    const result = layoutGroups({ fetched: [], groupNames: ["A", "B", "C"], channelGroups: {}, groupColors: { A: "#EF4444", B: "red", Ungrouped: "#22c55e" } });
+    expect(result.groups.map((g) => [g.groupName, g.color])).toEqual([["Ungrouped", "#22c55e"], ["A", "#ef4444"], ["B", undefined], ["C", undefined]]);
+  });
+
   test("only Ungrouped is the default group", () => {
     const result = layoutGroups({ fetched: [], groupNames: ["A", "B"], channelGroups: {} });
     expect(result.groups.filter((g) => g.default).map((g) => g.groupName)).toEqual(["Ungrouped"]);

@@ -23,7 +23,8 @@ export const constants = {
     followedChannels: 'followedChannels',
     channelGroups: 'channelGroups',
     groupNames: 'groupNames',
-    defaultGroup: 'defaultGroup'
+    defaultGroup: 'defaultGroup',
+    groupColors: 'groupColors'
   },
   htmlSearchStrings: {
     ARIA_LABEL_RECOMMENDED_CHANNELS: '[aria-label="Live Channels"]'
@@ -40,6 +41,7 @@ export const LEGACY_STORAGE_KEYS = [FOLLOWED_CHANNELS_KEY, 'sideBarStateByTab', 
 export const CHANNEL_GROUPS_KEY = constants.storage.channelGroups;
 export const GROUP_NAMES_KEY = constants.storage.groupNames;
 export const DEFAULT_GROUP_KEY = constants.storage.defaultGroup;
+export const GROUP_COLORS_KEY = constants.storage.groupColors;
 // When the stored Twitch token stops working (ms since epoch), from Twitch's own validate call
 export const TOKEN_EXPIRES_AT_KEY = 'tokenExpiresAt';
 // The Twitch account signed in on twitch.tv, as seen by the content script: { status, id?, login?, seenAt }

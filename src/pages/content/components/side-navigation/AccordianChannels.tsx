@@ -23,6 +23,7 @@ import ExpiredContent from "./ExpiredContent";
 import ChannelRow from "./ChannelRow";
 import { useNativeRowsVersion } from "../../hooks/useNativeRows";
 import type { SidebarChannel } from "@src/pages/utils/layoutGroups";
+import { DEFAULT_GROUP_COLOR, readableTextColor } from "@src/pages/utils/groupColor";
 import { isSharedRow, nativeRowsByLogin } from "../../rows/nativeRows";
 import { readNativeTooltip } from "../../rows/nativeTooltip";
 
@@ -106,6 +107,7 @@ const AccordianChannels = () => {
           <AccordionItem key={group.groupName} uuid={group.groupName}>
             <AccordionItemHeading id="expanded-side-bar-title" className="my-1">
               <AccordionItemButton
+                style={group.color ? { borderLeftColor: group.color } : undefined}
                 title={isSidebarExpanded ? `${group.numberOfLiveChannels} live of ${group.numberOfChannels}` : undefined}
                 aria-label={isSidebarExpanded ? undefined : group.groupName}
                 onMouseEnter={(e: React.MouseEvent<HTMLElement>) => showTip(e.currentTarget, group.groupName, group.numberOfLiveChannels)}
@@ -126,8 +128,10 @@ const AccordianChannels = () => {
                     </span>
                     <span
                       data-testid="group-live-count"
+                      // With live channels the count wears the group's color (purple until another is picked)
+                      style={group.numberOfLiveChannels > 0 ? { background: group.color ?? DEFAULT_GROUP_COLOR, color: readableTextColor(group.color ?? DEFAULT_GROUP_COLOR) } : undefined}
                       className={`rounded-full px-2 text-[1.1rem] leading-[1.7rem] ${
-                        group.numberOfLiveChannels > 0 ? "bg-purple-500 text-white" : "bg-[var(--color-border-base,#3a3a3d)] text-[var(--color-text-base,#efeff1)]"
+                        group.numberOfLiveChannels > 0 ? "" : "bg-[var(--color-border-base,#3a3a3d)] text-[var(--color-text-base,#efeff1)]"
                       }`}
                     >
                       {group.numberOfLiveChannels}

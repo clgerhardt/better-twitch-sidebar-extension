@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { CheckIcon, PencilIcon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import type { SidebarGroup } from "@src/pages/utils/layoutGroups";
 import { validateGroupName } from "@src/pages/utils/groupName";
-import { deleteGroup, renameGroup, setChannelGroup, setDefaultGroup } from "./groupsStorage";
+import { DEFAULT_GROUP_COLOR, GROUP_COLOR_CHOICES } from "@src/pages/utils/groupColor";
+import { deleteGroup, renameGroup, setChannelGroup, setDefaultGroup, setGroupColor } from "./groupsStorage";
 
 // The right pane: the selected group (rename, delete) and the channels to tick in or out of it
 export default function GroupDetail({
@@ -16,6 +17,10 @@ export default function GroupDetail({
 }) {
   // Where a channel goes when it is taken out of a group
   const defaultName = groups.find((g) => g.default)?.groupName ?? group.groupName;
+  const color = group.color ?? DEFAULT_GROUP_COLOR;
+  // The color input reports every step of a drag; the choice is saved when it is let go
+  const [dragColor, setDragColor] = useState(color);
+  useEffect(() => setDragColor(color), [color]);
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState(group.groupName);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -128,6 +133,31 @@ export default function GroupDetail({
         )}
       </div>
       {renaming && renameError && <p className="m-0 mb-2 text-[1.2rem] text-red-400">{renameError}</p>}
+
+      <div role="group" aria-label="Group color" className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="mr-1 text-[1.3rem] text-[#adadb8]">Color</span>
+        {GROUP_COLOR_CHOICES.map((choice) => (
+          <button
+            key={choice.value}
+            type="button"
+            aria-label={`${choice.name} color`}
+            title={choice.name}
+            aria-pressed={color === choice.value}
+            onClick={() => setGroupColor(group.groupName, choice.value === DEFAULT_GROUP_COLOR ? null : choice.value)}
+            style={{ background: choice.value }}
+            className={`h-6 w-6 cursor-pointer rounded-full border-2 border-solid p-0 ${color === choice.value ? "border-white" : "border-transparent hover:border-white/50"}`}
+          />
+        ))}
+        <input
+          type="color"
+          aria-label="Custom color"
+          title="Custom color"
+          value={dragColor}
+          onChange={(event) => setDragColor(event.target.value)}
+          onBlur={() => dragColor !== color && setGroupColor(group.groupName, dragColor === DEFAULT_GROUP_COLOR ? null : dragColor)}
+          className="h-6 w-8 cursor-pointer rounded border-0 bg-transparent p-0"
+        />
+      </div>
 
       {group.default ? (
         <p className="m-0 mb-3 text-[1.3rem] text-[#adadb8]">
