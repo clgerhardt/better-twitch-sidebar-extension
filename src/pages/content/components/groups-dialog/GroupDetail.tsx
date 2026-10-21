@@ -45,8 +45,7 @@ export default function GroupDetail({
         Number(pinned.has(b.channel.login)) - Number(pinned.has(a.channel.login)) ||
         a.channel.channelName.toLowerCase().localeCompare(b.channel.channelName.toLowerCase())
     );
-  // The default group only lists what is already in it: channels are moved by ticking them in another group
-  const candidates = group.default ? all.filter((entry) => entry.groupName === group.groupName) : all;
+  const candidates = all;
   const query = search.trim().toLowerCase();
   const shown = query ? candidates.filter(({ channel }) => channel.channelName.toLowerCase().includes(query) || channel.login.includes(query)) : candidates;
 
@@ -161,7 +160,7 @@ export default function GroupDetail({
 
       {group.default ? (
         <p className="m-0 mb-3 text-[1.3rem] text-[#adadb8]">
-          {group.groupName} is the default group: channels without a group land here, and it can't be deleted. Select another group to move channels into it, or make another group the default.
+          {group.groupName} is the default group: channels without a group land here, and it can't be deleted. Tick a channel to move it into {group.groupName}; a channel leaves it when you tick it into another group.
         </p>
       ) : (
         <p className="m-0 mb-3 text-[1.3rem] text-[#adadb8]">Tick the channels that belong in {group.groupName}.</p>
@@ -179,23 +178,21 @@ export default function GroupDetail({
       <ul aria-label="Channels" className="m-0 min-h-0 flex-1 list-none overflow-y-auto p-0">
         {shown.map(({ channel, groupName }) => (
           <li key={channel.login} className="flex items-center gap-3 rounded px-2 py-1 hover:bg-white/[0.07]">
-            {group.default ? (
-              <>
-                <img src={channel.channelImage} alt="" className="h-9 w-9 rounded-full bg-[#3a3a3d]" />
-                <span data-testid="channel-name" className="min-w-0 flex-1 truncate">{channel.channelName}</span>
-              </>
-            ) : (
-              <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={(optimistic[channel.login] ?? groupName) === group.groupName}
-                  onChange={(event) => tick(channel.login, event.target.checked ? group.groupName : defaultName)}
-                  className="h-5 w-5 shrink-0 cursor-pointer accent-purple-500"
-                />
-                <img src={channel.channelImage} alt="" className="h-9 w-9 rounded-full bg-[#3a3a3d]" />
-                <span className="min-w-0 flex-1 truncate">{channel.channelName}</span>
-              </label>
-            )}
+            <label
+              className={`flex min-w-0 flex-1 items-center gap-3 ${group.default && (optimistic[channel.login] ?? groupName) === group.groupName ? "" : "cursor-pointer"}`}
+              title={group.default && (optimistic[channel.login] ?? groupName) === group.groupName ? `To move it out of ${group.groupName}, tick it into another group` : undefined}
+            >
+              <input
+                type="checkbox"
+                checked={(optimistic[channel.login] ?? groupName) === group.groupName}
+                // A channel is always in some group, so it leaves the default group only by being ticked into another
+                disabled={group.default && (optimistic[channel.login] ?? groupName) === group.groupName}
+                onChange={(event) => tick(channel.login, event.target.checked ? group.groupName : defaultName)}
+                className="h-5 w-5 shrink-0 cursor-pointer accent-purple-500 disabled:cursor-default"
+              />
+              <img src={channel.channelImage} alt="" className="h-9 w-9 rounded-full bg-[#3a3a3d]" />
+              <span data-testid="channel-name" className="min-w-0 flex-1 truncate">{channel.channelName}</span>
+            </label>
             <span data-testid="channel-group" className="shrink-0 text-[1.2rem] text-[#adadb8]">{groupName}</span>
           </li>
         ))}

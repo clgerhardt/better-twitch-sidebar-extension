@@ -299,10 +299,25 @@ test.describe("Manage Groups dialog", () => {
       await expect(dialog).toContainText("No channels match");
     });
 
-    test("the default group lists its channels without checkboxes and points to the other groups", async ({ twitchPage }) => {
+    test("the default group lists every channel: its own are ticked and locked, the others can be ticked in", async ({ twitchPage }) => {
       const dialog = await open(twitchPage);
-      await expect(dialog.locator("input[type=checkbox]")).toHaveCount(0);
-      await expect(dialog).toContainText("Select another group to move channels into it");
+      await addGroup(dialog, "Zebra Squad");
+      await dialog.getByLabel("FixtureStreak").check();
+      await expect(dialog.getByTestId("channel-group").filter({ hasText: "Zebra Squad" })).toHaveCount(1);
+
+      // Back in the default group: all channels are listed
+      await groupButton(dialog, "Ungrouped").click();
+      await expect(dialog).toContainText("Tick a channel to move it into Ungrouped");
+      await expect(dialog.getByTestId("channel-name")).toHaveCount(3);
+      // A channel already in it is ticked and cannot be unticked (it leaves by being ticked into another group)
+      await expect(dialog.getByLabel("Fixture_Live")).toBeChecked();
+      await expect(dialog.getByLabel("Fixture_Live")).toBeDisabled();
+      // One that is elsewhere can be ticked in, which moves it back
+      await expect(dialog.getByLabel("FixtureStreak")).not.toBeChecked();
+      await dialog.getByLabel("FixtureStreak").check();
+      await expect(dialog.getByLabel("FixtureStreak")).toBeChecked();
+      await expect(dialog.getByTestId("channel-group").filter({ hasText: "Zebra Squad" })).toHaveCount(0);
+      await expect(groupButton(dialog, "Zebra Squad")).toContainText("0");
     });
   });
 
