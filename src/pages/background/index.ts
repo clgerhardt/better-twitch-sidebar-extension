@@ -9,7 +9,7 @@ import {
 import { getGlobalState } from "./utils";
 import { resolveGlobalState, shouldClearStorage } from "./installState";
 import { connectTwitch } from "./auth";
-import { refreshChannels } from "./refresh";
+import { handleFollow, handleUnfollow, refreshChannels } from "./refresh";
 import { watchAccountSwitch } from "./accountSwitch";
 import { MESSAGES } from "../shared/messages";
 
@@ -63,7 +63,15 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     return true;
   }
   if (request?.type === MESSAGES.REFRESH_CHANNELS) {
-    refreshChannels(request.force === true).then(sendResponse);
+    refreshChannels(request.force === true, request.follows === true).then(sendResponse);
+    return true;
+  }
+  if (request?.type === MESSAGES.FOLLOW_CLICKED && typeof request.login === "string") {
+    handleFollow(request.login, typeof request.displayName === "string" ? request.displayName : undefined).then(sendResponse);
+    return true;
+  }
+  if (request?.type === MESSAGES.UNFOLLOW_CLICKED && typeof request.login === "string") {
+    handleUnfollow(request.login, typeof request.displayName === "string" ? request.displayName : undefined).then(sendResponse);
     return true;
   }
 });

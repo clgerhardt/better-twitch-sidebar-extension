@@ -48,6 +48,9 @@ export const PAGE_ACCOUNT_KEY = 'pageAccount';
 export const TWITCH_LOGGED_OUT_KEY = 'twitchLoggedOut';
 // The channels fetched from Twitch for the connected user (written only by the background)
 export const CHANNEL_SNAPSHOT_KEY = 'channelSnapshot';
+
+// Channels the user just followed that Twitch's followed list does not include yet
+export const PENDING_FOLLOWS_KEY = 'pendingFollows';
 // Why the last refresh failed ('unauthorized' | 'rate_limited' | 'failed'); absent when it succeeded
 export const SNAPSHOT_ERROR_KEY = 'snapshotError';
 // The last Twitch channel row captured from the page, blanked of any account data, used to build

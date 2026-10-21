@@ -7,6 +7,7 @@ import ManageGroups from "./components/manage-groups-cta/ManageGroupsCta";
 import { getLocalStorage } from "../background/storage";
 import { getElementBySelector, createElement, insertBefore } from './utils/domUtils';
 import { startPageAccountReporting } from "./pageAccount";
+import { watchFollowClicks } from "./followWatcher";
 
 // One React root per container: creating a second root on the same container duplicates the UI
 const reactRoots = new WeakMap<Element, Root>();
@@ -190,6 +191,7 @@ try {
   startPageAccountReporting();
   setUpPage();
   watchSettings();
+  watchFollowClicks();
 } catch (e) {
   messageLogger(constants.location.CONTENT_SCRIPT, "Error in content script initialization", e);
 }

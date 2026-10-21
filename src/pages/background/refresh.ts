@@ -1,5 +1,6 @@
 import { createHelixClient } from "../shared/twitch/helix";
 import { createRefresher, type RefreshStorage } from "../shared/twitch/refresh";
+import { createFollowHandler } from "../shared/twitch/newFollow";
 import { trySilentReauth } from "../content/utils/getValidTwitchToken";
 import { messageLogger } from "../utils/logger";
 import { constants, PAGE_ACCOUNT_KEY, TWITCH_LOGGED_OUT_KEY } from "../utils/constants";
@@ -35,3 +36,15 @@ const refresher = createRefresher({
 });
 
 export const refreshChannels = refresher.refresh;
+
+const followHandler = createFollowHandler({
+  client,
+  storage,
+  now: () => Date.now(),
+  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  refreshFollows: () => refresher.refresh(true, true),
+  log: (message, detail) => messageLogger(constants.location.BACKGROUND, message, detail),
+});
+
+export const handleFollow = followHandler.onFollow;
+export const handleUnfollow = followHandler.onUnfollow;

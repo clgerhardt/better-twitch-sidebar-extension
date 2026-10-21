@@ -15,7 +15,3 @@ Hovering a shared stream's row (name with "+N") should show Twitch's tooltip wit
 ## Localization
 
 Add support for other languages. All UI text (popup, dialog, sidebar, tooltips) is currently hard-coded English.
-
-## Newly followed channels are slow to show up
-
-After following a channel, Twitch's followed-channels API lags before it includes the new channel, so it takes a while to appear in the sidebar. Look for ways to shorten or hide that delay (for example: pick up the follow from the page as it happens, retry the follow list a few times after a follow is detected, or add the channel optimistically).

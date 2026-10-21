@@ -4,9 +4,9 @@
 // Rules that matter for privacy: a snapshot belongs to one Twitch user and is never reused for
 // another; a refresh that is still running when the user logs out (or another account connects)
 // writes nothing.
-import { CHANNEL_SNAPSHOT_KEY, SNAPSHOT_ERROR_KEY } from "../../utils/constants";
+import { CHANNEL_SNAPSHOT_KEY, PENDING_FOLLOWS_KEY, SNAPSHOT_ERROR_KEY } from "../../utils/constants";
 import { HelixError, type HelixClient } from "./helix";
-import { applyLive, avatarsFrom, buildSnapshot, idsNeedingAvatars, isSnapshotFor } from "./snapshot";
+import { applyLive, avatarsFrom, buildSnapshot, idsNeedingAvatars, isSnapshotFor, prunePending } from "./snapshot";
 
 // A snapshot younger than this is not refreshed again (several tabs load at once) unless forced
 export const MIN_REFRESH_AGE_MS = 10_000;
@@ -34,7 +34,7 @@ type Deps = {
   log?: (message: string, detail?: unknown) => void;
 };
 
-type Flight = { promise: Promise<RefreshResult>; session?: string };
+type Flight = { promise: Promise<RefreshResult>; session?: string; refreshFollows: boolean };
 
 export const createRefresher = (deps: Deps) => {
   const { client, storage, now, log } = deps;
@@ -60,7 +60,7 @@ export const createRefresher = (deps: Deps) => {
     }
   };
 
-  const run = async (flight: Flight, force: boolean, renewed = false): Promise<RefreshResult> => {
+  const run = async (flight: Flight, force: boolean, refreshFollows: boolean, renewed = false): Promise<RefreshResult> => {
     const stored = await storage.get(["twitchToken", "twitchUserId", CHANNEL_SNAPSHOT_KEY]);
     const token: string | undefined = stored.twitchToken;
     const userId: string | undefined = stored.twitchUserId;
@@ -79,7 +79,7 @@ export const createRefresher = (deps: Deps) => {
 
     try {
       let snapshot;
-      if (!existing || now() - existing.staticAt >= STATIC_MAX_AGE_MS) {
+      if (!existing || refreshFollows || now() - existing.staticAt >= STATIC_MAX_AGE_MS) {
         const { channels: follows } = await client.getFollowedChannels(token, userId);
         const avatars = avatarsFrom(existing, userId);
         const missing = idsNeedingAvatars(follows, avatars);
@@ -89,6 +89,13 @@ export const createRefresher = (deps: Deps) => {
         const live = await client.getLiveFollowed(token, userId);
         const at = now();
         snapshot = buildSnapshot({ userId, follows, avatars, live, fetchedAt: at, staticAt: at });
+        // Channels the list now includes (or that waited too long) are no longer pending
+        const stored = await storage.get([PENDING_FOLLOWS_KEY]);
+        if (stored[PENDING_FOLLOWS_KEY]) {
+          const kept = prunePending(stored[PENDING_FOLLOWS_KEY], userId, follows, at);
+          if (kept) await storage.set({ [PENDING_FOLLOWS_KEY]: kept });
+          else await storage.remove([PENDING_FOLLOWS_KEY]);
+        }
       } else {
         const live = await client.getLiveFollowed(token, userId);
         snapshot = applyLive(existing, live, now());
@@ -104,7 +111,7 @@ export const createRefresher = (deps: Deps) => {
       // A rejected token gets one quiet renewal and one retry, never a loop
       if (error instanceof HelixError && error.kind === "unauthorized" && deps.renewToken && !renewed) {
         log?.("token rejected, renewing");
-        if (await deps.renewToken()) return run(flight, true, true);
+        if (await deps.renewToken()) return run(flight, true, refreshFollows, true);
         if (!(await sameSession())) return { ok: false, reason: "discarded" };
       }
       const reason: RefreshFailure =
@@ -120,13 +127,19 @@ export const createRefresher = (deps: Deps) => {
     // session that is not the connected one now (logout, another account, or it started before anyone
     // was connected): its result says nothing about the session this caller is asking for, so the
     // caller that only joined it starts a fresh refresh
-    refresh: async (force = false): Promise<RefreshResult> => {
+    // refreshFollows fetches the follow list now instead of when the stored one is old (a follow just happened)
+    refresh: async (force = false, refreshFollows = false): Promise<RefreshResult> => {
       for (let attempt = 0; ; attempt++) {
+        // A refresh already running without the follow list is no use to this caller: let it finish, then ask again
+        if (attempt < 3 && inFlight && refreshFollows && !inFlight.refreshFollows) {
+          await inFlight.promise;
+          continue;
+        }
         const joined = inFlight !== null;
         let flight = inFlight;
         if (!flight) {
-          const started: Flight = { promise: undefined as unknown as Promise<RefreshResult> };
-          started.promise = run(started, force).finally(() => {
+          const started: Flight = { promise: undefined as unknown as Promise<RefreshResult>, refreshFollows };
+          started.promise = run(started, force, refreshFollows).finally(() => {
             if (inFlight === started) inFlight = null;
           });
           flight = inFlight = started;

@@ -2,13 +2,14 @@ import { messageLogger } from "@src/pages/utils/logger";
 import {
   CHANNEL_GROUPS_KEY,
   CHANNEL_SNAPSHOT_KEY,
+  PENDING_FOLLOWS_KEY,
   GROUP_NAMES_KEY,
   DEFAULT_GROUP_KEY,
   SNAPSHOT_ERROR_KEY,
 } from "@src/pages/utils/constants";
 import { useEffect, useRef, useState } from "react";
 import { FetchedChannel, SidebarGroup, layoutGroups } from "@src/pages/utils/layoutGroups";
-import { isSnapshotFor, snapshotToFetched } from "@src/pages/shared/twitch/snapshot";
+import { isSnapshotFor, snapshotToFetched, withPendingFollows } from "@src/pages/shared/twitch/snapshot";
 import { MESSAGES } from "@src/pages/shared/messages";
 import { LIVE_REFRESH_MS, LIVE_RETRY_MS, startLiveRefresh } from "@src/pages/shared/liveRefresh";
 
@@ -62,7 +63,7 @@ export const useSidebarGroups = (): {
 
   // Shows whatever the background has stored for the connected account
   const showStoredSnapshot = () => {
-    chrome.storage.local.get(["twitchToken", "twitchUserId", CHANNEL_SNAPSHOT_KEY, SNAPSHOT_ERROR_KEY], (stored) => {
+    chrome.storage.local.get(["twitchToken", "twitchUserId", CHANNEL_SNAPSHOT_KEY, PENDING_FOLLOWS_KEY, SNAPSHOT_ERROR_KEY], (stored) => {
       const { twitchToken, twitchUserId } = stored;
       waitingForFirstRef.current = false;
       if (!twitchToken || !twitchUserId) {
@@ -77,7 +78,7 @@ export const useSidebarGroups = (): {
 
       const snapshot = stored[CHANNEL_SNAPSHOT_KEY];
       if (isSnapshotFor(snapshot, twitchUserId)) {
-        fetchedRef.current = snapshotToFetched(snapshot);
+        fetchedRef.current = snapshotToFetched(withPendingFollows(snapshot, stored[PENDING_FOLLOWS_KEY], Date.now()));
         updateFetchedAt(snapshot.fetchedAt);
         setLoading(false);
         applyLayout();
@@ -115,7 +116,7 @@ export const useSidebarGroups = (): {
       if (changes.twitchToken || changes.twitchUserId) {
         showStoredSnapshot();
         requestRefresh();
-      } else if (changes[CHANNEL_SNAPSHOT_KEY] || changes[SNAPSHOT_ERROR_KEY]) {
+      } else if (changes[CHANNEL_SNAPSHOT_KEY] || changes[PENDING_FOLLOWS_KEY] || changes[SNAPSHOT_ERROR_KEY]) {
         showStoredSnapshot();
       } else if (changes[CHANNEL_GROUPS_KEY] || changes[GROUP_NAMES_KEY] || changes[DEFAULT_GROUP_KEY]) {
         if (fetchedRef.current) applyLayout();

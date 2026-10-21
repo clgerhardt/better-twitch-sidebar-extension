@@ -134,6 +134,28 @@ export const createHelixClient = (deps: HelixDeps) => {
       return users;
     },
 
+    // One channel's profile by login, whether or not the user follows it (public data, so it works
+    // before the follow list has caught up). null when there is no such channel.
+    getUserByLogin: async (token: string, login: string): Promise<TwitchUser | null> => {
+      const data = await get("users", [["login", login]], token);
+      const u = data.data?.[0];
+      return u ? { id: u.id, login: u.login, displayName: u.display_name, image: u.profile_image_url ?? "" } : null;
+    },
+
+    // Which of these channels (by id, at most 100) are live right now, followed or not
+    getStreams: async (token: string, ids: string[]): Promise<LiveStream[]> => {
+      if (ids.length === 0) return [];
+      const data = await get("streams", ids.slice(0, PAGE_SIZE).map((id) => ["user_id", id] as [string, string]), token);
+      return (data.data ?? []).map((s: any) => ({
+        id: s.user_id,
+        login: s.user_login,
+        displayName: s.user_name,
+        game: s.game_name ?? "",
+        title: s.title ?? "",
+        viewers: s.viewer_count ?? 0,
+      }));
+    },
+
     // The followed channels that are live right now, in one paginated call
     getLiveFollowed: async (token: string, userId: string): Promise<LiveStream[]> => {
       const items = await getAllPages("streams/followed", [["user_id", userId]], token);
