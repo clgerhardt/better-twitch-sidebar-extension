@@ -51,7 +51,7 @@ test("the popup's toggles work without being tied to the active tab", async ({ t
 });
 
 for (const [label, section] of [
-  ["Hide streaks", "[aria-label='Streaks']"],
+  ["Hide streaks", "[aria-label='Watch Streaks at risk']"],
   ["Hide recommended categories", "[aria-label='Recommended Categories']"],
   ["Hide \"viewers also watch\"", "[aria-label$='Viewers Also Watch']"],
 ] as const) {
