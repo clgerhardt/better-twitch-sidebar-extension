@@ -49,7 +49,9 @@ const applySidebarVisibilityFromState = (globalState: any) => {
       overrideStyle: true,
     },
     {
-      selector: "#side-nav .side-nav-section[aria-label*='streak' i]",
+      // The "Watch Streaks at risk" group in the For You column. The row inside it has a stable class
+      // prefix, as a fallback for when the group's label changes.
+      selector: "#side-nav [role='group'][aria-label*='streak' i], #side-nav [class*='saveYourStreakSideNavRow']",
       hidden: globalState.hideStreaks,
       logMessage: "Applying initial visibility: Streaks",
       overrideStyle: false,
