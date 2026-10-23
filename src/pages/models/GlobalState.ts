@@ -7,4 +7,6 @@ export type GlobalState = {
   hideStreaks?: boolean;
   hideRecommendedCategories?: boolean;
   hideViewersAlsoWatch?: boolean;
+  // Sync groups across the user's devices (on unless switched off)
+  syncGroups?: boolean;
 };

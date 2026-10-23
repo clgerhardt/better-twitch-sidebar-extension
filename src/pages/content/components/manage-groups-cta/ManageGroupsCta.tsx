@@ -5,6 +5,7 @@ import useSidebarState from "../../hooks/useSidebarState";
 import { usePageAccount } from "../../hooks/usePageAccount";
 import { useNeedsReconnect } from "../../hooks/useNeedsReconnect";
 import useGlobalState from "../../hooks/useGlobalState";
+import useGroupsSyncWait from "../../hooks/useGroupsSyncWait";
 import ManageFollowedChannelsDialog from "../groups-dialog/ManageGroupsDialog";
 
 const ManageGroupsCTA = () => {
@@ -14,12 +15,13 @@ const ManageGroupsCTA = () => {
   const pageAccount = usePageAccount();
   const needsReconnect = useNeedsReconnect();
   const globalState = useGlobalState();
+  const waitingForSync = useGroupsSyncWait();
 
   const handleToggleDialog = () => {
     setOpenDialog((prev) => !prev);
   };
 
-  if (!isSidebarExpanded || pageAccount?.status === "signed_out" || needsReconnect || !globalState.loggedIn) return null;
+  if (!isSidebarExpanded || pageAccount?.status === "signed_out" || needsReconnect || !globalState.loggedIn || waitingForSync !== false) return null;
 
   return (
     <div>

@@ -11,10 +11,12 @@ import { resolveGlobalState, shouldClearStorage } from "./installState";
 import { connectTwitch } from "./auth";
 import { handleFollow, handleUnfollow, refreshChannels } from "./refresh";
 import { watchAccountSwitch } from "./accountSwitch";
+import { startGroupsSync } from "./groupsSync";
 import { MESSAGES } from "../shared/messages";
 
 messageLogger(constants.location.BACKGROUND, "background script loaded");
 watchAccountSwitch();
+startGroupsSync();
 // Data older versions left behind (a copy of the group list that could hold a previous account's
 // channels, and per-tab sidebar state). Cheap, so it runs every time the worker starts.
 void chrome.storage.local.remove(LEGACY_STORAGE_KEYS);
@@ -41,6 +43,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       hideStreaks: false,
       hideRecommendedCategories: false,
       hideViewersAlsoWatch: false,
+      syncGroups: true,
       lastUpdated: isoNow,
     };
     await setLocalStorage(

@@ -1,0 +1,544 @@
+import { test, expect } from "@playwright/test";
+import { canonicalize, hashState, isEmptyState, threeWayMerge, unionMerge, type GroupsState, type RawGroups } from "../src/pages/shared/groupsSync/groupsState";
+import { chunkKey, coreKey, decodeState, encodeState, MAX_ITEM_BYTES, MAX_TOTAL_BYTES, metaKey, type Meta } from "../src/pages/shared/groupsSync/remoteFormat";
+import { createGroupsSync, type RemoteStore, type SyncBase } from "../src/pages/shared/groupsSync/groupsSync";
+import { isWaitingForGroupsSync, SYNC_WAIT_MAX_MS } from "../src/pages/shared/groupsSync/waiting";
+
+const state = (over: Partial<RawGroups> = {}): GroupsState => canonicalize({ groupNames: [], channelGroups: {}, ...over });
+
+test.describe("canonical groups", () => {
+  test("the default group is implied, entries in it are dropped, colors must be valid and belong to a group", () => {
+    const s = canonicalize({
+      groupNames: ["Gym", "Gym", "Work"],
+      defaultGroup: "Ungrouped",
+      channelGroups: { b: "Gym", a: "Ungrouped", c: "Elsewhere" },
+      groupColors: { Gym: "#EF4444", Work: "red", Ghost: "#22c55e" },
+    });
+    expect(s.groupNames).toEqual(["Ungrouped", "Gym", "Work", "Elsewhere"]); // default first; a group only a channel uses still exists
+    expect(s.channelGroups).toEqual({ b: "Gym", c: "Elsewhere" });
+    expect(s.groupColors).toEqual({ Gym: "#ef4444" });
+  });
+
+  test("the default group keeps its place in the order when the order lists it", () => {
+    expect(canonicalize({ groupNames: ["A", "Ungrouped", "B"] }).groupNames).toEqual(["A", "Ungrouped", "B"]);
+  });
+
+  test("the same groups hash the same whatever order they were stored in, and any change changes the hash", async () => {
+    const a = canonicalize({ groupNames: ["A", "B"], channelGroups: { x: "A", y: "B" }, groupColors: { A: "#ef4444", B: "#22c55e" } });
+    const b = canonicalize({ groupNames: ["A", "B"], channelGroups: { y: "B", x: "A", z: "Ungrouped" }, groupColors: { B: "#22c55e", A: "#ef4444" } });
+    expect(await hashState(a)).toBe(await hashState(b));
+    expect(await hashState(a)).toMatch(/^[0-9a-f]{64}$/);
+    for (const changed of [
+      canonicalize({ groupNames: ["B", "A"], channelGroups: { x: "A", y: "B" }, groupColors: { A: "#ef4444", B: "#22c55e" } }),
+      canonicalize({ groupNames: ["A", "B"], channelGroups: { x: "B", y: "B" }, groupColors: { A: "#ef4444", B: "#22c55e" } }),
+      canonicalize({ groupNames: ["A", "B"], channelGroups: { x: "A", y: "B" }, groupColors: { A: "#ef4444" } }),
+      canonicalize({ groupNames: ["A", "B"], defaultGroup: "A", channelGroups: { x: "A", y: "B" }, groupColors: { A: "#ef4444", B: "#22c55e" } }),
+    ]) expect(await hashState(changed)).not.toBe(await hashState(a));
+  });
+
+  test("a fresh install has nothing worth sharing", () => {
+    expect(isEmptyState(canonicalize({}))).toBe(true);
+    expect(isEmptyState(canonicalize({ groupNames: ["A"] }))).toBe(false);
+    expect(isEmptyState(canonicalize({ defaultGroup: "Inbox" }))).toBe(false);
+    expect(isEmptyState(canonicalize({ groupColors: { Ungrouped: "#ef4444" } }))).toBe(false);
+  });
+});
+
+test.describe("merging", () => {
+  const base = state({ groupNames: ["A", "B"], channelGroups: { x: "A", y: "B", z: "A" } });
+
+  test("changes to different channels on both sides are both kept", () => {
+    const local = state({ groupNames: ["A", "B"], channelGroups: { x: "B", y: "B", z: "A" } });
+    const remote = state({ groupNames: ["A", "B"], channelGroups: { x: "A", y: "B", z: "Ungrouped" } });
+    expect(threeWayMerge(base, local, remote).channelGroups).toEqual({ x: "B", y: "B" });
+  });
+
+  test("a channel changed differently on both sides takes the remote value", () => {
+    const local = state({ groupNames: ["A", "B"], channelGroups: { x: "B", y: "B", z: "A" } });
+    const remote = state({ groupNames: ["A", "B", "C"], channelGroups: { x: "C", y: "B", z: "A" } });
+    expect(threeWayMerge(base, local, remote).channelGroups.x).toBe("C");
+  });
+
+  test("groups added on both sides are all kept, and a group removed on one side is gone", () => {
+    const local = state({ groupNames: ["A", "L"], channelGroups: { x: "A", z: "A" } }); // removed B, added L
+    const remote = state({ groupNames: ["A", "B", "R"], channelGroups: { x: "A", y: "B", z: "A" } }); // added R
+    const merged = threeWayMerge(base, local, remote);
+    expect(merged.groupNames).toEqual(["Ungrouped", "A", "R", "L"]);
+    expect(merged.channelGroups).toEqual({ x: "A", z: "A" }); // y went back to the default group on this side
+  });
+
+  test("a group someone else still used is not lost: the channels keep it", () => {
+    // this side renamed A to A2; the other side moved a channel into A
+    const local = state({ groupNames: ["A2", "B"], channelGroups: { x: "A2", y: "B", z: "A2" } });
+    const remote = state({ groupNames: ["A", "B"], channelGroups: { x: "A", y: "A", z: "A" } });
+    const merged = threeWayMerge(base, local, remote);
+    expect(merged.groupNames).toContain("A"); // y still points at it
+    expect(merged.channelGroups.y).toBe("A");
+  });
+
+  test("colors merge per group, and the default group can change on one side", () => {
+    const b = state({ groupNames: ["A", "B"], groupColors: { A: "#ef4444" } });
+    const local = state({ groupNames: ["A", "B"], groupColors: { A: "#ef4444", B: "#22c55e" } });
+    const remote = state({ groupNames: ["A", "B"], defaultGroup: "B", groupColors: { A: "#3b82f6" } });
+    const merged = threeWayMerge(b, local, remote);
+    expect(merged.groupColors).toEqual({ A: "#3b82f6", B: "#22c55e" });
+    expect(merged.defaultGroup).toBe("B");
+  });
+
+  test("when only one side changed, the result is that side", () => {
+    const changed = state({ groupNames: ["A", "B", "C"], channelGroups: { x: "C" } });
+    expect(threeWayMerge(base, base, changed)).toEqual(changed);
+    expect(threeWayMerge(base, changed, base)).toEqual(changed);
+  });
+
+  test("the first sync keeps both devices' groups, the remote's assignments win, and local choices the remote lacks stay", () => {
+    const remote = state({ groupNames: ["R1", "R2"], defaultGroup: "R1", channelGroups: { p: "R2", q: "R2" }, groupColors: { R2: "#ef4444" } });
+    const localRaw: RawGroups = { groupNames: ["L1"], channelGroups: { q: "L1", r: "L1", s: "Ungrouped" }, groupColors: { L1: "#22c55e", R2: "#3b82f6" } };
+    const merged = unionMerge(localRaw, remote);
+    expect(merged.groupNames).toEqual(["R1", "R2", "L1"]); // not this device's built-in "Ungrouped"
+    expect(merged.defaultGroup).toBe("R1");
+    expect(merged.channelGroups).toEqual({ p: "R2", q: "R2", r: "L1" }); // q: remote wins; s was only in this device's default, so it follows the synced default
+    expect(merged.groupColors).toEqual({ L1: "#22c55e", R2: "#ef4444" });
+  });
+
+  test("a new device, whose channels were all put in its own default group on load, adopts the synced groups exactly", () => {
+    // The synced groups: RoRs is the default (its members are implied), the others are explicit
+    const remote = state({ groupNames: ["RoRs", "Frends", "Was Ungrouped"], defaultGroup: "RoRs", channelGroups: { a: "Frends", b: "Was Ungrouped", c: "Was Ungrouped" } });
+    // A fresh install has put every channel, including d and e which the synced groups keep in RoRs, in "Ungrouped"
+    const fresh: RawGroups = { channelGroups: { a: "Ungrouped", b: "Ungrouped", c: "Ungrouped", d: "Ungrouped", e: "Ungrouped" } };
+    expect(unionMerge(fresh, remote)).toEqual(remote);
+  });
+});
+
+test.describe("the remote format", () => {
+  const big = (channels: number, groups: number): GroupsState =>
+    canonicalize({
+      groupNames: Array.from({ length: groups }, (_, i) => `Group number ${i}`),
+      channelGroups: Object.fromEntries(Array.from({ length: channels }, (_, i) => [`some_channel_${i}`, `Group number ${i % groups}`])),
+    });
+  const bytes = (key: string, value: unknown) => new TextEncoder().encode(key + JSON.stringify(value)).length;
+
+  test("a state round-trips, in chunks that each fit an item and that fit the quota together", async () => {
+    const s = big(3000, 12);
+    const encoded = encodeState("999", s, 1, "A", await hashState(s));
+    expect(encoded.meta.chunks).toBeGreaterThan(1);
+    for (const [key, value] of Object.entries(encoded.items)) expect(bytes(key, value)).toBeLessThanOrEqual(MAX_ITEM_BYTES);
+    expect(encoded.bytes).toBeLessThan(MAX_TOTAL_BYTES);
+    expect(decodeState("999", encoded.meta, encoded.items)).toEqual(s);
+  });
+
+  test("an empty channel map needs no chunks, and unicode group names survive", async () => {
+    const s = canonicalize({ groupNames: ["Игры", "友達"], groupColors: { 友達: "#22c55e" } });
+    const encoded = encodeState("999", s, 1, "A", await hashState(s));
+    expect(encoded.meta.chunks).toBe(0);
+    expect(decodeState("999", encoded.meta, encoded.items)).toEqual(s);
+  });
+
+  test("a reader that sees only part of a write gets nothing", async () => {
+    const s = big(2000, 3);
+    const encoded = encodeState("999", s, 1, "A", await hashState(s));
+    const { [chunkKey("999", 1)]: _lost, ...partial } = encoded.items;
+    expect(decodeState("999", encoded.meta, partial)).toBeNull();
+    const { [coreKey("999")]: _core, ...noCore } = encoded.items;
+    expect(decodeState("999", encoded.meta, noCore)).toBeNull();
+  });
+});
+
+// A fake chrome.storage.sync shared by the devices, which counts the writes
+const makeRemote = () => {
+  const data: Record<string, unknown> = {};
+  const stats = { sets: 0, removes: 0 };
+  let beforeGet: ((keys: string[]) => Promise<void>) | null = null;
+  const store: RemoteStore = {
+    get: async (keys) => {
+      if (beforeGet) {
+        const hook = beforeGet;
+        beforeGet = null; // once
+        await hook(keys);
+      }
+      return Object.fromEntries(keys.filter((k) => k in data).map((k) => [k, structuredClone(data[k])]));
+    },
+    set: async (items) => (stats.sets++, void Object.assign(data, structuredClone(items))),
+    remove: async (keys) => (stats.removes++, void keys.forEach((k) => delete data[k])),
+  };
+  return { store, data, stats, onNextGet: (fn: (keys: string[]) => Promise<void>) => (beforeGet = fn) };
+};
+
+// A device: its own local groups, its own base, and a connection to the shared remote
+const makeDevice = (remote: ReturnType<typeof makeRemote>, id: string, options: { userId?: () => string | undefined } = {}) => {
+  const local: RawGroups = {};
+  let base: SyncBase | null = null;
+  let enabled = true;
+  let paused = false;
+  const sync = createGroupsSync({
+    remote: remote.store,
+    userId: async () => (options.userId ? options.userId() : "999"),
+    enabled: async () => enabled,
+    readLocal: async () => structuredClone(local),
+    writeLocal: async (s) => void Object.assign(local, structuredClone({ groupNames: s.groupNames, defaultGroup: s.defaultGroup, groupColors: s.groupColors, channelGroups: s.channelGroups })),
+    readBase: async () => structuredClone(base),
+    writeBase: async (b) => void (base = structuredClone(b)),
+    deviceId: async () => id,
+    isPaused: async () => paused,
+    clearPaused: async () => void (paused = false),
+  });
+  return {
+    local,
+    run: sync.run,
+    setEnabled: (value: boolean) => (enabled = value),
+    base: () => base,
+    // What the popup's Turn off and Turn on do
+    turnOff: () => {
+      enabled = false;
+      paused = true;
+    },
+    turnOn: () => {
+      enabled = true;
+    },
+    paused: () => paused,
+  };
+};
+
+const view = (d: { local: RawGroups }) => canonicalize(d.local);
+
+test.describe("syncing devices", () => {
+  test("nothing is written for a device with nothing to share", async () => {
+    const remote = makeRemote();
+    const a = makeDevice(remote, "A");
+    expect(await a.run()).toEqual({ done: "nothing_to_share" });
+    expect(remote.stats.sets).toBe(0);
+  });
+
+  test("one device's groups reach another, and syncing again changes nothing (no echo)", async () => {
+    const remote = makeRemote();
+    const a = makeDevice(remote, "A");
+    const b = makeDevice(remote, "B");
+    Object.assign(a.local, { groupNames: ["Gym"], channelGroups: { x: "Gym", y: "Ungrouped" }, groupColors: { Gym: "#ef4444" } });
+    expect(await a.run()).toEqual({ done: "pushed" });
+    expect(await b.run()).toEqual({ done: "first_sync" });
+    expect(view(b)).toEqual(view(a));
+
+    const writes = remote.stats.sets;
+    expect(await a.run()).toEqual({ done: "in_step" });
+    expect(await b.run()).toEqual({ done: "in_step" });
+    expect(remote.stats.sets).toBe(writes);
+    expect((remote.data[metaKey("999")] as Meta).rev).toBe(1);
+  });
+
+  test("a later change on one device is pulled by the other, and the revision counts up", async () => {
+    const remote = makeRemote();
+    const a = makeDevice(remote, "A");
+    const b = makeDevice(remote, "B");
+    Object.assign(a.local, { groupNames: ["Gym"], channelGroups: { x: "Gym" } });
+    await a.run();
+    await b.run();
+
+    a.local.channelGroups = { x: "Gym", y: "Gym" };
+    expect(await a.run()).toEqual({ done: "pushed" });
+    expect(await b.run()).toEqual({ done: "pulled" });
+    expect(view(b).channelGroups).toEqual({ x: "Gym", y: "Gym" });
+    expect((remote.data[metaKey("999")] as Meta).rev).toBe(2);
+  });
+
+  test("edits to different channels made on two devices before they sync are both kept, and both end up the same", async () => {
+    const remote = makeRemote();
+    const a = makeDevice(remote, "A");
+    const b = makeDevice(remote, "B");
+    Object.assign(a.local, { groupNames: ["G1", "G2"], channelGroups: { x: "G1", y: "G1" } });
+    await a.run();
+    await b.run();
+
+    a.local.channelGroups = { x: "G2", y: "G1" }; // device A is offline when it edits
+    b.local.channelGroups = { x: "G1", y: "G2" };
+    expect(await b.run()).toEqual({ done: "pushed" });
+    expect(await a.run()).toEqual({ done: "merged" });
+    expect(await b.run()).toEqual({ done: "pulled" });
+    expect(view(a).channelGroups).toEqual({ x: "G2", y: "G2" });
+    expect(view(b)).toEqual(view(a));
+    expect(await a.run()).toEqual({ done: "in_step" });
+  });
+
+  test("the same channel moved to different groups on two devices ends in the same place on both", async () => {
+    const remote = makeRemote();
+    const a = makeDevice(remote, "A");
+    const b = makeDevice(remote, "B");
+    Object.assign(a.local, { groupNames: ["G1", "G2", "G3"], channelGroups: { x: "G1" } });
+    await a.run();
+    await b.run();
+    a.local.channelGroups = { x: "G2" };
+    b.local.channelGroups = { x: "G3" };
+    await b.run();
+    await a.run();
+    await b.run();
+    expect(view(a)).toEqual(view(b));
+    expect(view(a).channelGroups.x).toBe("G3"); // the one that reached the remote first wins
+  });
+
+  test("a device that changed groups while the remote moved on mid-push merges first instead of overwriting", async () => {
+    const remote = makeRemote();
+    const a = makeDevice(remote, "A");
+    const b = makeDevice(remote, "B");
+    Object.assign(a.local, { groupNames: ["G1", "G2"], channelGroups: { x: "G1", y: "G1" } });
+    await a.run();
+    await b.run();
+
+    a.local.channelGroups = { x: "G2", y: "G1" };
+    b.local.channelGroups = { x: "G1", y: "G2" };
+    // While A is about to push, B's push lands (A's second look at the header sees it)
+    let reads = 0;
+    const racing = remote.store.get;
+    remote.store.get = async (keys) => {
+      if (keys.includes(metaKey("999")) && ++reads === 2) await b.run();
+      return racing(keys);
+    };
+    await a.run();
+    remote.store.get = racing;
+    await b.run();
+    expect(view(a).channelGroups).toEqual({ x: "G2", y: "G2" });
+    expect(view(b)).toEqual(view(a));
+  });
+
+  test("the first sync of a device that already has groups keeps them and adds the synced ones", async () => {
+    const remote = makeRemote();
+    const a = makeDevice(remote, "A");
+    const c = makeDevice(remote, "C");
+    Object.assign(a.local, { groupNames: ["Gym"], channelGroups: { x: "Gym" }, groupColors: { Gym: "#ef4444" } });
+    await a.run();
+    Object.assign(c.local, { groupNames: ["Work"], channelGroups: { w: "Work", x: "Work" } });
+    expect(await c.run()).toEqual({ done: "first_sync" });
+    expect(view(c).groupNames).toEqual(["Ungrouped", "Gym", "Work"]);
+    expect(view(c).channelGroups).toEqual({ x: "Gym", w: "Work" });
+    expect(await a.run()).toEqual({ done: "pulled" });
+    expect(view(a)).toEqual(view(c));
+  });
+
+  test("a new device whose layout already put every channel in its own default group joins without disturbing the synced groups", async () => {
+    const remote = makeRemote();
+    const a = makeDevice(remote, "A");
+    // Device A: RoRs is the default; most channels were moved out of the old default
+    Object.assign(a.local, { groupNames: ["RoRs", "Frends", "Was Ungrouped"], defaultGroup: "RoRs", channelGroups: { d: "RoRs", e: "RoRs", a: "Frends", b: "Was Ungrouped" } });
+    await a.run();
+    const synced = view(a);
+
+    const fresh = makeDevice(remote, "B");
+    Object.assign(fresh.local, { channelGroups: { a: "Ungrouped", b: "Ungrouped", d: "Ungrouped", e: "Ungrouped" } });
+    const writes = remote.stats.sets;
+    expect(await fresh.run()).toEqual({ done: "first_sync" });
+    expect(view(fresh)).toEqual(synced); // RoRs keeps d and e; no "Ungrouped" group appears
+    expect(remote.stats.sets).toBe(writes); // nothing to push: the remote was already right
+    expect(await a.run()).toEqual({ done: "in_step" });
+    expect(view(a)).toEqual(synced);
+  });
+
+  test("a deleted group goes from every device", async () => {
+    const remote = makeRemote();
+    const a = makeDevice(remote, "A");
+    const b = makeDevice(remote, "B");
+    Object.assign(a.local, { groupNames: ["Gym", "Work"], channelGroups: { x: "Gym", y: "Work" } });
+    await a.run();
+    await b.run();
+    Object.assign(a.local, { groupNames: ["Gym"], channelGroups: { x: "Gym", y: "Ungrouped" } });
+    await a.run();
+    await b.run();
+    expect(view(b).groupNames).toEqual(["Ungrouped", "Gym"]);
+  });
+
+  test("only a complete write is applied: a header without all its items is left alone", async () => {
+    const remote = makeRemote();
+    const a = makeDevice(remote, "A");
+    const b = makeDevice(remote, "B");
+    Object.assign(a.local, { groupNames: ["Gym"], channelGroups: { x: "Gym" } });
+    await a.run();
+    delete remote.data[chunkKey("999", 0)]; // the chunk has not arrived yet
+    Object.assign(b.local, { groupNames: ["Mine"] });
+    expect(await b.run()).toEqual({ done: "waiting_for_other_items" });
+    expect(view(b).groupNames).toEqual(["Ungrouped", "Mine"]);
+  });
+
+  test("nothing is synced when the user switched syncing off, or no account is connected", async () => {
+    const remote = makeRemote();
+    let user: string | undefined;
+    const a = makeDevice(remote, "A", { userId: () => user });
+    Object.assign(a.local, { groupNames: ["Gym"] });
+    expect(await a.run()).toEqual({ done: "no_account" });
+    user = "999";
+    a.setEnabled(false);
+    expect(await a.run()).toEqual({ done: "off" });
+    expect(remote.stats.sets).toBe(0);
+  });
+
+  test("logging out while a sync runs writes nothing", async () => {
+    const remote = makeRemote();
+    let calls = 0;
+    const a = makeDevice(remote, "A", { userId: () => (++calls <= 1 ? "999" : undefined) });
+    Object.assign(a.local, { groupNames: ["Gym"], channelGroups: { x: "Gym" } });
+    await a.run();
+    expect(remote.stats.sets).toBe(0);
+    expect(a.base()).toBeNull();
+  });
+
+  test("groups too big for the quota are not pushed", async () => {
+    const remote = makeRemote();
+    const a = makeDevice(remote, "A");
+    Object.assign(a.local, {
+      groupNames: ["Gym"],
+      channelGroups: Object.fromEntries(Array.from({ length: 12_000 }, (_, i) => [`a_channel_name_${i}`, "Gym"])),
+    });
+    expect(await a.run()).toEqual({ done: "too_big" });
+    expect(remote.stats.sets).toBe(0);
+  });
+
+  test("each account has its own synced groups", async () => {
+    const remote = makeRemote();
+    const a = makeDevice(remote, "A", { userId: () => "111" });
+    const b = makeDevice(remote, "B", { userId: () => "222" });
+    Object.assign(a.local, { groupNames: ["Gym"] });
+    await a.run();
+    expect(await b.run()).toEqual({ done: "nothing_to_share" });
+    expect(view(b).groupNames).toEqual(["Ungrouped"]);
+  });
+
+  test("shrinking the groups removes the chunks that are no longer needed", async () => {
+    const remote = makeRemote();
+    const a = makeDevice(remote, "A");
+    Object.assign(a.local, { groupNames: ["Gym"], channelGroups: Object.fromEntries(Array.from({ length: 2000 }, (_, i) => [`some_channel_${i}`, "Gym"])) });
+    await a.run();
+    const chunks = () => Object.keys(remote.data).filter((k) => /:m\d+$/.test(k)).length;
+    const before = chunks();
+    expect(before).toBeGreaterThan(1);
+    a.local.channelGroups = { some_channel_1: "Gym" };
+    await a.run();
+    expect(chunks()).toBe(1);
+  });
+});
+
+test.describe("switching syncing off and on again", () => {
+  const twoDevices = async () => {
+    const remote = makeRemote();
+    const a = makeDevice(remote, "A");
+    const b = makeDevice(remote, "B");
+    Object.assign(a.local, { groupNames: ["Gym", "Work"], channelGroups: { x: "Gym", y: "Work" } });
+    await a.run();
+    await b.run();
+    return { remote, a, b };
+  };
+
+  test("a device that was off takes on what the other device synced, and pushes nothing", async () => {
+    const { remote, a, b } = await twoDevices();
+    b.turnOff();
+    b.local.channelGroups = { x: "Work", y: "Work", z: "Gym" }; // edited while off
+    a.local.channelGroups = { x: "Gym", y: "Gym" }; // the device that stayed on changes things
+    await a.run();
+    const synced = view(a);
+    const writes = remote.stats.sets;
+
+    b.turnOn();
+    expect(await b.run()).toEqual({ done: "pulled" });
+    expect(view(b)).toEqual(synced); // the offline edits are gone, the other device's are here
+    expect(remote.stats.sets).toBe(writes); // nothing reached the other device
+    expect(await a.run()).toEqual({ done: "in_step" });
+    expect(view(a)).toEqual(synced);
+  });
+
+  test("the offline edits are replaced even when the other device changed nothing", async () => {
+    const { remote, a, b } = await twoDevices();
+    const synced = view(a);
+    b.turnOff();
+    b.local.groupNames = ["Gym", "Work", "Private"];
+    b.local.channelGroups = { x: "Private", y: "Private" };
+    const writes = remote.stats.sets;
+    b.turnOn();
+    await b.run();
+    expect(view(b)).toEqual(synced);
+    expect(remote.stats.sets).toBe(writes);
+    expect(await a.run()).toEqual({ done: "in_step" });
+  });
+
+  test("while it is off nothing is read or written, and the pause is kept until it is switched on", async () => {
+    const { remote, b } = await twoDevices();
+    b.turnOff();
+    Object.assign(b.local, { groupNames: ["Private"], channelGroups: {} });
+    const writes = remote.stats.sets;
+    expect(await b.run()).toEqual({ done: "off" });
+    expect(remote.stats.sets).toBe(writes);
+    expect(view(b).groupNames).toEqual(["Ungrouped", "Private"]);
+    expect(b.paused()).toBe(true);
+  });
+
+  test("after rejoining, syncing works both ways again", async () => {
+    const { a, b } = await twoDevices();
+    b.turnOff();
+    b.turnOn();
+    await b.run();
+    expect(b.paused()).toBe(false);
+
+    b.local.channelGroups = { x: "Gym", y: "Gym" };
+    expect(await b.run()).toEqual({ done: "pushed" });
+    expect(await a.run()).toEqual({ done: "pulled" });
+    expect(view(a).channelGroups).toEqual({ x: "Gym", y: "Gym" });
+  });
+
+  test("with nothing synced yet, rejoining shares this device's groups", async () => {
+    const remote = makeRemote();
+    const b = makeDevice(remote, "B");
+    b.turnOff();
+    Object.assign(b.local, { groupNames: ["Mine"], channelGroups: { x: "Mine" } });
+    b.turnOn();
+    expect(await b.run()).toEqual({ done: "pushed" });
+    expect(b.paused()).toBe(false);
+    expect((remote.data[metaKey("999")] as Meta).rev).toBe(1);
+  });
+
+  test("with nothing to share either, the pause simply ends", async () => {
+    const remote = makeRemote();
+    const b = makeDevice(remote, "B");
+    b.turnOff();
+    b.turnOn();
+    expect(await b.run()).toEqual({ done: "nothing_to_share" });
+    expect(b.paused()).toBe(false);
+  });
+
+  test("the pause stays if the synced groups cannot be read yet", async () => {
+    const { remote, a, b } = await twoDevices();
+    b.turnOff();
+    b.local.groupNames = ["Private"];
+    a.local.channelGroups = { x: "Gym", y: "Gym" };
+    await a.run();
+    const lost = chunkKey("999", 0);
+    const saved = remote.data[lost];
+    delete remote.data[lost]; // the other items have not arrived
+
+    b.turnOn();
+    expect(await b.run()).toEqual({ done: "waiting_for_other_items" });
+    expect(b.paused()).toBe(true);
+    remote.data[lost] = saved;
+    expect(await b.run()).toEqual({ done: "pulled" });
+    expect(view(b)).toEqual(view(a));
+  });
+});
+
+test.describe("waiting for the first sync after a login", () => {
+  const input = { userId: "999", syncOn: true, readyFor: undefined as string | undefined, waitedMs: 0 };
+
+  test("the sidebar waits while an account is connected, syncing is on, and its first sync has not finished", () => {
+    expect(isWaitingForGroupsSync(input)).toBe(true);
+  });
+
+  test("it does not wait once the first sync has finished for this account", () => {
+    expect(isWaitingForGroupsSync({ ...input, readyFor: "999" })).toBe(false);
+  });
+
+  test("a sync that finished for another account does not count", () => {
+    expect(isWaitingForGroupsSync({ ...input, readyFor: "111" })).toBe(true);
+  });
+
+  test("it does not wait with no account connected, or with syncing switched off", () => {
+    expect(isWaitingForGroupsSync({ ...input, userId: undefined })).toBe(false);
+    expect(isWaitingForGroupsSync({ ...input, syncOn: false })).toBe(false);
+  });
+
+  test("it gives up after the time limit", () => {
+    expect(isWaitingForGroupsSync({ ...input, waitedMs: SYNC_WAIT_MAX_MS - 1 })).toBe(true);
+    expect(isWaitingForGroupsSync({ ...input, waitedMs: SYNC_WAIT_MAX_MS })).toBe(false);
+  });
+});
