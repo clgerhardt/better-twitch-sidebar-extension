@@ -114,19 +114,25 @@ export const threeWayMerge = (base: GroupsState, local: GroupsState, remote: Gro
   return canonicalize({ groupNames, defaultGroup, groupColors, channelGroups });
 };
 
-// The first time a device syncs, it has no common starting point. Nothing is lost: both sets of groups are
-// kept (the remote order first), colors and assignments the remote has win, and a channel the remote only
-// has by default stays where this device had put it. localRaw is used as stored, so channels this device
-// had in its own default group are kept in that group.
+// The first time a device syncs, it has no common starting point. Nothing the user chose is lost: both
+// sets of groups are kept (the remote order first), colors and assignments the remote has win, and a
+// channel the remote only has in its default group stays where this device put it.
+//
+// A channel in this device's own default group is NOT a choice: a new device puts every channel in its
+// default group as soon as it loads. Those follow the synced default group instead, and the device's own
+// built-in "Ungrouped" is not carried over as a group.
 export const unionMerge = (localRaw: RawGroups, remote: GroupsState): GroupsState => {
   const defaultGroup = remote.defaultGroup;
+  // Only assignments to groups other than this device's default (canonicalize drops the rest)
+  const chosen = canonicalize(localRaw);
 
   const groupNames = [...remote.groupNames];
   for (const n of localRaw.groupNames ?? []) if (n && !groupNames.includes(n)) groupNames.push(n);
 
-  const channelGroups: Record<string, string> = {};
-  for (const [login, group] of Object.entries(localRaw.channelGroups ?? {})) if (group) channelGroups[login] = group;
-  Object.assign(channelGroups, remote.channelGroups);
-
-  return canonicalize({ groupNames, defaultGroup, groupColors: { ...(localRaw.groupColors ?? {}), ...remote.groupColors }, channelGroups });
+  return canonicalize({
+    groupNames,
+    defaultGroup,
+    groupColors: { ...(localRaw.groupColors ?? {}), ...remote.groupColors },
+    channelGroups: { ...chosen.channelGroups, ...remote.channelGroups },
+  });
 };

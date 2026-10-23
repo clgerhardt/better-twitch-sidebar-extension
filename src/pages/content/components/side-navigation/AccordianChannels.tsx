@@ -22,6 +22,7 @@ import { useNeedsReconnect } from "../../hooks/useNeedsReconnect";
 import ExpiredContent from "./ExpiredContent";
 import ChannelRow from "./ChannelRow";
 import { useNativeRowsVersion } from "../../hooks/useNativeRows";
+import useGroupsSyncWait from "../../hooks/useGroupsSyncWait";
 import type { SidebarChannel } from "@src/pages/utils/layoutGroups";
 import { DEFAULT_GROUP_COLOR, readableTextColor } from "@src/pages/utils/groupColor";
 import { isSharedRow, nativeRowsByLogin } from "../../rows/nativeRows";
@@ -36,6 +37,7 @@ const AccordianChannels = () => {
   const [visibleGroups, setVisibleGroups] = useState(groups);
 
   const nativeVersion = useNativeRowsVersion();
+  const waitingForSync = useGroupsSyncWait();
 
   // When the side nav is collapsed a header shows only an initial, so hovering or focusing it says
   // which group it is. The tooltip lives on the page body: the sidebar clips anything sticking out.
@@ -85,7 +87,7 @@ const AccordianChannels = () => {
     return <ExpiredContent isSidebarExpanded={isSidebarExpanded} />;
   }
 
-  if (loading) {
+  if (loading || waitingForSync === null) {
     return <div className="text-center">Loading groups and channels...</div>;
   }
 
@@ -95,6 +97,11 @@ const AccordianChannels = () => {
 
   if (error) {
     return <div className="text-center text-red-500">Error loading groups: {error}</div>;
+  }
+
+  // The first time after a login the groups come from sync: showing this device's empty ones first would look like a reset
+  if (waitingForSync) {
+    return <div className="text-center">Syncing your groups...</div>;
   }
 
   return (

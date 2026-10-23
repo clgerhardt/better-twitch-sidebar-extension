@@ -1,10 +1,11 @@
-import { createGroupsSync, type SyncBase } from "../shared/groupsSync/groupsSync";
+import { createGroupsSync, type SyncBase, type SyncResult } from "../shared/groupsSync/groupsSync";
 import { SYNC_PREFIX } from "../shared/groupsSync/remoteFormat";
 import type { RawGroups } from "../shared/groupsSync/groupsState";
 import {
   CHANNEL_GROUPS_KEY,
   DEFAULT_GROUP_KEY,
   GLOBAL_STATE_KEY,
+  GROUPS_SYNC_READY_KEY,
   GROUPS_SYNC_STATE_KEY,
   GROUP_COLORS_KEY,
   GROUP_NAMES_KEY,
@@ -56,26 +57,42 @@ export const startGroupsSync = () => {
     log: (message, detail) => messageLogger(constants.location.BACKGROUND, message, detail),
   });
 
+  // The sidebar waits for the first sync after a login (see shared/groupsSync/waiting); this tells it the
+  // sync has finished, however it went, unless it could not look at the synced items yet
+  const markReady = async (result: SyncResult | null) => {
+    if (result && (result.done === "waiting_for_other_items" || result.done === "gave_up" || result.done === "off" || result.done === "no_account")) return;
+    const userId = (await chrome.storage.local.get("twitchUserId")).twitchUserId;
+    if (userId) await chrome.storage.local.set({ [GROUPS_SYNC_READY_KEY]: userId });
+  };
+
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const schedule = () => {
+  // Edits come in bursts, so they wait a moment; starting up and a change of account do not wait
+  const schedule = (delay = DEBOUNCE_MS) => {
     clearTimeout(timer);
     timer = setTimeout(() => {
       sync.run().then(
-        (result) => messageLogger(constants.location.BACKGROUND, "groups sync", result),
-        (error) => messageLogger(constants.location.BACKGROUND, "groups sync failed", error)
+        (result) => {
+          messageLogger(constants.location.BACKGROUND, "groups sync", result);
+          return markReady(result);
+        },
+        (error) => {
+          messageLogger(constants.location.BACKGROUND, "groups sync failed", error);
+          return markReady(null); // a sync that fails must not keep the sidebar waiting
+        }
       );
-    }, DEBOUNCE_MS);
+    }, delay);
   };
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "local") {
       // The groups changed, an account connected or left, or the switch was turned on or off
-      if (GROUP_KEYS.some((key) => changes[key]) || changes.twitchUserId || changes[GLOBAL_STATE_KEY]) schedule();
+      if (changes.twitchUserId || changes[GLOBAL_STATE_KEY]) schedule(0);
+      else if (GROUP_KEYS.some((key) => changes[key])) schedule();
     } else if (area === "sync" && Object.keys(changes).some((key) => key.startsWith(SYNC_PREFIX))) {
       schedule(); // another device wrote
     }
   });
 
   // On every start of the worker too, which also catches changes that arrived while it was asleep
-  schedule();
+  schedule(0);
 };

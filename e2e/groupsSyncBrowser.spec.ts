@@ -50,3 +50,58 @@ test("with the popup switch off, nothing is written to sync", async ({ twitchPag
   await toggle.click();
   await expect.poll(async () => JSON.stringify(await syncItems(worker)), { timeout: 15_000 }).toContain("Private Group");
 });
+
+const header = (page: import("@playwright/test").Page) => page.locator("#__root [data-accordion-component=AccordionItemButton]");
+
+test("the first sync after a login marks this device ready", async ({ twitchPage, worker }) => {
+  await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get("groupsSyncReady")).groupsSyncReady), { timeout: 10_000 }).toBe("999");
+  await expect(header(twitchPage).first()).toBeVisible();
+});
+
+test("until the first sync has finished the sidebar says so instead of showing groups, then shows them", async ({ twitchPage, worker }) => {
+  await worker.evaluate(() => chrome.storage.local.remove("groupsSyncReady")); // as right after a login
+  await twitchPage.reload();
+  await expect(twitchPage.locator("#__root")).toContainText("Syncing your groups...");
+  await expect(header(twitchPage)).toHaveCount(0);
+  await expect(twitchPage.getByRole("button", { name: "Manage Groups" })).toHaveCount(0);
+
+  await worker.evaluate(() => chrome.storage.local.set({ groupsSyncReady: "999" })); // the sync has finished
+  await expect(header(twitchPage).first()).toBeVisible({ timeout: 5_000 });
+  await expect(twitchPage.getByRole("button", { name: "Manage Groups" })).toBeVisible();
+});
+
+test("a first sync that never finishes does not keep the sidebar waiting for more than a few seconds", async ({ twitchPage, worker }) => {
+  await worker.evaluate(() => chrome.storage.local.remove("groupsSyncReady"));
+  await twitchPage.reload();
+  await expect(twitchPage.locator("#__root")).toContainText("Syncing your groups...");
+  await expect(header(twitchPage).first()).toBeVisible({ timeout: 12_000 });
+});
+
+test("with syncing switched off the sidebar does not wait", async ({ twitchPage, worker }) => {
+  await worker.evaluate(async () => {
+    const { globalState } = await chrome.storage.local.get("globalState");
+    await chrome.storage.local.set({ globalState: { ...globalState, syncGroups: false } });
+    await chrome.storage.local.remove("groupsSyncReady");
+  });
+  await twitchPage.reload();
+  await expect(header(twitchPage).first()).toBeVisible({ timeout: 4_000 });
+  await expect(twitchPage.locator("#__root")).not.toContainText("Syncing your groups...");
+});
+
+test("logging out clears the marker, so the next login waits for its first sync again", async ({ twitchPage, worker }) => {
+  await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get("groupsSyncReady")).groupsSyncReady), { timeout: 10_000 }).toBe("999");
+  const popup = await twitchPage.context().newPage();
+  await popup.goto(`chrome-extension://${new URL(worker.url()).host}/src/pages/popup/index.html`);
+  await popup.getByRole("button", { name: "Logout" }).click();
+  await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get(["groupsSyncReady", "twitchUserId"])).twitchUserId ?? null), { timeout: 10_000 }).toBeNull();
+  expect(await worker.evaluate(async () => (await chrome.storage.local.get("groupsSyncReady")).groupsSyncReady)).toBeUndefined();
+});
+
+test("the popup says that syncing goes through Chrome sync, tied to the switch", async ({ twitchPage, context, extensionId }) => {
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
+  const toggle = popup.getByRole("switch", { name: "Sync groups across devices" });
+  await expect(toggle).toBeVisible();
+  await expect(popup.getByText("Uses Chrome sync: sign in to Chrome with Extensions sync on.")).toBeVisible();
+  await expect(toggle).toHaveAccessibleDescription(/Uses Chrome sync/);
+});

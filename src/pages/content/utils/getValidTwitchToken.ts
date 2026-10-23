@@ -8,6 +8,7 @@ import {
   GROUP_COLORS_KEY,
   PENDING_FOLLOWS_KEY,
   GROUPS_SYNC_STATE_KEY,
+  GROUPS_SYNC_READY_KEY,
   SNAPSHOT_ERROR_KEY,
   TOKEN_EXPIRES_AT_KEY,
   TWITCH_LOGGED_OUT_KEY,
@@ -146,6 +147,7 @@ export const logoutTwitch = async () => {
     CHANNEL_SNAPSHOT_KEY,
     PENDING_FOLLOWS_KEY,
     GROUPS_SYNC_STATE_KEY,
+    GROUPS_SYNC_READY_KEY,
     SNAPSHOT_ERROR_KEY,
   ]);
   if (stored.twitchToken) await revokeTwitchToken(stored.twitchToken);

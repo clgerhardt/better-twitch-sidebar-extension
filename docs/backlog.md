@@ -11,3 +11,7 @@ Add support for other languages. All UI text (popup, dialog, sidebar, tooltips) 
 ## Sync the hide toggles across devices
 
 Groups sync across the Chrome profile; the popup's hide toggles (original followers list, stories, live channels, streaks, recommended categories, "viewers also watch") stay on each device. Consider syncing them through the same hash and merge machinery (`src/pages/shared/groupsSync`). Open question: whether some should stay per device (for example hiding sections on a small laptop screen only), which would need a per-toggle choice or a "sync settings" switch of its own.
+
+## Tell the user when Chrome sync is not signed in
+
+The popup now says that group syncing goes through Chrome sync, but it can't tell whether the user is actually signed in, so someone who never signs in to Chrome sees an "on" switch that syncs nothing. Detecting it (`chrome.identity.getProfileUserInfo`) returns an empty account unless the `identity.email` permission is added, which shows a "read your email address" warning at install. Decide whether that trade-off is worth it, or find another signal.

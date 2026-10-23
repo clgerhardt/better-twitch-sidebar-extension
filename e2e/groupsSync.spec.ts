@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { canonicalize, hashState, isEmptyState, threeWayMerge, unionMerge, type GroupsState, type RawGroups } from "../src/pages/shared/groupsSync/groupsState";
 import { chunkKey, coreKey, decodeState, encodeState, MAX_ITEM_BYTES, MAX_TOTAL_BYTES, metaKey, type Meta } from "../src/pages/shared/groupsSync/remoteFormat";
 import { createGroupsSync, type RemoteStore, type SyncBase } from "../src/pages/shared/groupsSync/groupsSync";
+import { isWaitingForGroupsSync, SYNC_WAIT_MAX_MS } from "../src/pages/shared/groupsSync/waiting";
 
 const state = (over: Partial<RawGroups> = {}): GroupsState => canonicalize({ groupNames: [], channelGroups: {}, ...over });
 
@@ -90,14 +91,22 @@ test.describe("merging", () => {
     expect(threeWayMerge(base, changed, base)).toEqual(changed);
   });
 
-  test("the first sync keeps both devices' groups, the remote's assignments win, and local ones the remote lacks stay", () => {
+  test("the first sync keeps both devices' groups, the remote's assignments win, and local choices the remote lacks stay", () => {
     const remote = state({ groupNames: ["R1", "R2"], defaultGroup: "R1", channelGroups: { p: "R2", q: "R2" }, groupColors: { R2: "#ef4444" } });
     const localRaw: RawGroups = { groupNames: ["L1"], channelGroups: { q: "L1", r: "L1", s: "Ungrouped" }, groupColors: { L1: "#22c55e", R2: "#3b82f6" } };
     const merged = unionMerge(localRaw, remote);
-    expect(merged.groupNames).toEqual(["R1", "R2", "L1", "Ungrouped"]);
+    expect(merged.groupNames).toEqual(["R1", "R2", "L1"]); // not this device's built-in "Ungrouped"
     expect(merged.defaultGroup).toBe("R1");
-    expect(merged.channelGroups).toEqual({ p: "R2", q: "R2", r: "L1", s: "Ungrouped" }); // q: remote wins; s stays in this device's old default group
+    expect(merged.channelGroups).toEqual({ p: "R2", q: "R2", r: "L1" }); // q: remote wins; s was only in this device's default, so it follows the synced default
     expect(merged.groupColors).toEqual({ L1: "#22c55e", R2: "#ef4444" });
+  });
+
+  test("a new device, whose channels were all put in its own default group on load, adopts the synced groups exactly", () => {
+    // The synced groups: RoRs is the default (its members are implied), the others are explicit
+    const remote = state({ groupNames: ["RoRs", "Frends", "Was Ungrouped"], defaultGroup: "RoRs", channelGroups: { a: "Frends", b: "Was Ungrouped", c: "Was Ungrouped" } });
+    // A fresh install has put every channel, including d and e which the synced groups keep in RoRs, in "Ungrouped"
+    const fresh: RawGroups = { channelGroups: { a: "Ungrouped", b: "Ungrouped", c: "Ungrouped", d: "Ungrouped", e: "Ungrouped" } };
+    expect(unionMerge(fresh, remote)).toEqual(remote);
   });
 });
 
@@ -286,6 +295,24 @@ test.describe("syncing devices", () => {
     expect(view(a)).toEqual(view(c));
   });
 
+  test("a new device whose layout already put every channel in its own default group joins without disturbing the synced groups", async () => {
+    const remote = makeRemote();
+    const a = makeDevice(remote, "A");
+    // Device A: RoRs is the default; most channels were moved out of the old default
+    Object.assign(a.local, { groupNames: ["RoRs", "Frends", "Was Ungrouped"], defaultGroup: "RoRs", channelGroups: { d: "RoRs", e: "RoRs", a: "Frends", b: "Was Ungrouped" } });
+    await a.run();
+    const synced = view(a);
+
+    const fresh = makeDevice(remote, "B");
+    Object.assign(fresh.local, { channelGroups: { a: "Ungrouped", b: "Ungrouped", d: "Ungrouped", e: "Ungrouped" } });
+    const writes = remote.stats.sets;
+    expect(await fresh.run()).toEqual({ done: "first_sync" });
+    expect(view(fresh)).toEqual(synced); // RoRs keeps d and e; no "Ungrouped" group appears
+    expect(remote.stats.sets).toBe(writes); // nothing to push: the remote was already right
+    expect(await a.run()).toEqual({ done: "in_step" });
+    expect(view(a)).toEqual(synced);
+  });
+
   test("a deleted group goes from every device", async () => {
     const remote = makeRemote();
     const a = makeDevice(remote, "A");
@@ -365,5 +392,31 @@ test.describe("syncing devices", () => {
     a.local.channelGroups = { some_channel_1: "Gym" };
     await a.run();
     expect(chunks()).toBe(1);
+  });
+});
+
+test.describe("waiting for the first sync after a login", () => {
+  const input = { userId: "999", syncOn: true, readyFor: undefined as string | undefined, waitedMs: 0 };
+
+  test("the sidebar waits while an account is connected, syncing is on, and its first sync has not finished", () => {
+    expect(isWaitingForGroupsSync(input)).toBe(true);
+  });
+
+  test("it does not wait once the first sync has finished for this account", () => {
+    expect(isWaitingForGroupsSync({ ...input, readyFor: "999" })).toBe(false);
+  });
+
+  test("a sync that finished for another account does not count", () => {
+    expect(isWaitingForGroupsSync({ ...input, readyFor: "111" })).toBe(true);
+  });
+
+  test("it does not wait with no account connected, or with syncing switched off", () => {
+    expect(isWaitingForGroupsSync({ ...input, userId: undefined })).toBe(false);
+    expect(isWaitingForGroupsSync({ ...input, syncOn: false })).toBe(false);
+  });
+
+  test("it gives up after the time limit", () => {
+    expect(isWaitingForGroupsSync({ ...input, waitedMs: SYNC_WAIT_MAX_MS - 1 })).toBe(true);
+    expect(isWaitingForGroupsSync({ ...input, waitedMs: SYNC_WAIT_MAX_MS })).toBe(false);
   });
 });
