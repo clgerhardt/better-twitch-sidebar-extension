@@ -5,6 +5,7 @@ import {
   CHANNEL_GROUPS_KEY,
   DEFAULT_GROUP_KEY,
   GLOBAL_STATE_KEY,
+  GROUPS_SYNC_PAUSED_KEY,
   GROUPS_SYNC_READY_KEY,
   GROUPS_SYNC_STATE_KEY,
   GROUP_COLORS_KEY,
@@ -54,6 +55,8 @@ export const startGroupsSync = () => {
     readBase: async () => ((await chrome.storage.local.get(GROUPS_SYNC_STATE_KEY))[GROUPS_SYNC_STATE_KEY] as SyncBase | undefined) ?? null,
     writeBase: (base) => chrome.storage.local.set({ [GROUPS_SYNC_STATE_KEY]: base }),
     deviceId,
+    isPaused: async () => !!(await chrome.storage.local.get(GROUPS_SYNC_PAUSED_KEY))[GROUPS_SYNC_PAUSED_KEY],
+    clearPaused: () => chrome.storage.local.remove(GROUPS_SYNC_PAUSED_KEY),
     log: (message, detail) => messageLogger(constants.location.BACKGROUND, message, detail),
   });
 
@@ -86,6 +89,9 @@ export const startGroupsSync = () => {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "local") {
       // The groups changed, an account connected or left, or the switch was turned on or off
+      // Switching syncing off leaves it; switching it on again rejoins (see shared/groupsSync)
+      const switchedOff = changes[GLOBAL_STATE_KEY]?.newValue?.syncGroups === false && changes[GLOBAL_STATE_KEY]?.oldValue?.syncGroups !== false;
+      if (switchedOff) void chrome.storage.local.set({ [GROUPS_SYNC_PAUSED_KEY]: true });
       if (changes.twitchUserId || changes[GLOBAL_STATE_KEY]) schedule(0);
       else if (GROUP_KEYS.some((key) => changes[key])) schedule();
     } else if (area === "sync" && Object.keys(changes).some((key) => key.startsWith(SYNC_PREFIX))) {

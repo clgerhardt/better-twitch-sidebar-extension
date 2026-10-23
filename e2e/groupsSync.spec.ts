@@ -169,6 +169,7 @@ const makeDevice = (remote: ReturnType<typeof makeRemote>, id: string, options: 
   const local: RawGroups = {};
   let base: SyncBase | null = null;
   let enabled = true;
+  let paused = false;
   const sync = createGroupsSync({
     remote: remote.store,
     userId: async () => (options.userId ? options.userId() : "999"),
@@ -178,8 +179,24 @@ const makeDevice = (remote: ReturnType<typeof makeRemote>, id: string, options: 
     readBase: async () => structuredClone(base),
     writeBase: async (b) => void (base = structuredClone(b)),
     deviceId: async () => id,
+    isPaused: async () => paused,
+    clearPaused: async () => void (paused = false),
   });
-  return { local, run: sync.run, setEnabled: (value: boolean) => (enabled = value), base: () => base };
+  return {
+    local,
+    run: sync.run,
+    setEnabled: (value: boolean) => (enabled = value),
+    base: () => base,
+    // What the popup's Turn off and Turn on do
+    turnOff: () => {
+      enabled = false;
+      paused = true;
+    },
+    turnOn: () => {
+      enabled = true;
+    },
+    paused: () => paused,
+  };
 };
 
 const view = (d: { local: RawGroups }) => canonicalize(d.local);
@@ -392,6 +409,111 @@ test.describe("syncing devices", () => {
     a.local.channelGroups = { some_channel_1: "Gym" };
     await a.run();
     expect(chunks()).toBe(1);
+  });
+});
+
+test.describe("switching syncing off and on again", () => {
+  const twoDevices = async () => {
+    const remote = makeRemote();
+    const a = makeDevice(remote, "A");
+    const b = makeDevice(remote, "B");
+    Object.assign(a.local, { groupNames: ["Gym", "Work"], channelGroups: { x: "Gym", y: "Work" } });
+    await a.run();
+    await b.run();
+    return { remote, a, b };
+  };
+
+  test("a device that was off takes on what the other device synced, and pushes nothing", async () => {
+    const { remote, a, b } = await twoDevices();
+    b.turnOff();
+    b.local.channelGroups = { x: "Work", y: "Work", z: "Gym" }; // edited while off
+    a.local.channelGroups = { x: "Gym", y: "Gym" }; // the device that stayed on changes things
+    await a.run();
+    const synced = view(a);
+    const writes = remote.stats.sets;
+
+    b.turnOn();
+    expect(await b.run()).toEqual({ done: "pulled" });
+    expect(view(b)).toEqual(synced); // the offline edits are gone, the other device's are here
+    expect(remote.stats.sets).toBe(writes); // nothing reached the other device
+    expect(await a.run()).toEqual({ done: "in_step" });
+    expect(view(a)).toEqual(synced);
+  });
+
+  test("the offline edits are replaced even when the other device changed nothing", async () => {
+    const { remote, a, b } = await twoDevices();
+    const synced = view(a);
+    b.turnOff();
+    b.local.groupNames = ["Gym", "Work", "Private"];
+    b.local.channelGroups = { x: "Private", y: "Private" };
+    const writes = remote.stats.sets;
+    b.turnOn();
+    await b.run();
+    expect(view(b)).toEqual(synced);
+    expect(remote.stats.sets).toBe(writes);
+    expect(await a.run()).toEqual({ done: "in_step" });
+  });
+
+  test("while it is off nothing is read or written, and the pause is kept until it is switched on", async () => {
+    const { remote, b } = await twoDevices();
+    b.turnOff();
+    Object.assign(b.local, { groupNames: ["Private"], channelGroups: {} });
+    const writes = remote.stats.sets;
+    expect(await b.run()).toEqual({ done: "off" });
+    expect(remote.stats.sets).toBe(writes);
+    expect(view(b).groupNames).toEqual(["Ungrouped", "Private"]);
+    expect(b.paused()).toBe(true);
+  });
+
+  test("after rejoining, syncing works both ways again", async () => {
+    const { a, b } = await twoDevices();
+    b.turnOff();
+    b.turnOn();
+    await b.run();
+    expect(b.paused()).toBe(false);
+
+    b.local.channelGroups = { x: "Gym", y: "Gym" };
+    expect(await b.run()).toEqual({ done: "pushed" });
+    expect(await a.run()).toEqual({ done: "pulled" });
+    expect(view(a).channelGroups).toEqual({ x: "Gym", y: "Gym" });
+  });
+
+  test("with nothing synced yet, rejoining shares this device's groups", async () => {
+    const remote = makeRemote();
+    const b = makeDevice(remote, "B");
+    b.turnOff();
+    Object.assign(b.local, { groupNames: ["Mine"], channelGroups: { x: "Mine" } });
+    b.turnOn();
+    expect(await b.run()).toEqual({ done: "pushed" });
+    expect(b.paused()).toBe(false);
+    expect((remote.data[metaKey("999")] as Meta).rev).toBe(1);
+  });
+
+  test("with nothing to share either, the pause simply ends", async () => {
+    const remote = makeRemote();
+    const b = makeDevice(remote, "B");
+    b.turnOff();
+    b.turnOn();
+    expect(await b.run()).toEqual({ done: "nothing_to_share" });
+    expect(b.paused()).toBe(false);
+  });
+
+  test("the pause stays if the synced groups cannot be read yet", async () => {
+    const { remote, a, b } = await twoDevices();
+    b.turnOff();
+    b.local.groupNames = ["Private"];
+    a.local.channelGroups = { x: "Gym", y: "Gym" };
+    await a.run();
+    const lost = chunkKey("999", 0);
+    const saved = remote.data[lost];
+    delete remote.data[lost]; // the other items have not arrived
+
+    b.turnOn();
+    expect(await b.run()).toEqual({ done: "waiting_for_other_items" });
+    expect(b.paused()).toBe(true);
+    remote.data[lost] = saved;
+    expect(await b.run()).toEqual({ done: "pulled" });
+    expect(view(b)).toEqual(view(a));
   });
 });
 

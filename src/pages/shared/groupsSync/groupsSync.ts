@@ -7,6 +7,8 @@
 //   remote = base, local differs   this device changed it: push it
 //   both differ                    both changed it: merge channel by channel (threeWayMerge), apply, push
 // A device that has never synced has no base, so the first sync keeps both sides (unionMerge).
+// A device that was switched off and is switched on again REJOINS: it adopts the synced groups exactly and
+// pushes nothing, so what it did while off never reaches the other devices.
 import {
   canonicalize,
   hashState,
@@ -37,6 +39,9 @@ export type SyncDeps = {
   readBase: () => Promise<SyncBase | null>;
   writeBase: (base: SyncBase) => Promise<void>;
   deviceId: () => Promise<string>;
+  // True from the moment the user switches syncing off until the first sync after switching it on again
+  isPaused?: () => Promise<boolean>;
+  clearPaused?: () => Promise<void>;
   hash?: (state: GroupsState) => Promise<string>;
   log?: (message: string, detail?: unknown) => void;
 };
@@ -102,8 +107,17 @@ export const createGroupsSync = (deps: SyncDeps) => {
       let target: GroupsState;
       let targetHash: string;
       let result: SyncResult["done"];
-      if (remote.kind === "none") {
-        if (isEmptyState(local)) return { done: "nothing_to_share" };
+      const rejoining = (await deps.isPaused?.()) ?? false;
+      if (rejoining && remote.kind === "ok") {
+        // The synced groups win: whatever this device did while it was off is replaced
+        target = remote.state;
+        targetHash = remote.hash;
+        result = "pulled";
+      } else if (remote.kind === "none") {
+        if (isEmptyState(local)) {
+          if (rejoining) await deps.clearPaused?.();
+          return { done: "nothing_to_share" };
+        }
         target = local;
         targetHash = localHash;
         result = "pushed";
@@ -145,6 +159,7 @@ export const createGroupsSync = (deps: SyncDeps) => {
       }
       if ((await deps.userId()) !== userId) return { done: "no_account" };
       await deps.writeBase({ userId, rev, hash: targetHash, state: target });
+      if (rejoining) await deps.clearPaused?.();
       return { done: result };
     }
     return { done: "gave_up" };

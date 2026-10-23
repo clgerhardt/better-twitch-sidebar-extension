@@ -37,6 +37,9 @@ test("a setting reaches every open Twitch tab, including one in the background",
   await expect(front.locator("[aria-label='Live Channels']")).toBeVisible({ timeout: 5_000 });
 });
 
+// The hide switches sit in a collapsible group in the popup
+const openHideSections = (popup: Page) => popup.getByRole("button", { name: /Hide sections/ }).click();
+
 test("the popup's toggles work without being tied to the active tab", async ({ twitchPage, context, extensionId }) => {
   // The popup is open as a tab here, so the Twitch tab is not the active one
   const popup = await context.newPage();
@@ -44,6 +47,7 @@ test("the popup's toggles work without being tied to the active tab", async ({ t
   const live = twitchPage.locator("[aria-label='Live Channels']");
   await expect(live).toBeVisible();
 
+  await openHideSections(popup);
   await popup.getByRole("switch", { name: "Hide Live Channels" }).click();
   await expect(live).toBeHidden({ timeout: 5_000 });
   await popup.getByRole("switch", { name: "Hide Live Channels" }).click();
@@ -61,6 +65,7 @@ for (const [label, section] of [
     const target = twitchPage.locator(section);
     await expect(target).toBeVisible();
 
+    await openHideSections(popup);
     await popup.getByRole("switch", { name: label }).click();
     await expect(target).toBeHidden({ timeout: 5_000 });
     await popup.getByRole("switch", { name: label }).click();
@@ -71,6 +76,7 @@ for (const [label, section] of [
 test("a Viewers Also Watch section that Twitch adds later is hidden too", async ({ twitchPage, context, extensionId }) => {
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
+  await openHideSections(popup);
   await popup.getByRole("switch", { name: "Hide \"viewers also watch\"" }).click();
   await expect(twitchPage.locator("[aria-label$='Viewers Also Watch']")).toBeHidden({ timeout: 5_000 });
 

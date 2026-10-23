@@ -54,6 +54,8 @@ export const CHANNEL_SNAPSHOT_KEY = 'channelSnapshot';
 // What this device last synced of the groups (the common starting point for merging), and its id in the sync data
 export const GROUPS_SYNC_STATE_KEY = 'groupsSyncState';
 export const SYNC_DEVICE_ID_KEY = 'syncDeviceId';
+// Set while the user has group syncing switched off: turning it on again adopts the synced groups
+export const GROUPS_SYNC_PAUSED_KEY = 'groupsSyncPaused';
 // The Twitch account the first groups sync has finished for on this device (the sidebar waits for it after a login)
 export const GROUPS_SYNC_READY_KEY = 'groupsSyncReady';
 

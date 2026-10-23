@@ -30,13 +30,13 @@ test("groups another device synced show up in the sidebar", async ({ twitchPage,
   await expect(header.getByTestId("group-live-count")).toHaveText("1");
 });
 
-test("with the popup switch off, nothing is written to sync", async ({ twitchPage, worker, context, extensionId }) => {
+test("with syncing turned off in the popup, nothing is written to sync", async ({ twitchPage, worker, context, extensionId }) => {
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
-  const toggle = popup.getByRole("switch", { name: "Sync groups across devices" });
-  await expect(toggle).toHaveAttribute("aria-pressed", "true"); // on by default
-  await toggle.click();
-  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  const status = popup.getByTestId("sync-status");
+  await expect(status).toContainText("Groups sync across your devices"); // on by default
+  await status.getByRole("button", { name: "Turn off" }).click();
+  await expect(status).toContainText("Group syncing is off");
 
   await twitchPage.getByRole("button", { name: "Manage Groups" }).click();
   const dialog = twitchPage.getByRole("dialog");
@@ -47,7 +47,8 @@ test("with the popup switch off, nothing is written to sync", async ({ twitchPag
   expect(JSON.stringify(await syncItems(worker))).not.toContain("Private Group");
 
   // Turning it back on shares what is there
-  await toggle.click();
+  await status.getByRole("button", { name: "Turn on" }).click();
+  await expect(status).toContainText("Groups sync across your devices");
   await expect.poll(async () => JSON.stringify(await syncItems(worker)), { timeout: 15_000 }).toContain("Private Group");
 });
 
@@ -97,11 +98,48 @@ test("logging out clears the marker, so the next login waits for its first sync 
   expect(await worker.evaluate(async () => (await chrome.storage.local.get("groupsSyncReady")).groupsSyncReady)).toBeUndefined();
 });
 
-test("the popup says that syncing goes through Chrome sync, tied to the switch", async ({ twitchPage, context, extensionId }) => {
+test("the popup shows syncing as a status that says it goes through Chrome sync, with a way to turn it off", async ({ twitchPage, context, extensionId }) => {
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
-  const toggle = popup.getByRole("switch", { name: "Sync groups across devices" });
-  await expect(toggle).toBeVisible();
-  await expect(popup.getByText("Uses Chrome sync: sign in to Chrome with Extensions sync on.")).toBeVisible();
-  await expect(toggle).toHaveAccessibleDescription(/Uses Chrome sync/);
+  const status = popup.getByTestId("sync-status");
+  await expect(status).toContainText("Groups sync across your devices");
+  await expect(status).toContainText("Through Chrome sync: sign in to Chrome with Extensions sync on.");
+  // It is not a switch: nothing to enable, only an opt-out
+  await expect(popup.getByRole("switch", { name: /sync/i })).toHaveCount(0);
+  await expect(status.getByRole("button", { name: "Turn off" })).toHaveAccessibleDescription("Groups sync across your devices");
+
+  await status.getByRole("button", { name: "Turn off" }).click();
+  await expect(status).toContainText("Changes stay on this device.");
+  await expect(status.getByRole("button", { name: "Turn on" })).toBeVisible();
+});
+
+test("turning syncing off, changing groups, and turning it on again replaces them with the synced groups", async ({ twitchPage, worker, context, extensionId }) => {
+  // Another device synced a group
+  const state = canonicalize({ groupNames: ["From Laptop"], channelGroups: { fixture_live: "From Laptop" } });
+  const encoded = encodeState("999", state, 5, "laptop", await hashState(state));
+  await worker.evaluate((items) => chrome.storage.sync.set(items), { ...encoded.items, [metaKey("999")]: encoded.meta });
+  const headers = twitchPage.locator("#__root [data-accordion-component=AccordionItemButton]");
+  await expect(headers.filter({ hasText: "From Laptop" })).toHaveCount(1, { timeout: 15_000 });
+
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
+  const status = popup.getByTestId("sync-status");
+  await status.getByRole("button", { name: "Turn off" }).click();
+  await expect(status).toContainText("replaces them with your synced groups");
+
+  // A change made while it is off stays on this device
+  await twitchPage.getByRole("button", { name: "Manage Groups" }).click();
+  const dialog = twitchPage.getByRole("dialog");
+  await dialog.getByPlaceholder("Add group").fill("Offline Edit");
+  await dialog.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(headers.filter({ hasText: "Offline Edit" })).toHaveCount(1, { timeout: 5_000 });
+  await twitchPage.keyboard.press("Escape");
+  await twitchPage.waitForTimeout(3_000);
+  expect(JSON.stringify(await syncItems(worker))).not.toContain("Offline Edit");
+
+  // Turning it on again takes on the synced groups and shares nothing
+  await status.getByRole("button", { name: "Turn on" }).click();
+  await expect(headers.filter({ hasText: "Offline Edit" })).toHaveCount(0, { timeout: 15_000 });
+  await expect(headers.filter({ hasText: "From Laptop" })).toHaveCount(1);
+  expect(JSON.stringify(await syncItems(worker))).not.toContain("Offline Edit");
 });

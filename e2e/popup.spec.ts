@@ -43,7 +43,7 @@ test.describe("the connected popup", () => {
     });
     const popup = await context.newPage();
     await openPopup(popup, extensionId);
-    const toggle = popup.getByRole("switch").first();
+    const toggle = popup.getByRole("button", { name: "Turn off" });
     await expect(toggle).toBeVisible();
     const early = (await toggle.boundingBox())!.y;
     await popup.waitForTimeout(1_600);
@@ -98,7 +98,9 @@ test.describe("the popup's look", () => {
   test("lists the toggles as dark rows with switches, not white cards", async ({ twitchPage, context, extensionId }) => {
     const popup = await context.newPage();
     await goto(popup, extensionId);
-    await expect(popup.getByRole("switch")).toHaveCount(7);
+    await expect(popup.getByRole("switch")).toHaveCount(0); // the hide switches are in a closed group
+    await popup.getByRole("button", { name: /Hide sections/ }).click();
+    await expect(popup.getByRole("switch")).toHaveCount(6);
     await expect(popup.getByText("Hide original followers list")).toBeVisible();
     const whites = await popup.evaluate(() => [...document.querySelectorAll("#main-container *")].filter((el) => getComputedStyle(el).backgroundColor === "rgb(255, 255, 255)" && el.getBoundingClientRect().width > 40).length);
     expect(whites).toBe(0);
@@ -107,9 +109,9 @@ test.describe("the popup's look", () => {
   test("Logout sits right under the toggles, with no empty gap", async ({ twitchPage, context, extensionId }) => {
     const popup = await context.newPage();
     await goto(popup, extensionId);
-    await expect(popup.getByRole("switch")).toHaveCount(7);
+    await expect(popup.getByTestId("sync-status")).toBeVisible();
     const gap = await popup.evaluate(() => {
-      const last = [...document.querySelectorAll("[role=switch]")].pop()!.closest("div")!.getBoundingClientRect();
+      const last = document.querySelector("[data-testid=sync-status]")!.getBoundingClientRect();
       const logout = [...document.querySelectorAll("button")].find((b) => b.innerText === "Logout")!.getBoundingClientRect();
       return logout.top - last.bottom;
     });
@@ -163,5 +165,59 @@ test.describe("the popup when the extension is not connected", () => {
     await expect(popup.getByText("Connected", { exact: true })).toHaveCount(0);
     await popup.waitForTimeout(500);
     expect((await worker.evaluate(() => chrome.storage.local.get("twitchToken"))).twitchToken).toBeUndefined();
+  });
+});
+
+test.describe("the group of hide switches", () => {
+  const openPopup = async (context: import("@playwright/test").BrowserContext, extensionId: string) => {
+    const popup = await context.newPage();
+    await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
+    return popup;
+  };
+
+  test("starts closed, with the sync switch outside it, and opens to show the six hide switches", async ({ twitchPage, context, extensionId }) => {
+    const popup = await openPopup(context, extensionId);
+    const header = popup.getByRole("button", { name: /Hide sections/ });
+    await expect(header).toHaveAttribute("aria-expanded", "false");
+    await expect(popup.getByTestId("sync-status")).toBeVisible();
+    await expect(popup.getByRole("switch", { name: /^Hide / })).toHaveCount(0);
+
+    await header.click();
+    await expect(header).toHaveAttribute("aria-expanded", "true");
+    await expect(popup.getByRole("group", { name: "Hide sections" }).getByRole("switch")).toHaveCount(6);
+    await expect(popup.getByRole("group", { name: "Hide sections" }).getByTestId("sync-status")).toHaveCount(0);
+  });
+
+  test("says how many hide switches are on, also while it is closed", async ({ twitchPage, context, extensionId }) => {
+    const popup = await openPopup(context, extensionId);
+    const header = popup.getByRole("button", { name: /Hide sections/ });
+    await expect(header).toContainText("1 on"); // a fresh install hides Twitch's own followed list
+    await header.click();
+    await popup.getByRole("switch", { name: "Hide stories" }).click();
+    await popup.getByRole("switch", { name: "Hide streaks" }).click();
+    await expect(header).toContainText("3 on");
+    await popup.getByRole("switch", { name: "Hide stories" }).click();
+    await expect(header).toContainText("2 on");
+    await header.click(); // closed again
+    await expect(header).toContainText("2 on");
+  });
+
+  test("stays open the next time the popup opens", async ({ twitchPage, context, extensionId }) => {
+    const popup = await openPopup(context, extensionId);
+    await popup.getByRole("button", { name: /Hide sections/ }).click();
+    await popup.close();
+    const again = await openPopup(context, extensionId);
+    await expect(again.getByRole("button", { name: /Hide sections/ })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  test("the space is held, so nothing jumps, closed or open", async ({ twitchPage, context, extensionId }) => {
+    const popup = await openPopup(context, extensionId);
+    const logout = popup.getByRole("button", { name: "Logout" });
+    await expect(logout).toBeVisible();
+    const closedY = (await logout.boundingBox())!.y;
+    await popup.getByRole("button", { name: /Hide sections/ }).click();
+    const openY = (await logout.boundingBox())!.y;
+    expect(openY).toBeGreaterThan(closedY); // opening pushes it down by the six rows, and no more
+    expect(openY - closedY).toBeLessThan(260);
   });
 });
