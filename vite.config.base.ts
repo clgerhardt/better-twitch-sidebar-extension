@@ -10,8 +10,9 @@ import pkg from './package.json';
 
 
 const isDev = process.env.__DEV__ === 'true';
-// set this flag to true, if you want localization support
-const localize = false;
+// The extension's name and description come from src/locales/<language>/messages.json, so Chrome (and the
+// Web Store) can show them in the user's language. The extension's own text is in src/pages/shared/i18n.
+const localize = true;
 
 export const baseManifest = {
     ...manifest,

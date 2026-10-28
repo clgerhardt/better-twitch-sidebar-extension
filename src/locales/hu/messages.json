@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Better Sidebar",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Csoportosítsd a követett csatornákat a Twitch oldalsávjában. Nem áll kapcsolatban a Twitch-csel.",
+    "description": "Extension description"
+  }
+}

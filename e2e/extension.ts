@@ -18,11 +18,41 @@ const AVATAR = "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
 
 const json = (data: unknown) => ({ contentType: "application/json", body: JSON.stringify(data) });
 
-async function stubTwitch(context: BrowserContext) {
+// Twitch translates its labels; the markup around them stays the same. "es" uses the Spanish labels Twitch
+// really shows (read off twitch.tv with its language set to es-ES). "xx" is a made-up language, so nothing
+// can depend on any one real language: every label becomes accented look-alike letters in brackets.
+export type TwitchLanguage = "en" | "es" | "xx";
+
+const SPANISH_LABELS: Record<string, string> = {
+  "Followed Channels": "Canales que sigo",
+  "Live Channels": "Canales en directo",
+  "Recommended Categories": "Categorías recomendadas",
+  "FixtureChannel Viewers Also Watch": "Los espectadores de FixtureChannel también ven",
+  "Watch Streaks at risk": "Rachas de visualizaciones en riesgo",
+  "Collapse Side Nav": "Contraer navegación lateral",
+  "Follow NewChan": "Seguir a NewChan",
+  "Unfollow Fixture_Live": "Dejar de seguir a Fixture_Live",
+  "Watch Streak": "Racha de visualizaciones", // after "Watch Streaks at risk", which it is a prefix of
+};
+const LABELS = Object.keys(SPANISH_LABELS);
+
+const pseudo = (text: string) => "[" + text.replace(/[A-Za-z]/g, (c) => ({ a: "å", e: "é", i: "ï", o: "ø", u: "ü", n: "ñ", c: "ç", s: "š", t: "ţ", l: "ł" } as Record<string, string>)[c.toLowerCase()] ?? c) + "]";
+
+// What Twitch calls this label in that language
+export const labelIn = (language: TwitchLanguage, english: string): string =>
+  language === "en" ? english : language === "es" ? SPANISH_LABELS[english] ?? english : pseudo(english);
+
+const fixtureIn = (language: TwitchLanguage) =>
+  language === "en"
+    ? SIDEBAR_FIXTURE
+    : LABELS.reduce((html, label) => html.split(label).join(labelIn(language, label)), SIDEBAR_FIXTURE).replace(/<html lang="en">/, `<html lang="${language === "es" ? "es-ES" : "xx"}">`);
+
+async function stubTwitch(context: BrowserContext, language: TwitchLanguage) {
+  const fixture = fixtureIn(language);
   await context.route("https://www.twitch.tv/**", (route) => {
     const url = new URL(route.request().url());
     if (route.request().resourceType() === "document") {
-      return route.fulfill({ contentType: "text/html", body: SIDEBAR_FIXTURE });
+      return route.fulfill({ contentType: "text/html", body: fixture });
     }
     return route.fulfill({ status: 204, body: "", headers: { "x-fixture": url.pathname } });
   });
@@ -65,6 +95,8 @@ async function stubTwitch(context: BrowserContext) {
 type Options = {
   // Drops the Stories section from the fixture, as on accounts/pages without one
   removeStories: boolean;
+  // The language Twitch is shown in: its labels are translated, the markup around them is not
+  twitchLanguage: TwitchLanguage;
 };
 
 type Fixtures = {
@@ -80,14 +112,15 @@ type Fixtures = {
 
 export const test = base.extend<Fixtures & Options>({
   removeStories: [false, { option: true }],
+  twitchLanguage: ["en", { option: true }],
 
-  context: async ({ removeStories }, use) => {
+  context: async ({ removeStories, twitchLanguage }, use) => {
     const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "btse-e2e-"));
     const context = await chromium.launchPersistentContext(userDataDir, {
       channel: "chromium",
       args: [`--disable-extensions-except=${EXTENSION_PATH}`, `--load-extension=${EXTENSION_PATH}`],
     });
-    await stubTwitch(context);
+    await stubTwitch(context, twitchLanguage);
     // The browser is signed in to the same fake Twitch account the extension is connected as
     await context.addCookies([
       { name: "twilight-user", value: encodeURIComponent(JSON.stringify({ id: "999", login: "fixture_viewer", displayName: "Fixture_Viewer" })), url: "https://www.twitch.tv/" },

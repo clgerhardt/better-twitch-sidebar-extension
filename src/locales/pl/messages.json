@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Better Sidebar",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Grupuj obserwowane kanały w pasku bocznym Twitcha. Bez powiązania z Twitchem.",
+    "description": "Extension description"
+  }
+}

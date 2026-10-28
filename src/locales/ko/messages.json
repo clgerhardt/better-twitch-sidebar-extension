@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Better Sidebar",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "팔로우하는 채널을 Twitch 사이드바에서 그룹으로 나눕니다. Twitch와 무관합니다.",
+    "description": "Extension description"
+  }
+}

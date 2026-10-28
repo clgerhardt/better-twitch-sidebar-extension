@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Better Sidebar",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Groepeer de kanalen die je volgt in de zijbalk van Twitch. Niet verbonden aan Twitch.",
+    "description": "Extension description"
+  }
+}

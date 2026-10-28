@@ -93,7 +93,7 @@ export const useSidebarGroups = (): {
       setGroups([]);
       const reason = stored[SNAPSHOT_ERROR_KEY];
       if (reason) {
-        setError(reason === "unauthorized" ? "Twitch login expired. Please reconnect in the extension popup." : "Failed to fetch followed channels");
+        setError(reason === "unauthorized" ? "sidebar.error.expired" : "sidebar.error.fetchFailed");
         setLoading(false);
       } else {
         setError(null);

@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
+import { isSidebarCollapsed } from '../twitchSections';
 
-// Twitch's own collapse button says which state the side nav is in: its label offers the action
-// that is not the current state. The sidebar is expanded unless the button says "Expand Side Nav"
-// (also when the button cannot be found).
-const SIDE_NAV_ARROW = '[data-a-target="side-nav-arrow"]';
-const SIDE_NAV_BAR = '[data-a-target="side-nav-bar"]';
+// Twitch swaps its whole sidebar element when it collapses, and the collapsed one is marked as such
+// (see twitchSections). The sidebar counts as expanded unless that mark is found, also while the page
+// is still loading.
+const readExpanded = () => !isSidebarCollapsed();
 
-const readExpanded = () => document.querySelector(SIDE_NAV_ARROW)?.getAttribute("aria-label") !== "Expand Side Nav";
+// The sidebar's container, which stays when Twitch swaps the sidebar inside it
+const sidebarContainer = () => document.querySelector('[data-a-target^="side-nav-bar"]')?.parentElement ?? document.body;
 
 const useSidebarState = () => {
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(readExpanded);
@@ -20,13 +21,12 @@ const useSidebarState = () => {
     };
 
     apply();
-    // The button can be replaced when Twitch re-renders, so watch its container, not the button
     const observer = new MutationObserver(apply);
-    observer.observe(document.querySelector(SIDE_NAV_BAR) ?? document.body, {
+    observer.observe(sidebarContainer(), {
       subtree: true,
       childList: true,
       attributes: true,
-      attributeFilter: ["aria-label"],
+      attributeFilter: ["class", "data-a-target"],
     });
     return () => observer.disconnect();
   }, []);

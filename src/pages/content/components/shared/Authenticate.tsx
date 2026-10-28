@@ -3,6 +3,7 @@ import { useTwitchToken } from "../../hooks/userTwitchToken";
 import { MESSAGES } from "../../../shared/messages";
 import { usePageAccount } from "../../hooks/usePageAccount";
 import { connectErrorMessage } from "../../../shared/twitch/connectMessages";
+import { useT } from "../../../shared/i18n/store";
 
 const Authenticate = ({ isSidebarExpanded }: { isSidebarExpanded: any }) => {
   const [tokenChecked, setTokenChecked] = useState(false);
@@ -10,6 +11,7 @@ const Authenticate = ({ isSidebarExpanded }: { isSidebarExpanded: any }) => {
   const [connectError, setConnectError] = useState<string | null>(null);
   const twitchToken = useTwitchToken();
   const pageAccount = usePageAccount();
+  const t = useT();
 
   useEffect(() => {
     // The background stores the user and the profile picture when connecting; this only shows the button
@@ -19,7 +21,7 @@ const Authenticate = ({ isSidebarExpanded }: { isSidebarExpanded: any }) => {
   }, [twitchToken]);
 
   if (!tokenChecked) {
-    return <div>Checking connection...</div>;
+    return <div>{t("connect.checking")}</div>;
   }
 
   if (!twitchToken) {
@@ -36,10 +38,10 @@ const Authenticate = ({ isSidebarExpanded }: { isSidebarExpanded: any }) => {
             // The login runs in the background so it survives this popup closing
             const result = await chrome.runtime.sendMessage({ type: MESSAGES.CONNECT_TWITCH }).catch(() => undefined);
             setConnecting(false);
-            if (!result?.ok) setConnectError(connectErrorMessage(result?.reason));
+            if (!result?.ok) setConnectError(connectErrorMessage(result?.reason, t));
           }}
         >
-          {connecting ? "Waiting for Twitch..." : `Connect for ${pageAccount.login}`}
+          {connecting ? t("connect.waiting") : t("connect.button", { login: pageAccount.login })}
         </button>
         {connectError && <p className="text-red-500 text-sm mt-2">{connectError}</p>}
       </div>

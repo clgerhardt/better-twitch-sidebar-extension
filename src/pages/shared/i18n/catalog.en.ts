@@ -1,0 +1,111 @@
+// The extension's own text, in English: the source every other language is checked against (a language
+// file that lacks a key here, or has one more, does not compile). A message is a string, or plural forms chosen
+// by the number passed as `count`: the categories the language has (English: one and other; Russian: one, few,
+// many and other; Arabic: all six). {name} is replaced by the value passed as `name`.
+//
+// Twitch's own text (its section labels, buttons and rows) is not here: it comes from Twitch.
+export type PluralForms = { other: string; zero?: string; one?: string; two?: string; few?: string; many?: string };
+export type Message = string | PluralForms;
+
+export const en = {
+  // Popup
+  "banner.tagline": "Group your way!",
+  "popup.incognito": "This extension does not work in Incognito Mode. Please disable it in your browser settings or use a normal window.",
+  "popup.connected": "Connected",
+  "popup.logout": "Logout",
+  "popup.signedOut": "You're signed out of Twitch. Sign in to Twitch to use your groups; they are saved and will be here when you do.",
+  "popup.expired": "The extension's connection to Twitch has expired. Reconnect to see your groups; they are saved.",
+  "popup.hideSections": "Hide sections",
+  "popup.hideSections.count": { one: "{count} on", other: "{count} on" },
+  "popup.hide.originalFollowers": "Hide original followers list",
+  "popup.hide.stories": "Hide stories",
+  "popup.hide.live": "Hide live channels",
+  "popup.hide.streaks": "Hide streaks",
+  "popup.hide.categories": "Hide recommended categories",
+  "popup.hide.viewersAlsoWatch": 'Hide "viewers also watch"',
+  "popup.sync.on": "Groups sync across your devices",
+  "popup.sync.onHint": "Through Chrome sync: sign in to Chrome with Extensions sync on.",
+  "popup.sync.off": "Group syncing is off",
+  "popup.sync.offHint": "Changes stay on this device. Turning it on again replaces them with your synced groups.",
+  "popup.sync.turnOff": "Turn off",
+  "popup.sync.turnOn": "Turn on",
+
+  // Connecting to Twitch
+  "guest.signedIn": "You're signed in to Twitch as {login}. Connect the extension to use your groups.",
+  "guest.signedOut": "Sign in to Twitch in a tab, then connect the extension to use your groups.",
+  "guest.default": "Open Twitch in a tab and sign in, then connect the extension to use your groups.",
+  "connect.wrongAccount": "That is not the account signed in to Twitch. Sign in to Twitch as the account you want, then try again.",
+  "connect.notSignedIn": "Sign in to Twitch in a tab first.",
+  "connect.failed": "Could not connect to Twitch. Please try again.",
+  "connect.button": "Connect for {login}",
+  "connect.waiting": "Waiting for Twitch...",
+  "connect.reconnect": "Reconnect",
+  "connect.checking": "Checking connection...",
+
+  // The sidebar
+  "sidebar.loading": "Loading groups and channels...",
+  "sidebar.syncing": "Syncing your groups...",
+  "sidebar.error": "Error loading groups: {error}",
+  "sidebar.error.fetchFailed": "Failed to fetch followed channels",
+  "sidebar.error.expired": "Twitch login expired. Please reconnect in the extension popup.",
+  "sidebar.notConnected": "Connect to group your followed channels",
+  "sidebar.notConnected.unknownAccount": "Could not tell which Twitch account is signed in",
+  "sidebar.expired": "Extension connection expired",
+  "sidebar.signedOut": "Sign in to Twitch to see your groups",
+  "sidebar.noChannels": "No channels",
+  "sidebar.noChannelsToShow": "No channels to show",
+  "sidebar.liveOf": "{live} live of {total}",
+  "sidebar.liveCount": "{count} live",
+  "manage.button": "Manage Groups",
+  "group.default.name": "Ungrouped",
+
+  // The rows we build inside Twitch's list
+  "row.offline": "Offline",
+  "row.live": "Live",
+  "row.viewers": { one: "{count} viewer", other: "{count} viewers" },
+
+  // Manage groups dialog
+  "dialog.title": "Manage groups",
+  "dialog.close": "Close",
+  "dialog.groups": "Groups",
+  "dialog.channels": "Channels",
+  "dialog.groupName": "Group name",
+  "dialog.addPlaceholder": "Add group",
+  "dialog.add": "Add",
+  "dialog.default": "Default",
+  "dialog.moveUp": "Move {name} up",
+  "dialog.moveDown": "Move {name} down",
+  "dialog.renamePlaceholder": "Updated Name",
+  "dialog.newGroupName": "New group name",
+  "dialog.makeDefault": "Make default",
+  "dialog.confirmDelete": "Are you sure?",
+  "dialog.color": "Color",
+  "dialog.colorGroup": "Group color",
+  "dialog.colorCustom": "Custom color",
+  "dialog.colorChoice": "{name} color",
+  "color.purple": "Purple",
+  "color.red": "Red",
+  "color.orange": "Orange",
+  "color.yellow": "Yellow",
+  "color.green": "Green",
+  "color.teal": "Teal",
+  "color.blue": "Blue",
+  "color.pink": "Pink",
+  "dialog.defaultInfo": "{name} is the default group: channels without a group land here, and it can't be deleted. Tick a channel to move it into {name}; a channel leaves it when you tick it into another group.",
+  "dialog.tickInfo": "Tick the channels that belong in {name}.",
+  "dialog.search": "Search channels",
+  "dialog.leaveHint": "To move it out of {name}, tick it into another group",
+  "dialog.noMatch": 'No channels match "{query}"',
+
+  // Group names
+  "groupName.blank": "Group name cannot be blank",
+  "groupName.tooLong": "Group name cannot be over {max} characters",
+  "groupName.exists": "Group name already exists",
+  "groupName.tooShort": "Group name must be at least {min} characters",
+  "groupName.profanity": "Group name contains language that isn't allowed",
+} as const satisfies Record<string, Message>;
+
+export type MessageKey = keyof typeof en;
+
+// A language's catalog: a message for every key
+export type Catalog = Record<MessageKey, Message>;

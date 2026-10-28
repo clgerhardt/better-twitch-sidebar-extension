@@ -23,10 +23,18 @@ import ExpiredContent from "./ExpiredContent";
 import ChannelRow from "./ChannelRow";
 import { useNativeRowsVersion } from "../../hooks/useNativeRows";
 import useGroupsSyncWait from "../../hooks/useGroupsSyncWait";
+import { useDirection, useT } from "@src/pages/shared/i18n/store";
+import type { MessageKey } from "@src/pages/shared/i18n/i18n";
+import { groupLabel } from "../../utils/groupLabel";
 import type { SidebarChannel } from "@src/pages/utils/layoutGroups";
 import { DEFAULT_GROUP_COLOR, readableTextColor } from "@src/pages/utils/groupColor";
 import { isSharedRow, nativeRowsByLogin } from "../../rows/nativeRows";
 import { readNativeTooltip } from "../../rows/nativeTooltip";
+
+// Where a tooltip goes beside an element: on the side of it with room. Twitch's sidebar is at the left edge
+// of the page, or at the right edge when Twitch is shown right to left.
+const placeBeside = (rect: DOMRect): { left?: number; right?: number } =>
+  rect.left + rect.width / 2 > window.innerWidth / 2 ? { right: window.innerWidth - rect.left + 8 } : { left: rect.right + 8 };
 
 const AccordianChannels = () => {
   const isSidebarExpanded = useSidebarState();
@@ -38,13 +46,15 @@ const AccordianChannels = () => {
 
   const nativeVersion = useNativeRowsVersion();
   const waitingForSync = useGroupsSyncWait();
+  const t = useT();
+  const dir = useDirection();
 
   // When the side nav is collapsed a header shows only an initial, so hovering or focusing it says
   // which group it is. The tooltip lives on the page body: the sidebar clips anything sticking out.
-  const [tip, setTip] = useState<{ name: string; live?: number; detail?: string; content?: HTMLElement; kind: "group" | "channel"; left: number; top: number } | null>(null);
+  const [tip, setTip] = useState<{ name: string; live?: number; detail?: string; content?: HTMLElement; kind: "group" | "channel"; place: { left?: number; right?: number }; top: number } | null>(null);
   const showTip = (element: HTMLElement, name: string, live?: number) => {
     const rect = element.getBoundingClientRect();
-    setTip({ name, live, kind: "group", left: rect.right + 8, top: rect.top + rect.height / 2 });
+    setTip({ name, live, kind: "group", place: placeBeside(rect), top: rect.top + rect.height / 2 });
   };
   const hoveredLogin = useRef<string | null>(null);
   const hideTip = () => {
@@ -59,7 +69,7 @@ const AccordianChannels = () => {
     if (!element || (isSidebarExpanded && !title)) return hideTip();
     hoveredLogin.current = channel.login;
     const rect = element.getBoundingClientRect();
-    setTip({ name: isSidebarExpanded ? "" : channel.channelName, detail: title, kind: "channel", left: rect.right + 8, top: rect.top });
+    setTip({ name: isSidebarExpanded ? "" : channel.channelName, detail: title, kind: "channel", place: placeBeside(rect), top: rect.top });
 
     // A shared stream has more to show than its title: take Twitch's own tooltip for it
     const native = channel.isLive ? nativeRowsByLogin().get(channel.login.toLowerCase()) : undefined;
@@ -88,7 +98,7 @@ const AccordianChannels = () => {
   }
 
   if (loading || waitingForSync === null) {
-    return <div className="text-center">Loading groups and channels...</div>;
+    return <div className="text-center">{t("sidebar.loading")}</div>;
   }
 
   if (error === "Missing Twitch credentials") {
@@ -96,12 +106,12 @@ const AccordianChannels = () => {
   }
 
   if (error) {
-    return <div className="text-center text-red-500">Error loading groups: {error}</div>;
+    return <div className="text-center text-red-500">{t("sidebar.error", { error: t(error as MessageKey) })}</div>;
   }
 
   // The first time after a login the groups come from sync: showing this device's empty ones first would look like a reset
   if (waitingForSync) {
-    return <div className="text-center">Syncing your groups...</div>;
+    return <div className="text-center">{t("sidebar.syncing")}</div>;
   }
 
   return (
@@ -114,24 +124,24 @@ const AccordianChannels = () => {
           <AccordionItem key={group.groupName} uuid={group.groupName}>
             <AccordionItemHeading id="expanded-side-bar-title" className="my-1">
               <AccordionItemButton
-                style={group.color ? { borderLeftColor: group.color } : undefined}
-                title={isSidebarExpanded ? `${group.numberOfLiveChannels} live of ${group.numberOfChannels}` : undefined}
-                aria-label={isSidebarExpanded ? undefined : group.groupName}
-                onMouseEnter={(e: React.MouseEvent<HTMLElement>) => showTip(e.currentTarget, group.groupName, group.numberOfLiveChannels)}
+                style={group.color ? { borderInlineStartColor: group.color } : undefined}
+                title={isSidebarExpanded ? t("sidebar.liveOf", { live: group.numberOfLiveChannels, total: group.numberOfChannels }) : undefined}
+                aria-label={isSidebarExpanded ? undefined : groupLabel(group, t)}
+                onMouseEnter={(e: React.MouseEvent<HTMLElement>) => showTip(e.currentTarget, groupLabel(group, t), group.numberOfLiveChannels)}
                 onMouseLeave={hideTip}
-                onFocus={(e: React.FocusEvent<HTMLElement>) => showTip(e.currentTarget, group.groupName, group.numberOfLiveChannels)}
+                onFocus={(e: React.FocusEvent<HTMLElement>) => showTip(e.currentTarget, groupLabel(group, t), group.numberOfLiveChannels)}
                 onBlur={hideTip}
-                className={`flex w-full cursor-pointer items-center gap-3 border-l-[3px] border-solid border-purple-500 bg-[color-mix(in_srgb,var(--color-text-base,#efeff1)_8%,transparent)] py-2 text-left text-[1.4rem] font-medium text-[var(--color-text-base,#efeff1)] ${isSidebarExpanded ? "px-3" : "justify-center gap-1 px-1"}`}
+                className={`flex w-full cursor-pointer items-center gap-3 border-s-[3px] border-solid border-purple-500 bg-[color-mix(in_srgb,var(--color-text-base,#efeff1)_8%,transparent)] py-2 text-left text-[1.4rem] font-medium text-[var(--color-text-base,#efeff1)] ${isSidebarExpanded ? "px-3" : "justify-center gap-1 px-1"}`}
               >
                 {!isSidebarExpanded && (
                   <span aria-hidden="true" className="text-[1.4rem] leading-none">
-                    {Array.from(group.groupName)[0]?.toUpperCase()}
+                    {Array.from(groupLabel(group, t))[0]?.toUpperCase()}
                   </span>
                 )}
                 {isSidebarExpanded && (
                   <>
                     <span id="expanded-side-bar-heading" className="min-w-0 truncate">
-                      {group.groupName}
+                      {groupLabel(group, t)}
                     </span>
                     <span
                       data-testid="group-live-count"
@@ -148,9 +158,9 @@ const AccordianChannels = () => {
                 <AccordionItemState>
                   {({ expanded }) =>
                     expanded ? (
-                      <ChevronUpIcon className={`h-6 w-6 text-[var(--color-text-alt-2,#adadb8)] ${isSidebarExpanded ? "ml-auto" : ""}`} />
+                      <ChevronUpIcon className={`h-6 w-6 text-[var(--color-text-alt-2,#adadb8)] ${isSidebarExpanded ? "ms-auto" : ""}`} />
                     ) : (
-                      <ChevronDownIcon className={`h-6 w-6 text-[var(--color-text-alt-2,#adadb8)] ${isSidebarExpanded ? "ml-auto" : ""}`} />
+                      <ChevronDownIcon className={`h-6 w-6 text-[var(--color-text-alt-2,#adadb8)] ${isSidebarExpanded ? "ms-auto" : ""}`} />
                     )
                   }
                 </AccordionItemState>
@@ -168,15 +178,15 @@ const AccordianChannels = () => {
                 {group.followedChannels.length === 0 && (
                   <div
                     className="text-center"
-                    onMouseEnter={isSidebarExpanded ? undefined : (e: React.MouseEvent<HTMLElement>) => showTip(e.currentTarget, "No channels")}
+                    onMouseEnter={isSidebarExpanded ? undefined : (e: React.MouseEvent<HTMLElement>) => showTip(e.currentTarget, t("sidebar.noChannels"))}
                     onMouseLeave={hideTip}
                   >
                     {isSidebarExpanded ? (
-                      "No channels to show"
+                      t("sidebar.noChannelsToShow")
                     ) : (
                       <>
                         <span aria-hidden="true">—</span>
-                        <span className="sr-only">No channels to show</span>
+                        <span className="sr-only">{t("sidebar.noChannelsToShow")}</span>
                       </>
                     )}
                   </div>
@@ -192,9 +202,10 @@ const AccordianChannels = () => {
         createPortal(
           <div
             role="tooltip"
+            dir={dir}
             style={{
               position: "fixed",
-              left: tip.left,
+              ...tip.place,
               top: tip.top,
               transform: tip.kind === "group" ? "translateY(-50%)" : undefined,
               zIndex: 2147483000,
@@ -213,7 +224,7 @@ const AccordianChannels = () => {
                 {tip.detail}
               </div>
             )}
-            {tip.live !== undefined && <div style={{ color: "#adadb8" }}>{tip.live} live</div>}
+            {tip.live !== undefined && <div style={{ color: "#adadb8" }}>{t("sidebar.liveCount", { count: tip.live })}</div>}
           </div>,
           document.body
         )}

@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Better Sidebar",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Gruppera kanalerna du följer i Twitchs sidofält. Inte knutet till Twitch.",
+    "description": "Extension description"
+  }
+}
