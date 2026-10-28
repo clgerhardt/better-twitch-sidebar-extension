@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Better Sidebar",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Ryhmittele seuraamasi kanavat Twitchin sivupalkissa. Ei ole yhteydessä Twitchiin.",
+    "description": "Extension description"
+  }
+}

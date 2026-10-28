@@ -2,8 +2,8 @@
 // extension usually hides, but the rows stay in the page, so they can be found and cloned.
 // All selectors that depend on Twitch's markup are here, because that markup changes without notice.
 
-export const NATIVE_SECTION = "[aria-label='Followed Channels']";
-export const NATIVE_ROW = `${NATIVE_SECTION} a[data-a-id^='followed-channel']`;
+// Twitch's rows for the channels the user follows (the data-a-id is removed from our copies)
+export const NATIVE_ROW = "a[data-a-id^='followed-channel']";
 // Stable, readable class names (not the generated ones)
 export const OFFLINE_LINK_CLASSES = ["side-nav-card__link--offline", "side-nav-card__link--empty-category"];
 export const OFFLINE_AVATAR_CLASS = "side-nav-card__avatar--offline";
@@ -26,7 +26,8 @@ export const isLiveRow = (row: Element): boolean => !!row.querySelector(LIVE_IND
 export const isPlainLiveRow = (row: Element): boolean =>
   isLiveRow(row) &&
   row.querySelectorAll("img").length === 1 &&
-  !/Watch Streak|Hype Train/i.test(row.textContent || "") &&
+  // Streak and Hype Train badges are a second block beside the name and status, whatever language their text is in
+  row.children[1]?.children.length === 1 &&
   !/\+\d+\s*$/.test(row.querySelector(TITLE)?.textContent || "");
 
 // A shared stream: the row's name block has a paragraph with "+N" for the guests

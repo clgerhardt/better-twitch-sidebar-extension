@@ -85,8 +85,10 @@ test("a Viewers Also Watch section that Twitch adds later is hidden too", async 
     document.querySelector("[aria-label$='Viewers Also Watch']")!.remove();
     const section = document.createElement("div");
     section.className = "side-nav-section";
+    section.setAttribute("role", "group");
     section.setAttribute("aria-label", "OtherChannel Viewers Also Watch");
-    section.textContent = "OtherChannel Viewers Also Watch";
+    // Twitch marks the rows of this section data-test-selector="similarity-channel"
+    section.innerHTML = '<div data-test-selector="similarity-channel">OtherChannel Viewers Also Watch</div>';
     document.querySelector("[aria-label='Recommended Categories']")!.after(section);
   });
   await expect(twitchPage.locator("[aria-label='OtherChannel Viewers Also Watch']")).toBeHidden({ timeout: 5_000 });
@@ -125,16 +127,21 @@ test("reconnecting to the background does not rebuild the sidebar UI", async ({ 
   await expect(twitchPage.locator("#__root [role=button][data-render-marker=kept]")).toHaveCount(1);
 });
 
-// The fixture has no Twitch JavaScript, so flip the arrow's label the way Twitch does when the side nav changes
-const setSideNavLabel = (page: Page, label: "Expand Side Nav" | "Collapse Side Nav") =>
-  page.locator("[data-a-target=side-nav-arrow]").evaluate((el, l) => el.setAttribute("aria-label", l), label);
+// The fixture has no Twitch JavaScript, so swap the sidebar element the way Twitch does when it collapses or expands
+const setSidebarCollapsed = (page: Page, collapsed: boolean) =>
+  page.evaluate((c) => {
+    const bar = document.querySelector("[data-a-target^=side-nav-bar]")!;
+    bar.setAttribute("data-a-target", c ? "side-nav-bar-collapsed" : "side-nav-bar");
+    bar.classList.toggle("side-nav--collapsed", c);
+    bar.classList.toggle("side-nav--expanded", !c);
+  }, collapsed);
 
 test("collapsing the side nav hides the Manage Groups button", async ({ twitchPage }) => {
   const manage = twitchPage.locator("#__manage-groups-root").getByRole("button", { name: "Manage Groups" });
   await expect(manage).toHaveCount(1);
-  await setSideNavLabel(twitchPage, "Expand Side Nav");
+  await setSidebarCollapsed(twitchPage, true);
   await expect(manage).toHaveCount(0, { timeout: 5_000 });
-  await setSideNavLabel(twitchPage, "Collapse Side Nav");
+  await setSidebarCollapsed(twitchPage, false);
   await expect(manage).toHaveCount(1, { timeout: 5_000 });
 });
 
@@ -146,7 +153,7 @@ test("collapse and expand are still reported after the background reconnects", a
 
   const manage = twitchPage.locator("#__manage-groups-root").getByRole("button", { name: "Manage Groups" });
   await expect(manage).toHaveCount(1);
-  await setSideNavLabel(twitchPage, "Expand Side Nav");
+  await setSidebarCollapsed(twitchPage, true);
   await expect(manage).toHaveCount(0, { timeout: 5_000 });
 });
 
@@ -168,7 +175,7 @@ const manageButton = (page: Page) => page.locator("#__manage-groups-root").getBy
 
 test("no per-tab sidebar state is stored", async ({ twitchPage, worker }) => {
   await expect(manageButton(twitchPage)).toHaveCount(1);
-  await setSideNavLabel(twitchPage, "Expand Side Nav");
+  await setSidebarCollapsed(twitchPage, true);
   await expect(manageButton(twitchPage)).toHaveCount(0, { timeout: 5_000 });
   const keys = Object.keys(await worker.evaluate(() => chrome.storage.local.get(null)));
   expect(keys.filter((key) => key.includes("sideBarStateByTab"))).toEqual([]);
@@ -201,10 +208,10 @@ test("a tab in the background follows its own collapse button", async ({ twitchP
   const front = await openTwitch(); // now the active tab; twitchPage is in the background
   await front.bringToFront();
 
-  await setSideNavLabel(twitchPage, "Expand Side Nav");
+  await setSidebarCollapsed(twitchPage, true);
   await expect(manageButton(twitchPage)).toHaveCount(0, { timeout: 5_000 });
   await expect(manageButton(front)).toHaveCount(1); // the other tab is untouched
-  await setSideNavLabel(twitchPage, "Collapse Side Nav");
+  await setSidebarCollapsed(twitchPage, false);
   await expect(manageButton(twitchPage)).toHaveCount(1, { timeout: 5_000 });
 });
 
@@ -257,14 +264,16 @@ test("a page that loads with the side nav collapsed starts collapsed", async ({ 
   const page = await context.newPage();
   await page.addInitScript(() => {
     document.addEventListener("DOMContentLoaded", () => {
-      document.querySelector("[data-a-target=side-nav-arrow]")?.setAttribute("aria-label", "Expand Side Nav");
+      const bar = document.querySelector("[data-a-target=side-nav-bar]");
+      bar?.setAttribute("data-a-target", "side-nav-bar-collapsed");
+      bar?.classList.replace("side-nav--expanded", "side-nav--collapsed");
     });
   });
   await page.goto("https://www.twitch.tv/");
   await page.locator("#__root").waitFor({ state: "attached" });
   await page.waitForTimeout(800);
   await expect(manageButton(page)).toHaveCount(0);
-  await setSideNavLabel(page, "Collapse Side Nav");
+  await setSidebarCollapsed(page, false);
   await expect(manageButton(page)).toHaveCount(1, { timeout: 5_000 });
 });
 
@@ -431,7 +440,7 @@ test.describe("group headers", () => {
     test.beforeEach(async ({ twitchPage, worker }) => {
       await worker.evaluate(() => chrome.storage.local.set({ groupNames: ["Friends"] }));
       await expect(header(twitchPage, "Friends")).toBeVisible();
-      await setSideNavLabel(twitchPage, "Expand Side Nav");
+      await setSidebarCollapsed(twitchPage, true);
       await expect(manageButton(twitchPage)).toHaveCount(0, { timeout: 5_000 });
     });
 
@@ -445,7 +454,7 @@ test.describe("group headers", () => {
       await expect(row.locator("img")).toHaveCount(1);
       await expect(row.locator("[data-a-target=side-nav-title]")).toHaveCount(0);
       await expect(row).toHaveAttribute("aria-label", /\S/);
-      await setSideNavLabel(twitchPage, "Collapse Side Nav");
+      await setSidebarCollapsed(twitchPage, false);
       await expect(twitchPage.locator("#__root a.side-nav-card__link [data-a-target=side-nav-title]").first()).toBeVisible();
     });
 

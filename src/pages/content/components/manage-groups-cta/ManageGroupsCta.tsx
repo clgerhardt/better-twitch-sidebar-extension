@@ -6,6 +6,7 @@ import { usePageAccount } from "../../hooks/usePageAccount";
 import { useNeedsReconnect } from "../../hooks/useNeedsReconnect";
 import useGlobalState from "../../hooks/useGlobalState";
 import useGroupsSyncWait from "../../hooks/useGroupsSyncWait";
+import { useT } from "@src/pages/shared/i18n/store";
 import ManageFollowedChannelsDialog from "../groups-dialog/ManageGroupsDialog";
 
 const ManageGroupsCTA = () => {
@@ -16,6 +17,7 @@ const ManageGroupsCTA = () => {
   const needsReconnect = useNeedsReconnect();
   const globalState = useGlobalState();
   const waitingForSync = useGroupsSyncWait();
+  const t = useT();
 
   const handleToggleDialog = () => {
     setOpenDialog((prev) => !prev);
@@ -31,7 +33,7 @@ const ManageGroupsCTA = () => {
           className="mt-0.5 flex w-full cursor-pointer items-center justify-center gap-3 rounded-md border-2 border-solid border-purple-500 px-3 py-1 text-[1.4rem] font-medium text-purple-300 transition-colors hover:bg-purple-500/20"
         >
           <Cog6ToothIcon aria-hidden="true" className="h-6 w-6 shrink-0" />
-          <span>Manage Groups</span>
+          <span>{t("manage.button")}</span>
         </button>
       </div>
       <ManageFollowedChannelsDialog

@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Better Sidebar",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Group the channels you follow into custom groups in Twitch's sidebar. Not affiliated with Twitch.",
+    "description": "Extension description"
+  }
+}

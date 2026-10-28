@@ -1,15 +1,16 @@
 import type { PageAccount } from "./pageAccount";
+import { tEn, type Translator } from "../i18n/i18n";
 
 export type StoredPageAccount = PageAccount & { seenAt: number };
 
 // What the logged-out popup says, depending on what is known about the account signed in to Twitch
-export const guestMessage = (account: StoredPageAccount | undefined): string => {
+export const guestMessage = (account: StoredPageAccount | undefined, t: Translator = tEn): string => {
   switch (account?.status) {
     case "signed_in":
-      return `You're signed in to Twitch as ${account.login}. Connect the extension to use your groups.`;
+      return t("guest.signedIn", { login: account.login });
     case "signed_out":
-      return "Sign in to Twitch in a tab, then connect the extension to use your groups.";
+      return t("guest.signedOut");
     default:
-      return "Open Twitch in a tab and sign in, then connect the extension to use your groups.";
+      return t("guest.default");
   }
 };

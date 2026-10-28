@@ -11,6 +11,7 @@ A Chrome extension that lets you put the channels you follow into your own group
 - **Fresh data.** Live status and viewer counts refresh about once a minute while a Twitch tab is in front, with a thin bar showing how old the data is. It does not poll while no Twitch tab is in front.
 - **Manage Groups.** A dark two-pane dialog: groups on the left, and on the right the selected group with every channel to tick in or out of it, plus search. Create, rename and delete groups (names are 3 to 15 characters and unique whatever their capitalisation). Deleting a group sends its channels back to Ungrouped.
 - **Collapsed sidebar.** When Twitch's side nav is collapsed, each group shows its initial, and hovering it names the group and its live count.
+- **Your language.** The extension follows the language Twitch is set to (30 languages, including right to left Arabic). Game names come from Twitch's own rows, so they appear in your language; a live channel Twitch did not render a row for shows the game's English name, because Twitch's API has no translated game names.
 - **Popup.** Hide Twitch's original followed list, the Stories section, or the live channels section, and log out. The settings apply to every open Twitch tab.
 
 ## Your account and your data
@@ -67,13 +68,13 @@ src/pages/
   content/      what runs on twitch.tv: sidebar groups, Manage Groups dialog
   popup/        the toolbar popup
   options/      the options page (a placeholder for now)
-  shared/       code shared by those parts (Twitch API client, snapshot, refresh rules)
+  shared/       code shared by those parts (Twitch API client, snapshot, refresh rules, i18n)
   utils/        constants, logger, pure helpers (grouping, name rules)
 e2e/            Playwright tests and the fake Twitch page they use
 docs/design/    why it is built this way
 ```
 
-The design notes in `docs/design/` explain the decisions: [the overhaul plan](docs/design/extension-overhaul.md), [moving Twitch fetching into the background](docs/design/background-fetch.md), [binding the extension to the signed-in Twitch account](docs/design/account-binding.md), and [rendering from the page](docs/design/page-local-rendering.md).
+The design notes in `docs/design/` explain the decisions: [the overhaul plan](docs/design/extension-overhaul.md), [moving Twitch fetching into the background](docs/design/background-fetch.md), [binding the extension to the signed-in Twitch account](docs/design/account-binding.md), [rendering from the page](docs/design/page-local-rendering.md) and [localization](docs/design/localization.md) (finding Twitch's sidebar in any language, the 30 languages the extension is shown in, and how to add one).
 
 ## Publishing
 

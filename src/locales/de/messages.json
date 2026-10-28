@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Better Sidebar",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Gruppiere die Kanäle, denen du folgst, in der Twitch-Seitenleiste. Nicht mit Twitch verbunden.",
+    "description": "Extension description"
+  }
+}

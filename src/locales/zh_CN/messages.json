@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Better Sidebar",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "在 Twitch 侧边栏中为你关注的频道分组。与 Twitch 无关联。",
+    "description": "Extension description"
+  }
+}

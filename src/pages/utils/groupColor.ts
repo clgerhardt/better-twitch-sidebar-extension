@@ -1,19 +1,20 @@
 // The accent color of a group: the bar down the left side of its header. No chrome.* imports, so it is
 // tested in plain node.
+import type { MessageKey } from "../shared/i18n/i18n";
 
 // Tailwind's purple-500, which every group has until the user picks another
 export const DEFAULT_GROUP_COLOR = "#a855f7";
 
 // The colors offered as quick picks (the default first); any other color can be chosen with the color input
-export const GROUP_COLOR_CHOICES: { name: string; value: string }[] = [
-  { name: "Purple", value: DEFAULT_GROUP_COLOR },
-  { name: "Red", value: "#ef4444" },
-  { name: "Orange", value: "#f97316" },
-  { name: "Yellow", value: "#eab308" },
-  { name: "Green", value: "#22c55e" },
-  { name: "Teal", value: "#14b8a6" },
-  { name: "Blue", value: "#3b82f6" },
-  { name: "Pink", value: "#ec4899" },
+export const GROUP_COLOR_CHOICES: { nameKey: MessageKey; value: string }[] = [
+  { nameKey: "color.purple", value: DEFAULT_GROUP_COLOR },
+  { nameKey: "color.red", value: "#ef4444" },
+  { nameKey: "color.orange", value: "#f97316" },
+  { nameKey: "color.yellow", value: "#eab308" },
+  { nameKey: "color.green", value: "#22c55e" },
+  { nameKey: "color.teal", value: "#14b8a6" },
+  { nameKey: "color.blue", value: "#3b82f6" },
+  { nameKey: "color.pink", value: "#ec4899" },
 ];
 
 // A stored color is a "#rrggbb" string. Anything else (hand-edited storage, an older version) is ignored.

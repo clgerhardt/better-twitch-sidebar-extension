@@ -11,6 +11,7 @@ import { constants } from "../utils/constants";
 import { useTwitchToken } from "../content/hooks/userTwitchToken";
 import { useStoredUserImage } from "../content/hooks/useStoredUserImage";
 import { logoutTwitch } from "../content/utils/getValidTwitchToken";
+import { useT } from "../shared/i18n/store";
 
 const Popup = () => {
   const [isIncognito, setIsIncognito] = useState<boolean | null>(
@@ -21,6 +22,7 @@ const Popup = () => {
   const pageAccount = usePageAccount();
   const needsReconnect = useNeedsReconnect();
   const userImage = useStoredUserImage();
+  const t = useT();
 
   const logout = async () => {
     await logoutTwitch();
@@ -36,9 +38,7 @@ const Popup = () => {
     return (
       <div id="main-container" className="p-3 text-sm text-[#efeff1]">
         <Banner />
-        <p className="mb-0 mt-3">
-          This extension does not work in Incognito Mode. Please disable it in your browser settings or use a normal window.
-        </p>
+        <p className="mb-0 mt-3">{t("popup.incognito")}</p>
       </div>
     );
   }
@@ -62,7 +62,7 @@ const Popup = () => {
             onClick={logout}
             className="mt-3 w-full cursor-pointer rounded-md border-2 border-solid border-purple-500 bg-transparent px-3 py-1.5 text-sm font-medium text-purple-300 transition-colors hover:bg-purple-500/20"
           >
-            Logout
+            {t("popup.logout")}
           </button>
         </>
       ) : (

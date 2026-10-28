@@ -1,4 +1,4 @@
-import { test, expect } from "./extension";
+import { test, expect, labelIn } from "./extension";
 import type { BrowserContext, Page } from "@playwright/test";
 
 // The fixture page has Twitch's own rows in its (hidden) Followed Channels section, including a
@@ -127,7 +127,18 @@ test("with no Twitch rows and nothing stored, the bundled template is used", asy
   await expect(rowFor(page, "nonative_live")).toContainText("3 viewers");
 });
 
-test("a shared-stream row keeps its '+1' name and gets the game on the game line", async ({ context, session, worker, openTwitch }) => {
+// Twitch shows game names in the user's language and its API only has the English one, so a row copied from
+// Twitch's own keeps Twitch's game; only a row built from the template (no row of Twitch's) uses the API's
+test("a row copied from Twitch's own keeps Twitch's game name, not the API's", async ({ context, session, worker, openTwitch }) => {
+  await seedChannels(worker, [channel("fixture_live", "Fixture_Live", { isLive: true, game: "English Game Name", viewers: 7 })]);
+  await twitchDown(context);
+  const page = await openTwitch();
+  await openGroup(page);
+  await expect(rowFor(page, "fixture_live").locator("p[dir=auto]")).toHaveText("Lootbound");
+  await expect(rowFor(page, "fixture_live")).toContainText("7 viewers"); // the numbers are still ours
+});
+
+test("a shared-stream row keeps its '+1' name and Twitch's game on the game line", async ({ context, session, worker, openTwitch }) => {
   await seedChannels(worker, [
     channel("fixtureshared", "FixtureShared", { isLive: true, game: "Another Game", viewers: 2500 }),
     channel("fixturesharedstreak", "FixtureSharedStreak", { isLive: true, game: "Third Game", viewers: 40 }),
@@ -136,7 +147,7 @@ test("a shared-stream row keeps its '+1' name and gets the game on the game line
   const page = await openTwitch();
   await openGroup(page);
 
-  for (const [login, game, viewers] of [["fixtureshared", "Another Game", "2.5K"], ["fixturesharedstreak", "Third Game", "40"]]) {
+  for (const [login, game, viewers] of [["fixtureshared", "Z1: Battle Royale", "2.5K"], ["fixturesharedstreak", "Z1: Battle Royale", "40"]]) {
     const row = rowFor(page, login);
     // The name block is untouched: the channel name, then " +1"
     const names = await row.locator("[data-a-target=side-nav-card-metadata] > div:first-child p").allTextContents();
@@ -178,3 +189,19 @@ test("live channels are listed by viewer count, highest first, with offline chan
   const order = await twitchPage.locator("#__root a.side-nav-card__link").evaluateAll((rows) => rows.map((r) => r.getAttribute("href")));
   expect(order).toEqual(["/fixturestreak", "/fixture_live", "/fixture_offline"]);
 });
+
+// Twitch labels a Watch Streak in the user's language, so a row's extras are found by its markup, not its text
+for (const language of ["es", "xx"] as const) {
+  test.describe(`rows built from the template, Twitch in ${language}`, () => {
+    test.use({ twitchLanguage: language });
+    test("carry no streak badge", async ({ context, session, worker, openTwitch }) => {
+      await seedChannels(worker, [channel("nonative_live", "NoNative_Live", { isLive: true, game: "Template Game", viewers: 7 })]);
+      await twitchDown(context);
+      const page = await openTwitch();
+      const live = rowFor(page, "nonative_live");
+      await expect(live).toContainText("Template Game"); // the first group opens by itself
+      await expect(live.locator("svg[fill=none]")).toHaveCount(0); // the streak flame
+      await expect(live).not.toContainText(labelIn(language, "Watch Streak"));
+    });
+  });
+}

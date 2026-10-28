@@ -25,9 +25,6 @@ export const constants = {
     groupNames: 'groupNames',
     defaultGroup: 'defaultGroup',
     groupColors: 'groupColors'
-  },
-  htmlSearchStrings: {
-    ARIA_LABEL_RECOMMENDED_CHANNELS: '[aria-label="Live Channels"]'
   }
 };
 
@@ -50,6 +47,9 @@ export const PAGE_ACCOUNT_KEY = 'pageAccount';
 export const TWITCH_LOGGED_OUT_KEY = 'twitchLoggedOut';
 // The channels fetched from Twitch for the connected user (written only by the background)
 export const CHANNEL_SNAPSHOT_KEY = 'channelSnapshot';
+
+// The language Twitch was last seen in (a Twitch page's <html lang>), so the popup can follow it
+export const TWITCH_LANGUAGE_KEY = 'twitchLanguage';
 
 // What this device last synced of the groups (the common starting point for merging), and its id in the sync data
 export const GROUPS_SYNC_STATE_KEY = 'groupsSyncState';

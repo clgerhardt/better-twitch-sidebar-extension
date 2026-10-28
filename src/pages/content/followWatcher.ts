@@ -8,20 +8,17 @@ import { constants } from "../utils/constants";
 // button only opens that confirmation, so an unfollow has happened only once the user confirms it.
 const FOLLOW_BUTTON = '[data-a-target="follow-button"]';
 const UNFOLLOW_CONFIRM_BUTTON = '[data-a-target="modal-unfollow-button"]';
-const UNFOLLOW_BUTTON = '[data-a-target="unfollow-button"]';
 // How long to wait before asking for the follow list again, while Twitch's list has not caught up
 const RETRY_DELAYS_MS = [5_000, 10_000, 20_000, 40_000, 60_000];
 
 // The channel the page is about: the first part of the address ("/somechannel", "/somechannel/videos")
 const loginFromPath = (path: string): string | null => {
   const first = path.split("/")[1]?.toLowerCase() ?? "";
-  return /^[a-z0-9_]{1,25}$/.test(first) ? first : null;
+  return /^[a-z0-9_]{1,25}$/.test(first) && !NOT_A_CHANNEL.has(first) ? first : null;
 };
 
-const displayNameFromButton = (button: Element | undefined): string | undefined => {
-  const name = (button?.getAttribute("aria-label") ?? "").replace(/^(Un)?follow\s*/i, "").trim();
-  return name || undefined;
-};
+// Pages of Twitch that are not a channel's own, though they may have a Follow button
+const NOT_A_CHANNEL = new Set(["videos", "directory", "settings", "subscriptions", "friends", "wallet", "drops", "inventory", "turbo", "prime", "search", "downloads", "p", "u", "popout", "embed", "dashboard", "moderator"]);
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -31,9 +28,9 @@ const isFollowed = async (login: string): Promise<boolean> => {
   return isSnapshotFor(snapshot, stored.twitchUserId) && snapshot.channels.some((c) => c.login.toLowerCase() === login);
 };
 
-const trackFollow = async (login: string, displayName: string | undefined) => {
+const trackFollow = async (login: string) => {
   try {
-    const outcome = await chrome.runtime.sendMessage({ type: MESSAGES.FOLLOW_CLICKED, login, displayName });
+    const outcome = await chrome.runtime.sendMessage({ type: MESSAGES.FOLLOW_CLICKED, login });
     if (outcome?.found) return;
     // Twitch's list has not caught up: the background shows the channel meanwhile; keep asking
     for (const delay of RETRY_DELAYS_MS) {
@@ -47,9 +44,9 @@ const trackFollow = async (login: string, displayName: string | undefined) => {
   }
 };
 
-const trackUnfollow = async (login: string, displayName: string | undefined) => {
+const trackUnfollow = async (login: string) => {
   try {
-    const outcome = await chrome.runtime.sendMessage({ type: MESSAGES.UNFOLLOW_CLICKED, login, displayName });
+    const outcome = await chrome.runtime.sendMessage({ type: MESSAGES.UNFOLLOW_CLICKED, login });
     if (outcome?.gone) return;
     // Twitch's list still has the channel (the background keeps it hidden meanwhile); keep asking
     for (const delay of RETRY_DELAYS_MS) {
@@ -75,9 +72,8 @@ export const watchFollowClicks = () => {
       const confirmed = follow ? null : target?.closest?.(UNFOLLOW_CONFIRM_BUTTON);
       const login = follow || confirmed ? loginFromPath(window.location.pathname) : null;
       if (!login) return;
-      if (follow) void trackFollow(login, displayNameFromButton(follow));
-      // The confirmation has no channel name; the page's own Unfollow button behind it does
-      else void trackUnfollow(login, displayNameFromButton(document.querySelector(UNFOLLOW_BUTTON) ?? undefined));
+      if (follow) void trackFollow(login);
+      else void trackUnfollow(login);
     },
     true
   );

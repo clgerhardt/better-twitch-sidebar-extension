@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Better Sidebar",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Grupează canalele pe care le urmărești în bara laterală Twitch. Neafiliat cu Twitch.",
+    "description": "Extension description"
+  }
+}

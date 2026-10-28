@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Better Sidebar",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Raggruppa i canali che segui nella barra laterale di Twitch. Non affiliato a Twitch.",
+    "description": "Extension description"
+  }
+}

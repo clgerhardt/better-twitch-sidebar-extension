@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Better Sidebar",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Группируй отслеживаемые каналы на боковой панели Twitch. Не связано с Twitch.",
+    "description": "Extension description"
+  }
+}

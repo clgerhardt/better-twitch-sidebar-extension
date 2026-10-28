@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Better Sidebar",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "フォロー中のチャンネルをTwitchのサイドバーでグループ分け。Twitchとは無関係です。",
+    "description": "Extension description"
+  }
+}

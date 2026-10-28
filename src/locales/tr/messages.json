@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Better Sidebar",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Takip ettiğin kanalları Twitch kenar çubuğunda grupla. Twitch ile bağlantılı değildir.",
+    "description": "Extension description"
+  }
+}

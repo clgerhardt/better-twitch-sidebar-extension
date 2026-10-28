@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Better Sidebar",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Regroupez les chaînes que vous suivez dans la barre latérale de Twitch. Non affilié à Twitch.",
+    "description": "Extension description"
+  }
+}

@@ -68,9 +68,9 @@ test("a stored snapshot is shown immediately while a slow refresh runs", async (
   // Before Twitch answers, the last snapshot is already on screen
   await expect(sidebar.getByRole("button", { name: /Ungrouped/ })).toBeVisible({ timeout: 1_000 });
   await sidebar.getByRole("button", { name: /Ungrouped/ }).click();
-  await expect(sidebar).toContainText("Cached Game", { timeout: 1_000 });
+  await expect(sidebar).toContainText("5 viewers", { timeout: 1_000 });
   // Then the refresh lands and replaces it
-  await expect(sidebar).toContainText("Lootbound", { timeout: 8_000 });
+  await expect(sidebar).toContainText("1.1K viewers", { timeout: 8_000 });
 });
 
 test("a refresh that is still running when the user logs out writes nothing", async ({ context, session, worker, extensionId, openTwitch }) => {
@@ -264,7 +264,7 @@ test("a Twitch outage keeps showing the last snapshot", async ({ context, sessio
   const page = await openTwitch();
   await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get("snapshotError")).snapshotError)).toBe("failed");
   await page.locator("#__root").getByRole("button", { name: /Ungrouped/ }).click();
-  await expect(page.locator("#__root")).toContainText("Cached Game");
+  await expect(page.locator("#__root")).toContainText("5 viewers");
 });
 
 test("connecting fetches the channels right away", async ({ context, session, worker, extensionId }) => {

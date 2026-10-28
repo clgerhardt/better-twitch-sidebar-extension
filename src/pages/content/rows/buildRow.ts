@@ -1,6 +1,7 @@
 import type { SidebarChannel } from "@src/pages/utils/layoutGroups";
 import { OFFLINE_AVATAR_CLASS, OFFLINE_LINK_CLASSES, isLiveRow, nativeRowsByLogin, selectors } from "./nativeRows";
 import { liveRowTemplate } from "./rowTemplates";
+import { count, t } from "@src/pages/shared/i18n/store";
 
 const { TITLE, METADATA, STATUS } = selectors;
 
@@ -10,8 +11,9 @@ const setText = (el: Element | null | undefined, text: string) => {
   if (el.hasAttribute("title")) el.setAttribute("title", text);
 };
 
-// The channel's live details, from our own data so they change with each refresh
-const syncDetails = (row: HTMLAnchorElement, channel: SidebarChannel) => {
+// The channel's live details, from our own data so they change with each refresh. A copy of Twitch's own row
+// keeps Twitch's game name: Twitch shows it in the user's language, and the API only has the English one.
+const syncDetails = (row: HTMLAnchorElement, channel: SidebarChannel, fromTwitchRow = false) => {
   row.removeAttribute("data-a-id");
   row.setAttribute("href", `/${channel.login}`);
   // The game is the paragraph marked dir="auto" (the name block can hold several paragraphs, for
@@ -21,13 +23,13 @@ const syncDetails = (row: HTMLAnchorElement, channel: SidebarChannel) => {
     setText(gameLine, "");
     return;
   }
-  setText(gameLine, channel.streamingContent ?? "");
-  const viewers = (channel.viewerCount ?? "").replace(/\s*viewers$/, ""); // "1.1K"
+  if (!fromTwitchRow) setText(gameLine, channel.streamingContent ?? "");
+  const viewers = count(channel.viewers); // "1.1K"
   const status = row.querySelector(STATUS);
   // The count appears twice: an abbreviated span ("1.1K") and, right after it, a paragraph ("1.1K viewers")
   status?.querySelectorAll("span[aria-hidden]").forEach((span) => {
     setText(span, viewers);
-    if (span.nextElementSibling?.tagName === "P") setText(span.nextElementSibling, channel.viewerCount ?? "");
+    if (span.nextElementSibling?.tagName === "P") setText(span.nextElementSibling, t("row.viewers", { count: channel.viewers, countText: viewers }));
   });
 };
 
@@ -38,7 +40,8 @@ const makeOffline = (row: HTMLAnchorElement) => {
   const status = row.querySelector(STATUS);
   if (status) {
     const labelClass = status.querySelector("span")?.className ?? "";
-    status.innerHTML = `<span class="${labelClass}">Offline</span>`;
+    status.innerHTML = `<span class="${labelClass}"></span>`;
+    status.querySelector("span")!.textContent = t("row.offline");
   }
 };
 
@@ -70,11 +73,15 @@ const buildFullRow = (channel: SidebarChannel): HTMLAnchorElement => {
   const native = nativeRowsByLogin().get(channel.login.toLowerCase());
   if (native && isLiveRow(native) === channel.isLive) {
     const row = native.cloneNode(true) as HTMLAnchorElement;
-    syncDetails(row, channel);
+    syncDetails(row, channel, true);
     return row;
   }
 
   const row = liveRowTemplate();
+  // The row's "Live" label sits right after the live indicator; its text is the language of whichever page the
+  // template came from, so it is set here rather than trusted
+  const liveLabel = row.querySelector(`${STATUS} .tw-channel-status-indicator + p`);
+  if (liveLabel) liveLabel.textContent = t("row.live");
   if (!channel.isLive) makeOffline(row);
   syncDetails(row, channel);
   setText(row.querySelector(TITLE), channel.channelName);

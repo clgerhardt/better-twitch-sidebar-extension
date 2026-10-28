@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Better Sidebar",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "จัดกลุ่มช่องที่คุณติดตามในแถบด้านข้างของ Twitch ไม่เกี่ยวข้องกับ Twitch",
+    "description": "Extension description"
+  }
+}

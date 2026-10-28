@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Better Sidebar",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Seskupte sledované kanály v postranním panelu Twitche. Není spojeno s Twitchem.",
+    "description": "Extension description"
+  }
+}

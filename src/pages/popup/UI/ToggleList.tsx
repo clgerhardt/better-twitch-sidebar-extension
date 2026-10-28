@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { getLocalStorage, setLocalStorage } from '@src/pages/background/storage';
 import { GLOBAL_STATE_KEY } from '@src/pages/utils/constants';
+import { useT } from '@src/pages/shared/i18n/store';
+import type { MessageKey } from '@src/pages/shared/i18n/i18n';
 
 type ToggleItem = {
   id: number;
-  label: string;
+  labelKey: MessageKey;
   // The hide switches sit together in a collapsible group; the others stand alone
   group?: 'hide';
-  // A line of explanation under the label
-  hint?: string;
   enabled: boolean;
 };
 
@@ -26,19 +26,20 @@ const readHideOpen = (): boolean => {
 };
 
 export default function ToggleList() {
+  const t = useT();
   const [items, setItems] = useState<ToggleItem[]>([]);
   const [hideOpen, setHideOpen] = useState(readHideOpen);
 
   useEffect(() => {
     getLocalStorage(GLOBAL_STATE_KEY).then((globalState: any) => {
       const initialItems: ToggleItem[] = [
-        { id: 1, label: 'Hide original followers list', group: 'hide', enabled: globalState?.hideOriginalFollowersList ?? false },
-        { id: 2, label: 'Hide stories', group: 'hide', enabled: globalState?.hideStories ?? false },
-        { id: 3, label: 'Hide live channels', group: 'hide', enabled: globalState?.hideLiveChannels ?? false },
-        { id: 4, label: 'Hide streaks', group: 'hide', enabled: globalState?.hideStreaks ?? false },
-        { id: 5, label: 'Hide recommended categories', group: 'hide', enabled: globalState?.hideRecommendedCategories ?? false },
-        { id: 6, label: 'Hide "viewers also watch"', group: 'hide', enabled: globalState?.hideViewersAlsoWatch ?? false },
-        { id: 7, label: 'Sync groups across devices', enabled: globalState?.syncGroups ?? true },
+        { id: 1, labelKey: 'popup.hide.originalFollowers', group: 'hide', enabled: globalState?.hideOriginalFollowersList ?? false },
+        { id: 2, labelKey: 'popup.hide.stories', group: 'hide', enabled: globalState?.hideStories ?? false },
+        { id: 3, labelKey: 'popup.hide.live', group: 'hide', enabled: globalState?.hideLiveChannels ?? false },
+        { id: 4, labelKey: 'popup.hide.streaks', group: 'hide', enabled: globalState?.hideStreaks ?? false },
+        { id: 5, labelKey: 'popup.hide.categories', group: 'hide', enabled: globalState?.hideRecommendedCategories ?? false },
+        { id: 6, labelKey: 'popup.hide.viewersAlsoWatch', group: 'hide', enabled: globalState?.hideViewersAlsoWatch ?? false },
+        { id: 7, labelKey: 'popup.sync.on', enabled: globalState?.syncGroups ?? true },
       ];
       setItems(initialItems);
     });
@@ -90,22 +91,16 @@ export default function ToggleList() {
   const renderRow = (item: ToggleItem, className: string) => (
     <div key={item.id} className={`flex items-center justify-between gap-3 px-3 py-2 ${className}`}>
       <div className="min-w-0">
-        <span className="text-sm text-[#efeff1]">{item.label}</span>
-        {item.hint && (
-          <p id={`toggle-hint-${item.id}`} className="m-0 mt-0.5 text-xs text-[#adadb8]">
-            {item.hint}
-          </p>
-        )}
+        <span className="text-sm text-[#efeff1]">{t(item.labelKey)}</span>
       </div>
       <button
         onClick={() => toggle(item.id)}
         className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300 ${item.enabled ? 'bg-purple-500' : 'bg-[#3a3a3d]'}`}
         aria-pressed={item.enabled}
         role="switch"
-        aria-label={item.label}
-        aria-describedby={item.hint ? `toggle-hint-${item.id}` : undefined}
+        aria-label={t(item.labelKey)}
       >
-        <span className={`pointer-events-none mt-0.5 ml-0.5 inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${item.enabled ? 'translate-x-4' : ''}`} />
+        <span className={`pointer-events-none mt-0.5 ms-0.5 inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${item.enabled ? 'translate-x-4 rtl:-translate-x-4' : ''}`} />
       </button>
     </div>
   );
@@ -116,10 +111,10 @@ export default function ToggleList() {
     <div key={item.id} data-testid="sync-status" className="flex items-center justify-between gap-3 rounded-md bg-white/[0.07] px-3 py-2">
       <div className="min-w-0">
         <p id="sync-status-text" className="m-0 text-sm text-[#efeff1]">
-          {item.enabled ? 'Groups sync across your devices' : 'Group syncing is off'}
+          {item.enabled ? t('popup.sync.on') : t('popup.sync.off')}
         </p>
         <p className="m-0 mt-0.5 text-xs text-[#adadb8]">
-          {item.enabled ? 'Through Chrome sync: sign in to Chrome with Extensions sync on.' : 'Changes stay on this device. Turning it on again replaces them with your synced groups.'}
+          {item.enabled ? t('popup.sync.onHint') : t('popup.sync.offHint')}
         </p>
       </div>
       <button
@@ -128,7 +123,7 @@ export default function ToggleList() {
         aria-describedby="sync-status-text"
         className="flex-shrink-0 cursor-pointer rounded border border-solid border-[#3a3a3d] bg-transparent px-2 py-1 text-xs text-[#efeff1] hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300"
       >
-        {item.enabled ? 'Turn off' : 'Turn on'}
+        {item.enabled ? t('popup.sync.turnOff') : t('popup.sync.turnOn')}
       </button>
     </div>
   );
@@ -147,16 +142,16 @@ export default function ToggleList() {
             onClick={() => setOpen(!hideOpen)}
             aria-expanded={hideOpen}
             aria-controls="hide-sections"
-            className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-md border-0 bg-transparent px-3 py-2 text-left text-sm text-[#efeff1] focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300"
+            className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-md border-0 bg-transparent px-3 py-2 text-start text-sm text-[#efeff1] focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300"
           >
-            <span>Hide sections</span>
+            <span>{t('popup.hideSections')}</span>
             <span className="flex items-center gap-2 text-xs text-[#adadb8]">
-              {hiddenCount > 0 && <span>{hiddenCount} on</span>}
+              {hiddenCount > 0 && <span>{t('popup.hideSections.count', { count: hiddenCount })}</span>}
               <ChevronDownIcon aria-hidden="true" className={`h-4 w-4 transition-transform duration-200 ${hideOpen ? 'rotate-180' : ''}`} />
             </span>
           </button>
           {hideOpen && (
-            <div id="hide-sections" role="group" aria-label="Hide sections" className="border-0 border-t border-solid border-white/10">
+            <div id="hide-sections" role="group" aria-label={t('popup.hideSections')} className="border-0 border-t border-solid border-white/10">
               {hideItems.map(item => renderRow(item, ''))}
             </div>
           )}

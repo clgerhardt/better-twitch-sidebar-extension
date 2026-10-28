@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Better Sidebar",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Nhóm các kênh bạn theo dõi trong thanh bên của Twitch. Không liên kết với Twitch.",
+    "description": "Extension description"
+  }
+}

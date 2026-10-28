@@ -6,7 +6,17 @@ import AccordianChannels from "./components/side-navigation/AccordianChannels";
 import ManageGroups from "./components/manage-groups-cta/ManageGroupsCta";
 import { getLocalStorage } from "../background/storage";
 import { getElementBySelector, createElement, insertBefore } from './utils/domUtils';
+import {
+  findFollowedSection,
+  findLiveSection,
+  findMountAnchor,
+  findRecommendedCategoriesSection,
+  findStoriesSection,
+  findStreaksSection,
+  findViewersAlsoWatchSection,
+} from './twitchSections';
 import { startPageAccountReporting } from "./pageAccount";
+import { getDirection, initI18n, onLanguageChange } from "../shared/i18n/store";
 import { watchFollowClicks } from "./followWatcher";
 
 // One React root per container: creating a second root on the same container duplicates the UI
@@ -31,53 +41,51 @@ const applySidebarVisibilityFromState = (globalState: any) => {
 
   const configs = [
     {
-      selector: "[aria-label='Followed Channels']",
+      find: findFollowedSection,
       hidden: globalState.hideOriginalFollowersList,
       logMessage: "Applying initial visibility: Followed Channels",
       overrideStyle: false,
     },
     {
-      selector: "[aria-label='Live Channels']",
+      find: findLiveSection,
       hidden: globalState.hideLiveChannels,
       logMessage: "Applying initial visibility: Live Channels",
       overrideStyle: false,
     },
     {
-      selector: "[class*='storiesLeftNavSection']",
+      find: findStoriesSection,
       hidden: globalState.hideStories,
       logMessage: "Applying initial visibility: Stories",
       overrideStyle: true,
     },
     {
-      // The "Watch Streaks at risk" group in the For You column. The row inside it has a stable class
-      // prefix, as a fallback for when the group's label changes.
-      selector: "#side-nav [role='group'][aria-label*='streak' i], #side-nav [class*='saveYourStreakSideNavRow']",
+      find: findStreaksSection,
       hidden: globalState.hideStreaks,
       logMessage: "Applying initial visibility: Streaks",
       overrideStyle: false,
     },
     {
-      selector: "[aria-label='Recommended Categories']",
+      find: findRecommendedCategoriesSection,
       hidden: globalState.hideRecommendedCategories,
       logMessage: "Applying initial visibility: Recommended Categories",
       overrideStyle: false,
     },
     {
-      // "<channel> Viewers Also Watch": only on channel pages, so it can appear after the page loads
-      selector: "[aria-label$='Viewers Also Watch' i]",
+      // Only on channel pages, so it can appear after the page loads
+      find: findViewersAlsoWatchSection,
       hidden: globalState.hideViewersAlsoWatch,
       logMessage: "Applying initial visibility: Viewers Also Watch",
       overrideStyle: false,
     },
   ];
 
-  for (const { selector, hidden, logMessage, overrideStyle } of configs) {
-    const element = getElementBySelector(selector);
+  for (const { find, hidden, logMessage, overrideStyle } of configs) {
+    const element = find();
     if (!element) continue;
 
     if (hidden && element.classList.contains("iGMbNn")) {
       element.classList.remove("iGMbNn");
-      messageLogger(constants.location.CONTENT_SCRIPT, `Removed class iGMbNn from ${selector}`);
+      messageLogger(constants.location.CONTENT_SCRIPT, `Removed class iGMbNn from ${logMessage}`);
     }
 
     messageLogger(constants.location.CONTENT_SCRIPT, logMessage);
@@ -92,11 +100,11 @@ const applySidebarVisibilityFromState = (globalState: any) => {
   }
 };
 
-const waitForSidebarElements = async (selectors: string[], timeoutMs = 5000): Promise<boolean> => {
+const waitForSidebarElements = async (finders: (() => Element | null)[], timeoutMs = 5000): Promise<boolean> => {
   const start = performance.now();
   return new Promise(resolve => {
     const check = () => {
-      const allFound = selectors.every(sel => !!getElementBySelector(sel));
+      const allFound = finders.every(find => !!find());
       if (allFound) return resolve(true);
       if (performance.now() - start > timeoutMs) return resolve(false);
       requestAnimationFrame(check);
@@ -111,11 +119,11 @@ const waitForSidebarElements = async (selectors: string[], timeoutMs = 5000): Pr
 let rootContainer: HTMLElement | null = null;
 let manageGroupsContainer: HTMLElement | null = null;
 
-// Puts the sidebar groups and the Manage Groups button in front of Twitch's "Live Channels" section.
+// Puts the sidebar groups and the Manage Groups button in front of Twitch's live channels section.
 // Safe to call at any time: it does nothing when they are already in place.
 const mountSidebar = () => {
-  const followed = getElementBySelector("[aria-label='Followed Channels']");
-  const anchor = getElementBySelector(constants.htmlSearchStrings.ARIA_LABEL_RECOMMENDED_CHANNELS);
+  const followed = findFollowedSection();
+  const anchor = findMountAnchor();
   if (!followed || !anchor) return;
 
   const firstMount = !rootContainer || !manageGroupsContainer;
@@ -129,6 +137,10 @@ const mountSidebar = () => {
   }
 
   if (firstMount) {
+    // Our parts of the page are written in the language's direction, whatever the page around them is
+    const applyDirection = () => [rootContainer, manageGroupsContainer].forEach((container) => container && (container.dir = getDirection()));
+    applyDirection();
+    onLanguageChange(applyDirection);
     getReactRoot(rootContainer).render(<AccordianChannels />);
     getReactRoot(manageGroupsContainer).render(<ManageGroups />);
     messageLogger(constants.location.CONTENT_SCRIPT, "Sidebar mounted");
@@ -157,13 +169,12 @@ const keepSidebarMounted = () => {
 };
 
 const setUpPage = async () => {
+    // The language is set before anything is mounted, so the first thing shown is in the right one
+    await initI18n("page");
     const globalS: any = await getLocalStorage(GLOBAL_STATE_KEY);
-    const success = await waitForSidebarElements([
-      "[aria-label='Followed Channels']",
-      "[aria-label='Live Channels']"
-    ]);
+    const success = await waitForSidebarElements([findFollowedSection, findMountAnchor]);
     // Stories is optional (not every page or account has it): only give it a short grace period
-    await waitForSidebarElements(["[class*='storiesLeftNavSection']"], 1000);
+    await waitForSidebarElements([findStoriesSection], 1000);
 
     if (success) {
       applySidebarVisibilityFromState(globalS);

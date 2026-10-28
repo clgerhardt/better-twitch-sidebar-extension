@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Better Sidebar",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Ομαδοποίησε τα κανάλια που ακολουθείς στην πλευρική γραμμή του Twitch. Δεν συνδέεται με το Twitch.",
+    "description": "Extension description"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Better Sidebar",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "جمّع القنوات التي تتابعها في الشريط الجانبي لـ Twitch. غير تابع لـ Twitch.",
+    "description": "Extension description"
+  }
+}

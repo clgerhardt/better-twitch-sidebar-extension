@@ -18,6 +18,28 @@ test.describe("manifest.json", () => {
     expect(messages.extDescription.message).toBe(manifest.description);
   });
 
+  test("every language has a name and a description, and the description fits the Store's 132 characters", () => {
+    const languages = fs.readdirSync(path.resolve("src/locales"));
+    expect(languages).toEqual(expect.arrayContaining(["en", "es", "de", "zh_CN", "pt_BR", "ar"]));
+    for (const language of languages) {
+      const messages = JSON.parse(fs.readFileSync(path.resolve(`src/locales/${language}/messages.json`), "utf8"));
+      expect(Object.keys(messages).sort(), language).toEqual(["extDescription", "extName"]);
+      expect(messages.extName.message, language).toBe("Better Sidebar"); // the product name is not translated
+      expect(messages.extDescription.message.length, language).toBeLessThanOrEqual(132);
+      expect(messages.extDescription.message, language).toContain("Twitch");
+    }
+  });
+
+  test("the built extension takes its name and description from those messages, in every language", () => {
+    const built = JSON.parse(fs.readFileSync(path.resolve("dist_chrome/manifest.json"), "utf8"));
+    expect(built.name).toBe("__MSG_extName__");
+    expect(built.description).toBe("__MSG_extDescription__");
+    expect(built.default_locale).toBe("en");
+    for (const language of fs.readdirSync(path.resolve("src/locales"))) {
+      expect(fs.existsSync(path.resolve(`dist_chrome/_locales/${language}/messages.json`)), language).toBe(true);
+    }
+  });
+
   test("content scripts only run on Twitch", () => {
     for (const script of manifest.content_scripts) {
       expect(script.matches).toEqual(["https://*.twitch.tv/*"]);

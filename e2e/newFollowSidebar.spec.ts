@@ -1,4 +1,4 @@
-import { test, expect } from "./extension";
+import { test, expect, labelIn } from "./extension";
 import type { BrowserContext, Page } from "@playwright/test";
 
 // The viewer follows a channel on its page. Twitch's followed list either has it straight away or
@@ -148,3 +148,45 @@ test("an unfollow that Twitch's list lags on is hidden at once, stays hidden, an
   await expect.poll(() => pending(worker), { timeout: 20_000 }).toBeNull();
   await expect(liveRow(page)).toHaveCount(0);
 });
+
+// Twitch's button labels are translated ("Seguir a NewChan"); the extension must not depend on them
+for (const language of ["es", "xx"] as const) {
+  test.describe(`with Twitch in ${language === "es" ? "Spanish" : "a made-up language"}`, () => {
+    test.use({ twitchLanguage: language });
+
+    test("a follow shows in the sidebar", async ({ context, session, worker }) => {
+      const state: State = { listed: false, followedCalls: 0, lookups: 0 };
+      await stubNewChan(context, state);
+      const page = await openChannelPage(context);
+      await expect(page.locator('[data-a-target="follow-button"]').first()).toHaveAttribute("aria-label", labelIn(language, "Follow NewChan"));
+      await expect(rows(page)).toHaveCount(0);
+
+      state.listed = true;
+      await page.locator('[data-a-target="follow-button"]').first().click();
+      await expect(rows(page)).toHaveCount(1, { timeout: 10_000 });
+      expect(await pending(worker)).toBeNull();
+    });
+
+    test("a follow the list lags on still shows, as pending", async ({ context, session, worker }) => {
+      const state: State = { listed: false, followedCalls: 0, lookups: 0 };
+      await stubNewChan(context, state);
+      const page = await openChannelPage(context);
+      await page.locator('[data-a-target="follow-button"]').first().click();
+      await expect(rows(page)).toHaveCount(1, { timeout: 10_000 });
+      expect(await pending(worker)).toMatchObject({ items: [{ channel: { login: "newchan" } }] });
+    });
+
+    test("an unfollow takes the channel out of the sidebar", async ({ context, session }) => {
+      const state: State = { listed: false, followedCalls: 0, lookups: 0 };
+      await stubNewChan(context, state);
+      const page = await context.newPage();
+      await page.goto("https://www.twitch.tv/fixture_live");
+      await expect(liveRow(page)).toHaveCount(1, { timeout: 10_000 });
+
+      state.unfollowed = true;
+      await page.locator('[data-a-target="unfollow-button"]').first().click();
+      await page.getByRole("button", { name: "Yes, unfollow" }).click();
+      await expect(liveRow(page)).toHaveCount(0, { timeout: 10_000 });
+    });
+  });
+}

@@ -4,6 +4,8 @@ import type { SidebarGroup } from "@src/pages/utils/layoutGroups";
 import { validateGroupName } from "@src/pages/utils/groupName";
 import { DEFAULT_GROUP_COLOR, GROUP_COLOR_CHOICES } from "@src/pages/utils/groupColor";
 import { deleteGroup, renameGroup, setChannelGroup, setDefaultGroup, setGroupColor } from "./groupsStorage";
+import { useT } from "@src/pages/shared/i18n/store";
+import { groupLabel, groupLabelByName } from "../../utils/groupLabel";
 
 // The right pane: the selected group (rename, delete) and the channels to tick in or out of it
 export default function GroupDetail({
@@ -17,6 +19,8 @@ export default function GroupDetail({
 }) {
   // Where a channel goes when it is taken out of a group
   const defaultName = groups.find((g) => g.default)?.groupName ?? group.groupName;
+  const t = useT();
+  const name = groupLabel(group, t);
   const color = group.color ?? DEFAULT_GROUP_COLOR;
   // The color input reports every step of a drag; the choice is saved when it is let go
   const [dragColor, setDragColor] = useState(color);
@@ -51,7 +55,7 @@ export default function GroupDetail({
 
   // Renaming may change only the capitalisation of the group's own name
   const takenByOthers = groups.filter((g) => g.groupName !== group.groupName).map((g) => g.groupName.toLowerCase());
-  const renameError = newName === group.groupName ? null : validateGroupName(newName, takenByOthers);
+  const renameError = newName === group.groupName ? null : validateGroupName(newName, takenByOthers, t);
   const canSave = newName !== "" && renameError === null;
 
   const saveName = async (event: React.FormEvent) => {
@@ -76,8 +80,8 @@ export default function GroupDetail({
           <form onSubmit={saveName} className="flex flex-1 items-center gap-2">
             <input
               type="text"
-              aria-label="New group name"
-              placeholder="Updated Name"
+              aria-label={t("dialog.newGroupName")}
+              placeholder={t("dialog.renamePlaceholder")}
               value={newName}
               onChange={(event) => setNewName(event.target.value)}
               className={`min-w-0 flex-1 rounded border border-solid bg-[#0e0e10] px-3 py-2 text-[1.4rem] text-[#efeff1] focus:border-purple-500 focus:outline-none ${
@@ -101,15 +105,15 @@ export default function GroupDetail({
           </form>
         ) : (
           <>
-            <h3 className="m-0 min-w-0 truncate text-[1.6rem] font-semibold text-[#efeff1]">{group.groupName}</h3>
-            <div className="ml-auto flex items-center gap-1">
+            <h3 className="m-0 min-w-0 truncate text-[1.6rem] font-semibold text-[#efeff1]">{name}</h3>
+            <div className="ms-auto flex items-center gap-1">
               {!group.default && (
                 <button
                   type="button"
                   onClick={() => setDefaultGroup(group.groupName, groups.map((g) => g.groupName))}
-                  className="mr-1 cursor-pointer rounded border border-solid border-[#3a3a3d] bg-transparent px-3 py-1 text-[1.3rem] text-[#efeff1] hover:bg-white/10"
+                  className="me-1 cursor-pointer rounded border border-solid border-[#3a3a3d] bg-transparent px-3 py-1 text-[1.3rem] text-[#efeff1] hover:bg-white/10"
                 >
-                  Make default
+                  {t("dialog.makeDefault")}
                 </button>
               )}
               <button type="button" aria-label="edit-group-name" onClick={() => setRenaming(true)} className="cursor-pointer rounded p-1 text-[#adadb8] hover:bg-white/10 hover:text-[#efeff1]">
@@ -121,8 +125,8 @@ export default function GroupDetail({
                     <TrashIcon className="h-6 w-6" />
                   </button>
                   {confirmDelete && (
-                    <button type="button" onClick={confirmedDelete} className="ml-1 cursor-pointer rounded bg-red-600 px-3 py-1 text-[1.3rem] font-medium text-white hover:bg-red-500">
-                      Are you sure?
+                    <button type="button" onClick={confirmedDelete} className="ms-1 cursor-pointer rounded bg-red-600 px-3 py-1 text-[1.3rem] font-medium text-white hover:bg-red-500">
+                      {t("dialog.confirmDelete")}
                     </button>
                   )}
                 </>
@@ -133,14 +137,14 @@ export default function GroupDetail({
       </div>
       {renaming && renameError && <p className="m-0 mb-2 text-[1.2rem] text-red-400">{renameError}</p>}
 
-      <div role="group" aria-label="Group color" className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="mr-1 text-[1.3rem] text-[#adadb8]">Color</span>
+      <div role="group" aria-label={t("dialog.colorGroup")} className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="me-1 text-[1.3rem] text-[#adadb8]">{t("dialog.color")}</span>
         {GROUP_COLOR_CHOICES.map((choice) => (
           <button
             key={choice.value}
             type="button"
-            aria-label={`${choice.name} color`}
-            title={choice.name}
+            aria-label={t("dialog.colorChoice", { name: t(choice.nameKey) })}
+            title={t(choice.nameKey)}
             aria-pressed={color === choice.value}
             onClick={() => setGroupColor(group.groupName, choice.value === DEFAULT_GROUP_COLOR ? null : choice.value)}
             style={{ background: choice.value }}
@@ -149,8 +153,8 @@ export default function GroupDetail({
         ))}
         <input
           type="color"
-          aria-label="Custom color"
-          title="Custom color"
+          aria-label={t("dialog.colorCustom")}
+          title={t("dialog.colorCustom")}
           value={dragColor}
           onChange={(event) => setDragColor(event.target.value)}
           onBlur={() => dragColor !== color && setGroupColor(group.groupName, dragColor === DEFAULT_GROUP_COLOR ? null : dragColor)}
@@ -160,27 +164,27 @@ export default function GroupDetail({
 
       {group.default ? (
         <p className="m-0 mb-3 text-[1.3rem] text-[#adadb8]">
-          {group.groupName} is the default group: channels without a group land here, and it can't be deleted. Tick a channel to move it into {group.groupName}; a channel leaves it when you tick it into another group.
+          {t("dialog.defaultInfo", { name })}
         </p>
       ) : (
-        <p className="m-0 mb-3 text-[1.3rem] text-[#adadb8]">Tick the channels that belong in {group.groupName}.</p>
+        <p className="m-0 mb-3 text-[1.3rem] text-[#adadb8]">{t("dialog.tickInfo", { name })}</p>
       )}
 
       <input
         type="text"
-        aria-label="Search channels"
-        placeholder="Search channels"
+        aria-label={t("dialog.search")}
+        placeholder={t("dialog.search")}
         value={search}
         onChange={(event) => setSearch(event.target.value)}
         className="mb-3 w-full rounded border border-solid border-[#3a3a3d] bg-[#0e0e10] px-3 py-2 text-[1.4rem] text-[#efeff1] placeholder:text-[#adadb8] focus:border-purple-500 focus:outline-none"
       />
 
-      <ul aria-label="Channels" className="m-0 min-h-0 flex-1 list-none overflow-y-auto p-0">
+      <ul aria-label={t("dialog.channels")} className="m-0 min-h-0 flex-1 list-none overflow-y-auto p-0">
         {shown.map(({ channel, groupName }) => (
           <li key={channel.login} className="flex items-center gap-3 rounded px-2 py-1 hover:bg-white/[0.07]">
             <label
               className={`flex min-w-0 flex-1 items-center gap-3 ${group.default && (optimistic[channel.login] ?? groupName) === group.groupName ? "" : "cursor-pointer"}`}
-              title={group.default && (optimistic[channel.login] ?? groupName) === group.groupName ? `To move it out of ${group.groupName}, tick it into another group` : undefined}
+              title={group.default && (optimistic[channel.login] ?? groupName) === group.groupName ? t("dialog.leaveHint", { name }) : undefined}
             >
               <input
                 type="checkbox"
@@ -193,10 +197,10 @@ export default function GroupDetail({
               <img src={channel.channelImage} alt="" className="h-9 w-9 rounded-full bg-[#3a3a3d]" />
               <span data-testid="channel-name" className="min-w-0 flex-1 truncate">{channel.channelName}</span>
             </label>
-            <span data-testid="channel-group" className="shrink-0 text-[1.2rem] text-[#adadb8]">{groupName}</span>
+            <span data-testid="channel-group" className="shrink-0 text-[1.2rem] text-[#adadb8]">{groupLabelByName(groupName, groups, t)}</span>
           </li>
         ))}
-        {shown.length === 0 && <li className="px-2 py-4 text-[1.3rem] text-[#adadb8]">{query ? `No channels match "${search.trim()}"` : "No channels"}</li>}
+        {shown.length === 0 && <li className="px-2 py-4 text-[1.3rem] text-[#adadb8]">{query ? t("dialog.noMatch", { query: search.trim() }) : t("sidebar.noChannels")}</li>}
       </ul>
     </div>
   );
