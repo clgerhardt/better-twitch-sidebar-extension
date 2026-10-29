@@ -1,5 +1,5 @@
 import type { SidebarChannel } from "@src/pages/utils/layoutGroups";
-import { OFFLINE_AVATAR_CLASS, OFFLINE_LINK_CLASSES, isLiveRow, nativeRowsByLogin, selectors } from "./nativeRows";
+import { OFFLINE_AVATAR_CLASS, OFFLINE_LINK_CLASSES, isLiveRow, isSharedRow, nativeRowsByLogin, selectors } from "./nativeRows";
 import { liveRowTemplate } from "./rowTemplates";
 import { count, t } from "@src/pages/shared/i18n/store";
 
@@ -24,6 +24,9 @@ const syncDetails = (row: HTMLAnchorElement, channel: SidebarChannel, fromTwitch
     return;
   }
   if (!fromTwitchRow) setText(gameLine, channel.streamingContent ?? "");
+  // On a shared stream Twitch shows the viewers of everyone in it added up (the split is in its hover
+  // tooltip), while the API only has this channel's own count
+  if (fromTwitchRow && isSharedRow(row)) return;
   const viewers = count(channel.viewers); // "1.1K"
   const status = row.querySelector(STATUS);
   // The count appears twice: an abbreviated span ("1.1K") and, right after it, a paragraph ("1.1K viewers")

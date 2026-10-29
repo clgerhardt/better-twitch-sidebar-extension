@@ -1,9 +1,5 @@
 # Backlog
 
-## Shared-stream hover tooltip ("Live with")
-
-Hovering a shared stream's row (name with "+N") should show Twitch's tooltip with the title and the "Live with:" list. It is built (the content is copied from Twitch's own tooltip for the hidden native row) but has only been verified against the e2e fixture, not a real shared stream. Check it on a live shared stream, and consider using the same copy for other extras Twitch shows (e.g. Hype Train level).
-
 ## Translation follow-ups
 
 The extension works with Twitch in any language and its own text is translated into every language Twitch offers (see `docs/design/localization.md`). Left for later:
