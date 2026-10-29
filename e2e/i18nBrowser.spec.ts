@@ -111,6 +111,8 @@ test.describe("rows built by the extension", () => {
   });
 });
 
+const pseudo = (key: MessageKey) => translate(PSEUDO, undefined, key);
+
 // Every message is wrapped in brackets in the pseudo-locale, so any text that is not is text that was never
 // moved into the catalog. Names the user or Twitch supplies (channels, groups, accounts) are not ours.
 const untranslated = (root: Locator) =>
@@ -128,8 +130,7 @@ const untranslated = (root: Locator) =>
       if (e.closest(skip)) continue;
       for (const a of ["aria-label", "title", "placeholder"]) {
         const v = e.getAttribute(a);
-        // the dialog's icon buttons are named by identifiers (edit-group-name and so on), not by text
-        if (v && !/^(edit-group-name|delete-group|save-group-name|cancel-rename)$/.test(v)) check(v);
+        if (v) check(v);
       }
     }
     return [...new Set(found)];
@@ -154,11 +155,11 @@ test.describe("nothing is left out of the catalog", () => {
     await dialog.getByPlaceholder(/^\[/).first().fill("Alpha");
     await dialog.locator("form button[type=submit]").click();
     await expect(dialog.getByRole("heading", { level: 3 })).toHaveText("Alpha");
-    await dialog.getByRole("button", { name: "edit-group-name" }).click();
+    await dialog.getByRole("button", { name: pseudo("dialog.renameGroup") }).click();
     expect(await untranslated(dialog)).toEqual([]);
 
     // An error message under the field
-    await dialog.getByRole("button", { name: "cancel-rename" }).click();
+    await dialog.getByRole("button", { name: pseudo("dialog.cancelRename") }).click();
     await dialog.getByPlaceholder(/^\[/).first().fill("ab");
     await expect(dialog.getByTestId("dialog-panel")).toContainText("[");
     expect(await untranslated(dialog)).toEqual([]);
@@ -182,7 +183,8 @@ test.describe("nothing is left out of the catalog", () => {
 
 // Every language the extension offers: the sidebar, the dialog and the popup show its text, run in its
 // direction, and nothing spills out of its box however long the words are
-import { LANGUAGES } from "../src/pages/shared/i18n/languages";
+import { LANGUAGES, PSEUDO } from "../src/pages/shared/i18n/languages";
+import { translate, type MessageKey } from "../src/pages/shared/i18n/i18n";
 import type { Catalog } from "../src/pages/shared/i18n/catalog.en";
 
 test.describe("every language", () => {

@@ -6,8 +6,6 @@ The extension works with Twitch in any language and its own text is translated i
 - Have native speakers review the translations (all but English were drafted, not reviewed), in particular "Sin conexión" in Spanish, which was not checked against Twitch's own row.
 - Game names: Twitch's API (Helix) has no locale support (checked `locale`, `language`, `Accept-Language`), so a live channel with no native Twitch row shows the English name. Rows copied from Twitch's own keep Twitch's localized name.
 - Check the hover tooltip and the dialog with the longest languages on a live Twitch page (the tests check for overflow, not for looks).
-- The Manage Groups icon buttons are named by identifiers (`edit-group-name`, `delete-group`, `save-group-name`, `cancel-rename`), so a screen reader says those words in every language. Give them readable, translated names (this also changes the tests that find them).
-- Twitch shows full numbers on its own rows ("2860 espectadores") where we abbreviate ("2,9 mil"); match Twitch.
 
 
 ## Sync the hide toggles across devices
