@@ -88,12 +88,12 @@ export default function GroupDetail({
                 renameError ? "border-red-500" : "border-[#3a3a3d]"
               }`}
             />
-            <button type="submit" aria-label="save-group-name" disabled={!canSave} className="rounded p-1 text-purple-300 enabled:cursor-pointer enabled:hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40">
+            <button type="submit" aria-label={t("dialog.saveName")} disabled={!canSave} className="rounded p-1 text-purple-300 enabled:cursor-pointer enabled:hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40">
               <CheckIcon className="h-7 w-7" />
             </button>
             <button
               type="button"
-              aria-label="cancel-rename"
+              aria-label={t("dialog.cancelRename")}
               onClick={() => {
                 setRenaming(false);
                 setNewName(group.groupName);
@@ -116,12 +116,12 @@ export default function GroupDetail({
                   {t("dialog.makeDefault")}
                 </button>
               )}
-              <button type="button" aria-label="edit-group-name" onClick={() => setRenaming(true)} className="cursor-pointer rounded p-1 text-[#adadb8] hover:bg-white/10 hover:text-[#efeff1]">
+              <button type="button" aria-label={t("dialog.renameGroup")} onClick={() => setRenaming(true)} className="cursor-pointer rounded p-1 text-[#adadb8] hover:bg-white/10 hover:text-[#efeff1]">
                 <PencilIcon className="h-6 w-6" />
               </button>
               {!group.default && (
                 <>
-                  <button type="button" aria-label="delete-group" onClick={() => setConfirmDelete((open) => !open)} className="cursor-pointer rounded p-1 text-[#adadb8] hover:bg-white/10 hover:text-[#efeff1]">
+                  <button type="button" aria-label={t("dialog.deleteGroup")} onClick={() => setConfirmDelete((open) => !open)} className="cursor-pointer rounded p-1 text-[#adadb8] hover:bg-white/10 hover:text-[#efeff1]">
                     <TrashIcon className="h-6 w-6" />
                   </button>
                   {confirmDelete && (

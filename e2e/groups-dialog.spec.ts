@@ -206,12 +206,12 @@ test.describe("Manage Groups dialog", () => {
       const dialog = await open(twitchPage);
       await addGroup(dialog, "Alpha");
       await dialog.getByRole("button", { name: "Blue color" }).click();
-      await dialog.getByRole("button", { name: "edit-group-name" }).click();
+      await dialog.getByRole("button", { name: "Rename group" }).click();
       await dialog.getByLabel("New group name").fill("Bravo");
-      await dialog.getByRole("button", { name: "save-group-name" }).click();
+      await dialog.getByRole("button", { name: "Save name" }).click();
       await expect.poll(() => rail(groupButton(dialog, "Bravo"))).toBe("rgb(59, 130, 246)");
 
-      await dialog.getByRole("button", { name: "delete-group" }).click();
+      await dialog.getByRole("button", { name: "Delete group" }).click();
       await dialog.getByRole("button", { name: "Are you sure?" }).click();
       await addGroup(dialog, "Bravo");
       expect(await rail(groupButton(dialog, "Bravo"))).toBe(PURPLE);
@@ -327,9 +327,9 @@ test.describe("Manage Groups dialog", () => {
       await addGroup(dialog, "Zebra Squad");
       await dialog.getByLabel("FixtureStreak").check();
 
-      await dialog.getByRole("button", { name: "edit-group-name" }).click();
+      await dialog.getByRole("button", { name: "Rename group" }).click();
       await dialog.getByPlaceholder("Updated Name").fill("Quagga Crew");
-      await dialog.getByRole("button", { name: "save-group-name" }).click();
+      await dialog.getByRole("button", { name: "Save name" }).click();
 
       await expect(groupButton(dialog, "Quagga Crew")).toContainText("1");
       await expect(dialog).not.toContainText("Zebra Squad");
@@ -345,10 +345,10 @@ test.describe("Manage Groups dialog", () => {
     test("a group can be renamed to a different capitalisation of its own name", async ({ twitchPage }) => {
       const dialog = await open(twitchPage);
       await addGroup(dialog, "zebra squad");
-      await dialog.getByRole("button", { name: "edit-group-name" }).click();
+      await dialog.getByRole("button", { name: "Rename group" }).click();
       await dialog.getByPlaceholder("Updated Name").fill("Zebra Squad");
       await expect(dialog).not.toContainText("already exists");
-      await dialog.getByRole("button", { name: "save-group-name" }).click();
+      await dialog.getByRole("button", { name: "Save name" }).click();
 
       await expect(dialog.getByRole("heading", { name: "Zebra Squad", exact: true })).toBeVisible();
       await expect(dialog.getByText("zebra squad", { exact: true })).toHaveCount(0);
@@ -358,18 +358,18 @@ test.describe("Manage Groups dialog", () => {
       const dialog = await open(twitchPage);
       await addGroup(dialog, "Alpha");
       await addGroup(dialog, "Beta");
-      await dialog.getByRole("button", { name: "edit-group-name" }).click();
+      await dialog.getByRole("button", { name: "Rename group" }).click();
       await dialog.getByPlaceholder("Updated Name").fill("alpha");
       await expect(dialog).toContainText("Group name already exists");
-      await expect(dialog.getByRole("button", { name: "save-group-name" })).toBeDisabled();
+      await expect(dialog.getByRole("button", { name: "Save name" })).toBeDisabled();
     });
 
     test("renaming can be cancelled", async ({ twitchPage }) => {
       const dialog = await open(twitchPage);
       await addGroup(dialog, "Zebra Squad");
-      await dialog.getByRole("button", { name: "edit-group-name" }).click();
+      await dialog.getByRole("button", { name: "Rename group" }).click();
       await dialog.getByPlaceholder("Updated Name").fill("Something else");
-      await dialog.getByRole("button", { name: "cancel-rename" }).click();
+      await dialog.getByRole("button", { name: "Cancel rename" }).click();
       await expect(dialog.getByPlaceholder("Updated Name")).toHaveCount(0);
       await expect(dialog.getByRole("heading", { name: "Zebra Squad" })).toBeVisible();
     });
@@ -380,7 +380,7 @@ test.describe("Manage Groups dialog", () => {
       await dialog.getByLabel("FixtureStreak").check();
       await expect(groupButton(dialog, "Ungrouped")).toContainText("2");
 
-      await dialog.getByRole("button", { name: "delete-group" }).click();
+      await dialog.getByRole("button", { name: "Delete group" }).click();
       await dialog.getByRole("button", { name: "Are you sure?" }).click();
 
       await expect(dialog).not.toContainText("Zebra Squad");
@@ -393,7 +393,7 @@ test.describe("Manage Groups dialog", () => {
     test("deleting needs a second click", async ({ twitchPage }) => {
       const dialog = await open(twitchPage);
       await addGroup(dialog, "Zebra Squad");
-      await dialog.getByRole("button", { name: "delete-group" }).click();
+      await dialog.getByRole("button", { name: "Delete group" }).click();
       await expect(dialog.getByRole("button", { name: "Are you sure?" })).toBeVisible();
       await expect(groupButton(dialog, "Zebra Squad")).toBeVisible();
     });
@@ -401,16 +401,16 @@ test.describe("Manage Groups dialog", () => {
     test("the default group can be renamed but not deleted", async ({ twitchPage }) => {
       const dialog = await open(twitchPage);
       await expect(dialog).toContainText("default group");
-      await expect(dialog.getByRole("button", { name: "edit-group-name" })).toHaveCount(1);
-      await expect(dialog.getByRole("button", { name: "delete-group" })).toHaveCount(0);
+      await expect(dialog.getByRole("button", { name: "Rename group" })).toHaveCount(1);
+      await expect(dialog.getByRole("button", { name: "Delete group" })).toHaveCount(0);
       await expect(dialog.getByRole("button", { name: "Make default" })).toHaveCount(0);
     });
 
     test("renaming the default group keeps its channels and it stays the default", async ({ twitchPage }) => {
       const dialog = await open(twitchPage);
-      await dialog.getByRole("button", { name: "edit-group-name" }).click();
+      await dialog.getByRole("button", { name: "Rename group" }).click();
       await dialog.getByLabel("New group name").fill("Inbox");
-      await dialog.getByRole("button", { name: "save-group-name" }).click();
+      await dialog.getByRole("button", { name: "Save name" }).click();
       await expect(groupButton(dialog, "Inbox")).toContainText("Default");
       await expect(groupButton(dialog, "Inbox")).toHaveAttribute("aria-pressed", "true");
       await expect(dialog.getByRole("list", { name: "Groups" })).not.toContainText("Ungrouped");
@@ -427,11 +427,11 @@ test.describe("Manage Groups dialog", () => {
       await expect(groupButton(dialog, "Ungrouped")).not.toContainText("Default");
       // The old default keeps its channels and can now be deleted: they move to the new default
       await groupButton(dialog, "Ungrouped").click();
-      await expect(dialog.getByRole("button", { name: "delete-group" })).toBeVisible();
+      await expect(dialog.getByRole("button", { name: "Delete group" })).toBeVisible();
       const members = dialog.locator("input[type=checkbox]:checked");
       await expect(members).not.toHaveCount(0);
       const channels = await members.count();
-      await dialog.getByRole("button", { name: "delete-group" }).click();
+      await dialog.getByRole("button", { name: "Delete group" }).click();
       await dialog.getByRole("button", { name: "Are you sure?" }).click();
       await expect(dialog.getByRole("list", { name: "Groups" })).not.toContainText("Ungrouped");
       await expect(groupButton(dialog, "Alpha")).toHaveAttribute("aria-pressed", "true");

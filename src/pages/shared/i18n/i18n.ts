@@ -39,5 +39,10 @@ export const translate = (locale: string, catalog: Catalog | undefined, key: Mes
 export type Translator = (key: MessageKey, params?: Params) => string;
 export const tEn: Translator = (key, params) => translate("en", undefined, key, params);
 
-// A count the way people read it in that language ("2.8K", "2,8 mil")
-export const formatCount = (locale: string, count: number): string => new Intl.NumberFormat(intlLocale(locale), { notation: "compact" }).format(count);
+// Twitch writes viewer counts out in full in these languages ("1008", "1.008") and abbreviates them in the
+// others ("1K", "7,2 mil"); the sidebar follows Twitch
+const FULL_COUNT_LANGUAGES = new Set(["es", "de", "ru", "ja", "ko", "zh-CN", "zh-TW", "pl", "it", "uk"]);
+
+// A count the way Twitch shows it in that language
+export const formatCount = (locale: string, count: number): string =>
+  new Intl.NumberFormat(intlLocale(locale), FULL_COUNT_LANGUAGES.has(locale) ? {} : { notation: "compact" }).format(count);

@@ -126,7 +126,10 @@ test.describe("turning a key into text", () => {
 
   test("shows counts the way people read them in each language", () => {
     expect(formatCount("en", 2800)).toBe("2.8K");
-    expect(formatCount("es", 2800)).toMatch(/2,8\s*mil/);
+    expect(formatCount("pt-BR", 2800)).toMatch(/2,8\s*mil/);
+    // Twitch writes the number out in full in these
+    expect(formatCount("es", 2800)).toBe("2800");
+    expect(formatCount("de", 2800)).toBe("2.800");
     expect(formatCount("en", 40)).toBe("40");
     expect(formatCount("ar", 40)).toBeTruthy();
   });
