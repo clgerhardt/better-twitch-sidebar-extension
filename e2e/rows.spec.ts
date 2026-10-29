@@ -147,7 +147,7 @@ test("a shared-stream row keeps its '+1' name and Twitch's game on the game line
   const page = await openTwitch();
   await openGroup(page);
 
-  for (const [login, game, viewers] of [["fixtureshared", "Z1: Battle Royale", "2.5K"], ["fixturesharedstreak", "Z1: Battle Royale", "40"]]) {
+  for (const [login, game, viewers] of [["fixtureshared", "Z1: Battle Royale", "619"], ["fixturesharedstreak", "Z1: Battle Royale", "619"]]) {
     const row = rowFor(page, login);
     // The name block is untouched: the channel name, then " +1"
     const names = await row.locator("[data-a-target=side-nav-card-metadata] > div:first-child p").allTextContents();
@@ -155,6 +155,7 @@ test("a shared-stream row keeps its '+1' name and Twitch's game on the game line
     // The game is on the game line, and nowhere in the name block
     expect(names.join(" ")).not.toContain(game);
     await expect(row.locator("p[dir=auto]")).toHaveText(game);
+    // Twitch's count is everyone's added up, so a shared row keeps it instead of the channel's own
     await expect(row).toContainText(`${viewers} viewers`);
   }
   await expect(rowFor(page, "fixturesharedstreak")).toContainText("Watch Streak");
