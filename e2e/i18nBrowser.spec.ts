@@ -211,8 +211,9 @@ test.describe("every language", () => {
       await expect(popup.locator("html")).toHaveAttribute("dir", dir);
       await popup.getByRole("button", { name: new RegExp(`^${(catalog["popup.hideSections"] as string).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`) }).click();
       expect(await popup.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
-      const popupOverflow = await popup.evaluate(() => [...document.querySelectorAll<HTMLElement>("body *")].filter((e) => e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflowX === "visible" && e.clientWidth > 0 && !e.closest("select")).map((e) => e.tagName + ":" + (e.textContent ?? "").slice(0, 30)));
-      expect(popupOverflow).toEqual([]);
+      // The section opens with a transition, so measure until it has settled
+      const popupOverflow = () => popup.evaluate(() => [...document.querySelectorAll<HTMLElement>("body *")].filter((e) => e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflowX === "visible" && e.clientWidth > 0 && !e.closest("select")).map((e) => e.tagName + ":" + (e.textContent ?? "").slice(0, 30)));
+      await expect.poll(popupOverflow).toEqual([]);
     });
   }
 });
