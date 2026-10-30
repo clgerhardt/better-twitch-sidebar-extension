@@ -25,6 +25,9 @@ const es: Catalog = {
   "popup.sync.offHint": "Los cambios se quedan en este dispositivo. Al volver a activarla, se sustituyen por tus grupos sincronizados.",
   "popup.sync.turnOff": "Desactivar",
   "popup.sync.turnOn": "Activar",
+  "popup.sync.check": "Comprobar la sincronización de Chrome",
+  "popup.sync.chromeOn": "La sincronización de Chrome está activada en este perfil. Comprueba que Extensiones esté marcado en los ajustes de sincronización de Chrome.",
+  "popup.sync.chromeOff": "La sincronización de Chrome está desactivada, así que tus grupos se quedan en este dispositivo. Inicia sesión en Chrome y activa la sincronización.",
 
   // Connecting to Twitch
   "guest.signedIn": "Has iniciado sesión en Twitch como {login}. Conecta la extensión para usar tus grupos.",

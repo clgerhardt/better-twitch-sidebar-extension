@@ -15,6 +15,8 @@ Your groups, your followed-channel list, your settings, and your Twitch login to
 
 **Syncing groups across your devices.** Your groups are also copied to `chrome.storage.sync`, so they follow you to your other browsers where you use Chrome with sync turned on. This covers the group names and their order, which group is the default, group colors, and which of your followed channels (by their Twitch login names) is in which group. It does not include your login token, your followed-channel list, or your settings. Chrome sends this to Google as part of your browser's own sync, under your Google account and its sync settings; the extension does not send it anywhere itself, and the developer cannot see it. Without Chrome sync, `chrome.storage.sync` only stays on your device. The copy is kept separately for each Twitch account. You can turn this off with "Turn off" next to "Groups sync across your devices" in the extension's popup, which stops further syncing and does not delete what was already synced. Turning it on again replaces this device's groups with the synced copy.
 
+**Checking that Chrome sync is on.** The popup has a "Check Chrome sync" button. Tapping it makes Chrome ask whether to let the extension "know your email address" (the `identity.email` permission, which is optional and not requested at install). The extension uses it only to learn whether Chrome sync is turned on, to tell you if your groups are staying on this device; it does not read, store, or send the address. If you decline, nothing changes. You can take the permission back in `chrome://extensions` under the extension's details.
+
 ## Who the extension talks to
 
 Only Twitch's own servers:

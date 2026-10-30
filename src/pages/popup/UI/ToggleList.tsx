@@ -15,6 +15,16 @@ type ToggleItem = {
 
 const HIDE_OPEN_KEY = 'popupHideSectionsOpen';
 
+// Whether Chrome sync is on is only told to extensions that hold the identity.email permission (the extension
+// never reads the address). The permission is optional, so nobody sees an install warning for it: it is asked
+// for when the user taps "Check Chrome sync", and the answer is shown on every visit after that.
+type ChromeSync = 'unknown' | 'on' | 'off';
+const EMAIL_PERMISSION = { permissions: ['identity.email'] };
+const readChromeSync = async (): Promise<ChromeSync> => {
+  const info = await chrome.identity.getProfileUserInfo({ accountStatus: 'SYNC' as chrome.identity.AccountStatus });
+  return info.id ? 'on' : 'off';
+};
+
 // Whether the user left the group of hide switches open; the popup is a page of its own, so localStorage is fine
 // for this small convenience, and it must work without it
 const readHideOpen = (): boolean => {
@@ -29,6 +39,7 @@ export default function ToggleList() {
   const t = useT();
   const [items, setItems] = useState<ToggleItem[]>([]);
   const [hideOpen, setHideOpen] = useState(readHideOpen);
+  const [chromeSync, setChromeSync] = useState<ChromeSync>('unknown');
 
   useEffect(() => {
     getLocalStorage(GLOBAL_STATE_KEY).then((globalState: any) => {
@@ -44,6 +55,16 @@ export default function ToggleList() {
       setItems(initialItems);
     });
   }, []);
+
+  useEffect(() => {
+    chrome.permissions.contains(EMAIL_PERMISSION).then(async granted => {
+      if (granted) setChromeSync(await readChromeSync());
+    });
+  }, []);
+
+  const checkChromeSync = async () => {
+    if (await chrome.permissions.request(EMAIL_PERMISSION)) setChromeSync(await readChromeSync());
+  };
 
   const updateInLocalStorageById = async (id: number, value: boolean) => {
     const currentState: any = await getLocalStorage(GLOBAL_STATE_KEY);
@@ -116,6 +137,20 @@ export default function ToggleList() {
         <p className="m-0 mt-0.5 text-xs text-[#adadb8]">
           {item.enabled ? t('popup.sync.onHint') : t('popup.sync.offHint')}
         </p>
+        {item.enabled && chromeSync === 'unknown' && (
+          <button
+            type="button"
+            onClick={checkChromeSync}
+            className="m-0 mt-0.5 cursor-pointer border-0 bg-transparent p-0 text-xs text-purple-300 underline hover:text-purple-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300"
+          >
+            {t('popup.sync.check')}
+          </button>
+        )}
+        {item.enabled && chromeSync !== 'unknown' && (
+          <p data-testid="chrome-sync-state" className="m-0 mt-0.5 text-xs text-[#adadb8]">
+            {chromeSync === 'on' ? t('popup.sync.chromeOn') : t('popup.sync.chromeOff')}
+          </p>
+        )}
       </div>
       <button
         type="button"
