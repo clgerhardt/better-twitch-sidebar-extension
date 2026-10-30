@@ -221,3 +221,55 @@ test.describe("the group of hide switches", () => {
     expect(openY - closedY).toBeLessThan(260);
   });
 });
+
+test.describe("the Chrome sync check", () => {
+  // Chrome's own permission prompt cannot be clicked in a test, so the popup's answers are stubbed
+  const stub = (page: Page, profile: { id: string }) =>
+    page.evaluate((info) => {
+      const w = window as any;
+      w.chrome.permissions.request = async () => true;
+      w.chrome.identity.getProfileUserInfo = async () => info;
+    }, profile);
+
+  const openPopup = async (context: import("@playwright/test").BrowserContext, extensionId: string) => {
+    const popup = await context.newPage();
+    await popup.goto(`chrome-extension://${extensionId}/src/pages/popup/index.html`);
+    return popup;
+  };
+
+  test.beforeEach(async ({ twitchPage, worker }) => {
+    await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get("pageAccount")).pageAccount?.status)).toBe("signed_in");
+  });
+
+  test("offers a check, which asks for the permission only when tapped", async ({ context, extensionId }) => {
+    const popup = await openPopup(context, extensionId);
+    await expect(popup.getByRole("button", { name: "Check Chrome sync" })).toBeVisible();
+    await expect(popup.getByTestId("chrome-sync-state")).toHaveCount(0);
+  });
+
+  test("says when Chrome sync is on", async ({ context, extensionId }) => {
+    const popup = await openPopup(context, extensionId);
+    await stub(popup, { id: "123" });
+    await popup.getByRole("button", { name: "Check Chrome sync" }).click();
+    await expect(popup.getByTestId("chrome-sync-state")).toContainText("Chrome sync is on for this profile.")
+    await expect(popup.getByTestId("chrome-sync-state")).toContainText("Extensions is ticked");
+    await expect(popup.getByRole("button", { name: "Check Chrome sync" })).toHaveCount(0);
+  });
+
+  test("says when Chrome sync is off, and the groups stay on this device", async ({ context, extensionId }) => {
+    const popup = await openPopup(context, extensionId);
+    await stub(popup, { id: "" });
+    await popup.getByRole("button", { name: "Check Chrome sync" }).click();
+    await expect(popup.getByTestId("chrome-sync-state")).toContainText("Chrome sync is off, so your groups stay on this device");
+  });
+
+  test("a declined permission changes nothing", async ({ context, extensionId }) => {
+    const popup = await openPopup(context, extensionId);
+    await popup.evaluate(() => {
+      (window as any).chrome.permissions.request = async () => false;
+    });
+    await popup.getByRole("button", { name: "Check Chrome sync" }).click();
+    await expect(popup.getByRole("button", { name: "Check Chrome sync" })).toBeVisible();
+    await expect(popup.getByTestId("chrome-sync-state")).toHaveCount(0);
+  });
+});

@@ -29,6 +29,9 @@ export const en = {
   "popup.sync.offHint": "Changes stay on this device. Turning it on again replaces them with your synced groups.",
   "popup.sync.turnOff": "Turn off",
   "popup.sync.turnOn": "Turn on",
+  "popup.sync.check": "Check Chrome sync",
+  "popup.sync.chromeOn": "Chrome sync is on for this profile. Make sure Extensions is ticked in Chrome's sync settings.",
+  "popup.sync.chromeOff": "Chrome sync is off, so your groups stay on this device. Sign in to Chrome and turn on sync.",
 
   // Connecting to Twitch
   "guest.signedIn": "You're signed in to Twitch as {login}. Connect the extension to use your groups.",

@@ -23,6 +23,9 @@
     "storage",
     "identity"
   ],
+  "optional_permissions": [
+    "identity.email"
+  ],
   "host_permissions": [
     "https://*.twitch.tv/*"
   ],
